@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo $PATH)",
+      "Bash(grep:*)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "pyright@claude-code-lsps": true,
+    "vtsls@claude-code-lsps": true,
+    "rust-analyzer@claude-code-lsps": true,
+    "sourcekit-lsp@claude-code-lsps": true,
+    "swift-lsp@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-code-lsps": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/Piebald-AI/claude-code-lsps.git"
+      }
+    }
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "xhigh",
+  "skipDangerousModePermissionPrompt": true,
+  "editorMode": "vim",
+  "fileCheckpointingEnabled": false
+}
