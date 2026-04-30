@@ -43,4 +43,4 @@ git_prompt() {
 }
 
 # Main status line output
-printf "\033[32m$(whoami)@$(hostname -s)\033[0m:\033[34m$(pwd)\033[0m$(git_prompt)"
+printf "\033[32m$(whoami)@${HOSTNAME%%.*}\033[0m:\033[34m$(pwd)\033[0m$(git_prompt)"
