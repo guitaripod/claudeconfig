@@ -15,9 +15,11 @@
     "pyright@claude-code-lsps": true,
     "vtsls@claude-code-lsps": true,
     "rust-analyzer@claude-code-lsps": true,
-    "sourcekit-lsp@claude-code-lsps": true,
     "swift-lsp@claude-plugins-official": true,
-    "pyright-lsp@claude-plugins-official": true
+    "pyright-lsp@claude-plugins-official": true,
+    "cloudflare@claude-plugins-official": true,
+    "revenuecat@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-code-lsps": {
