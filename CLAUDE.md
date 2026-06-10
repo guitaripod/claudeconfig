@@ -12,7 +12,7 @@
 
 ## Dotfiles
 
-- Global Claude Code config (cross-platform: `~/.claude/CLAUDE.md`, `settings.json`, `statusline-command.sh`, `skills/`) lives in `~/claudeconfig` (public repo: `guitaripod/claudeconfig`) and is symlinked into `~/.claude/` on both Arch and macOS. Edit in the repo, commit, push.
+- Global Claude Code config (cross-platform: `~/.claude/CLAUDE.md`, `settings.json`, `statusline-command.sh`, `skills/`, `workflows/`) lives in `~/claudeconfig` (public repo: `guitaripod/claudeconfig`) and is symlinked into `~/.claude/` on both Arch and macOS. Edit in the repo, commit, push.
 - macOS configs live in `~/macconfig` (public repo: `guitaripod/macconfig`). After modifying any tracked dotfile (`.bashrc`, `.gitconfig`, `.swift-format`, Karabiner, etc.), run `~/macconfig/scripts/update-from-system.sh` and commit the changes.
 - Arch Linux configs live in `~/dotfiles` (public repo: `guitaripod/archconfig`).
 - Neovim config (cross-platform) lives in `~/.config/nvim/` (public repo: `guitaripod/rawdog.ml.nvim`), cloned by both archconfig and macconfig `link.sh`. Edit in `~/.config/nvim/`, commit, push — do not duplicate into the dotfiles repos.

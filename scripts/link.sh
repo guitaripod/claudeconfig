@@ -40,4 +40,5 @@ link CLAUDE.md
 link settings.json
 link statusline-command.sh
 link skills
+link workflows
 echo "=== Done ==="
