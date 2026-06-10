@@ -15,6 +15,10 @@
 - **NEVER upload App Store binaries built on a beta macOS.** Apple rejects them post-submission with ITMS-90111 ("must use the latest Xcode and SDK Release Candidates") — the message is misleading boilerplate; the real trigger is `BuildMachineOSBuild` in the app's Info.plist carrying a beta host-OS build number (beta pattern: digits + letter + `5xxx` + trailing lowercase letter, e.g. `26A5353q`). The Xcode/SDK versions can be fully release and it still bounces. Diagnose with `sw_vers -buildVersion` on the build host and `PlistBuddy -c "Print BuildMachineOSBuild" App.app/Info.plist` on the artifact.
 - Fix: build release binaries on a stable-macOS GitHub Actions runner with manual signing (p12 + provisioning profile + ASC API key as repo secrets, `altool --upload-app`). Reference workflow: `guitaripod/master-of-flags` → `.github/workflows/testflight.yml`, including a guard step that fails the run if the runner's macOS build number matches the beta pattern.
 
+## Midgar operations vault (macOS operator machine)
+
+- Everything needed to autonomously operate Midgar's apps and services lives in `~/.config/midgar/` (machine-local, chmod 600, never in git): `credentials.env` (ASC API key/issuer, RevenueCat v2 secret keys per project, signing paths), `signing/` (distribution p12 + password, provisioning profiles, AICredits deploy key), and `OPERATIONS.md` — the manifest documenting App Store Connect, RevenueCat, the mako credits backend, and release-CI mechanics. Read `OPERATIONS.md` first when doing store/revenue/release work on any Midgar app, and keep it accurate after changes.
+
 ## Dotfiles
 
 - Global Claude Code config (cross-platform: `~/.claude/CLAUDE.md`, `settings.json`, `statusline-command.sh`, `skills/`, `workflows/`) lives in `~/claudeconfig` (public repo: `guitaripod/claudeconfig`) and is symlinked into `~/.claude/` on both Arch and macOS. Edit in the repo, commit, push.
