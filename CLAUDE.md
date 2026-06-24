@@ -29,6 +29,12 @@
 
 - Everything needed to autonomously operate Midgar's apps and services lives in `~/.config/midgar/` (machine-local, chmod 600, never in git): `credentials.env` (ASC API key/issuer, RevenueCat v2 secret keys per project, signing paths), `signing/` (distribution p12 + password, provisioning profiles, AICredits deploy key), and `OPERATIONS.md` — the manifest documenting App Store Connect, RevenueCat, the mako credits backend, and release-CI mechanics. Read `OPERATIONS.md` first when doing store/revenue/release work on any Midgar app, and keep it accurate after changes.
 
+## Finnish house-hunting (kontu)
+
+- To search for / evaluate a house to buy in Finland, use the **`kontu`** CLI (repo `~/Dev/kontu`, Cloudflare Worker backend; binary on PATH or `~/Dev/kontu/tui/target/debug/kontu`). It is agent-native: run **`kontu guide`** for the full playbook and `kontu <cmd> --help` per command. Always pass `--json`.
+- When the user's house request is vague, **ask 2–4 clarifying questions first** (budget, area(s), type, must-haves like shore/year/heating, deal-breakers, cost-model horizon), then encode the answers as filters.
+- Typical flow for "find a lakeside house in Outokumpu under 120k, 20-yr cost": `kontu pull Outokumpu` (ingest real listings — MUST run from this machine; the Worker's IP is portal-blocked) → `kontu list --municipality Outokumpu --price-max 120000 --shore oma_ranta --json` → `kontu cost <id> --horizon 20 --json` / `kontu risk <id> --json` / `kontu compare <ids> --json` → `kontu open <id>`. The cost & risk models run locally and are deterministic.
+
 ## Dotfiles
 
 - Global Claude Code config (cross-platform: `~/.claude/CLAUDE.md`, `settings.json`, `statusline-command.sh`, `skills/`, `workflows/`) lives in `~/claudeconfig` (public repo: `guitaripod/claudeconfig`) and is symlinked into `~/.claude/` on both Arch and macOS. Edit in the repo, commit, push.
