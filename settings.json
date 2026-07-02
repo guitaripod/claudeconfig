@@ -7,6 +7,7 @@
     "deny": [],
     "defaultMode": "default"
   },
+  "model": "claude-fable-5[1m]",
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
@@ -30,9 +31,11 @@
     }
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "xhigh",
+  "effortLevel": "low",
   "ultracode": true,
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "theme": "dark",
   "editorMode": "vim",
   "fileCheckpointingEnabled": false
