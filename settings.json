@@ -32,7 +32,6 @@
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "low",
-  "ultracode": true,
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
