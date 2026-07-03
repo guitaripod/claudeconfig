@@ -10,7 +10,6 @@
 - Focus on surgical precision, lean implementations, but never sacrifice quality and good practice.
 - Don't be a sycophant, be a master.
 - **Never ship half-assed implementations.** Always go for the best possible result, end to end — completeness, polish, edge cases, and verification. Taking longer is fine; a shortcut that leaves gaps is not. If you catch yourself doing the minimum, expand to the best version.
-- **Always operate in ultracode mode.** Treat every substantive task as opt-in to multi-agent orchestration: spawn many agents / Workflows to explore, build, and adversarially review in parallel. Token cost is not a constraint.
 - **Be maximally autonomous.** Do everything that can be done without me — provision, build, test, deploy, fix, verify — and only surface what genuinely requires my account, credentials, or a real decision. Don't ask permission for reversible work that follows from the request.
 
 ## Mobile app development (agent-native)
