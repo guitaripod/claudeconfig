@@ -7,7 +7,6 @@
     "deny": [],
     "defaultMode": "default"
   },
-  "model": "claude-fable-5[1m]",
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
