@@ -17,7 +17,8 @@ WORKERS = min(6, (os.cpu_count() or 4))
 
 _enc = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], capture_output=True, text=True).stdout
 NVENC = "h264_nvenc" in _enc
-GRADE = (f"scale={OW}:{OH}:force_original_aspect_ratio=increase,crop={OW}:{OH}," + CFG["grade"])
+OSW, OSH = int(round(OW * 1.06 / 2)) * 2, int(round(OH * 1.06 / 2)) * 2
+GRADE = (f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,crop={OW}:{OH}," + CFG["grade"])
 
 
 def zoom(a, d):
@@ -43,6 +44,7 @@ def vf(s):
         if "shake" in eff: p.append(shake(16, 0.30))
     else:
         if "punch" in eff: p.append(zoom(0.08, d))
+        else: p.append(zoom(0.06, d))
         if "beatflash" in eff: p.append("eq=brightness='if(lt(t\\,0.04)\\,0.5\\,0)':eval=frame")
         if "dropflash" in eff:
             p.append("eq=brightness='if(lt(t\\,0.06)\\,0.85\\,if(lt(t\\,0.18)\\,0.85*(1-(t-0.06)/0.12)\\,0))':eval=frame")
