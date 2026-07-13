@@ -7,6 +7,7 @@
     "deny": [],
     "defaultMode": "default"
   },
+  "model": "opus[1m]",
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
@@ -31,7 +32,6 @@
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "low",
-  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
