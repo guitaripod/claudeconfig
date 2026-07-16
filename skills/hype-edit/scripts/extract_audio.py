@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """extract_audio.py <workdir> <song_path_or_url> [--fps 30] [--w 1920] [--h 1080]
-   [--start 0] [--end 0] [--keep-tail]
+   [--start 0] [--end 0] [--keep-tail] [--pitch 1.0]
+
+--pitch shifts pitch by the given ratio (e.g. 1.04 = +4%) with rubberband, tempo
+unchanged — use to dodge platform Content-ID matching. Applied before analysis so
+the beat grid and both WAVs stay sample-consistent.
 
 Downloads/extracts the song, trims trailing silence, frame-aligns the timeline, and
 writes sample-exact analysis (22.05k mono) + master (44.1k stereo) WAVs. Emits
@@ -25,6 +29,8 @@ def main():
     ap.add_argument("--start", type=float, default=0.0)
     ap.add_argument("--end", type=float, default=0.0, help="hard end (s); 0 = whole song")
     ap.add_argument("--keep-tail", action="store_true", help="don't trim trailing silence")
+    ap.add_argument("--pitch", type=float, default=1.0,
+                    help="pitch ratio, tempo preserved (1.04 = +4%%; anti-Content-ID)")
     a = ap.parse_args()
     root = os.path.abspath(a.root)
 
@@ -37,6 +43,16 @@ def main():
         song = subprocess.run(["bash", "-c", f"ls {root}/song_src.*"],
                               capture_output=True, text=True).stdout.split("\n")[0].strip()
     assert os.path.exists(song), f"song not found: {song}"
+
+    if a.pitch != 1.0:
+        pitched = f"{root}/song_pitched.wav"
+        r = sh(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", song,
+                "-vn", "-af", f"rubberband=pitch={a.pitch}:transients=crisp",
+                "-c:a", "pcm_s24le", pitched])
+        if r.returncode != 0:
+            sys.exit("pitch shift failed (ffmpeg needs librubberband):\n" + r.stderr[-500:])
+        song = pitched
+        print(f"pitch x{a.pitch} → song_pitched.wav")
 
     total = float(sh(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                       "-of", "csv=p=0", song]).stdout.strip())
@@ -82,6 +98,7 @@ def main():
             "colorbalance=rs=-0.06:gs=-0.02:bs=0.08:rm=0.02:bm=-0.02:rh=0.10:gh=0.03:bh=-0.08,"
             "curves=master='0/0 0.10/0.03 0.5/0.5 0.9/0.97 1/1',vignette=angle=PI/6"),
         "hero_overrides": cfg.get("hero_overrides", []),
+        "pitch": a.pitch,
     })
     json.dump(cfg, open(f"{root}/project.json", "w"), indent=1)
     print(f"dur={dur:.3f}s ({cfg['total_frames']} frames @ {a.fps}fps) "

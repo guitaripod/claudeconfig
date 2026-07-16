@@ -44,11 +44,11 @@ PY=<workdir>/.venv/bin/python       # use THIS python for build_spine.py, scenes
 ### Phase 0 — Audio is the boss
 
 ```bash
-$PY $S/extract_audio.py <workdir> "<song file or URL>" [--start S --end E] [--w 1920 --h 1080 --fps 30]
+$PY $S/extract_audio.py <workdir> "<song file or URL>" [--start S --end E] [--w 1920 --h 1080 --fps 30] [--pitch 1.04]
 $PY $S/build_spine.py <workdir>
 ```
 
-`extract_audio.py` downloads/extracts the song, **trims trailing silence**, frame-aligns the timeline, writes **sample-exact** analysis (22.05k mono) + master (44.1k stereo) WAVs, and seeds `project.json`. `build_spine.py` runs octave-corrected tempo detection, a **phase-locked uniform beat grid** (metronomic — no per-beat jitter), an energy curve, drop detection, sections, and a `cutlist` tiled 0→dur on the beat grid with hero slots. Read its printout: BPM/`cv` (want `cv`≈0), drop time, hero placement, and the density gradient (drops should have the most cuts). If tempo looks octave-wrong, that's the thing to fix here.
+`extract_audio.py` downloads/extracts the song, optionally **pitch-shifts it** (`--pitch 1.04` = +4% via rubberband, tempo preserved — use when the edit is bound for TikTok/IG/YT and the track would trip Content-ID; ±3–5% is enough), **trims trailing silence**, frame-aligns the timeline, writes **sample-exact** analysis (22.05k mono) + master (44.1k stereo) WAVs, and seeds `project.json`. `build_spine.py` runs octave-corrected tempo detection, a **phase-locked uniform beat grid** (metronomic — no per-beat jitter), an energy curve, drop detection, sections, and a `cutlist` tiled 0→dur on the beat grid with hero slots. Read its printout: BPM/`cv` (want `cv`≈0), drop time, hero placement, and the density gradient (drops should have the most cuts). If tempo looks octave-wrong, that's the thing to fix here.
 
 ### Phase 1 — Source the footage (you drive this)
 
