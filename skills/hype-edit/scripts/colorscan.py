@@ -23,7 +23,8 @@ def features(path):
     pitch = ((g > 50) & (g < 205) & (g > r * 1.08) & (g > b * 1.12)).mean((1, 2))  # grass
     sat = ((mx - mn) / (mx + 1.0) > 0.45).mean((1, 2))
     detail = gray.std((1, 2)); bright = (gray > 210).mean((1, 2))
-    return greencard, pitch, sat, detail, bright
+    white = ((mx > 200) & ((mx - mn) / (mx + 1.0) < 0.16)).mean((1, 2))
+    return greencard, pitch, sat, detail, bright, white
 
 
 def main():
@@ -34,9 +35,10 @@ def main():
     for path in sorted(glob.glob(f"{ROOT}/src/*.mp4")):
         sid = os.path.splitext(os.path.basename(path))[0]
         if sid not in by: continue
-        gc, pit, sat, det, bri = features(path)
-        # per-frame "graphic": little pitch AND (flat OR oversaturated OR big bright logo/number)
-        bad = ((pit < 0.10) & ((det < 20) | (sat > 0.50) | (bri > 0.20))) | (gc > 0.6)
+        gc, pit, sat, det, bri, wht = features(path)
+        # per-frame "graphic": little pitch AND (flat OR oversaturated OR big bright logo/number),
+        # a green promo card, or a white replay-card / typography overlay
+        bad = ((pit < 0.10) & ((det < 20) | (sat > 0.50) | (bri > 0.20))) | (gc > 0.6) | (wht > 0.30)
         bad_masks[sid] = bad.astype(np.uint8)
         def sl(arr, s, e):
             i0, i1 = int(s * CFPS), max(int(e * CFPS), int(s * CFPS) + 1)
@@ -44,7 +46,8 @@ def main():
             return seg if len(seg) else arr[max(i0 - 1, 0):i0 + 1]
         for c in by[sid]:
             c["green"] = round(float((sl(gc, c["start"], c["end"]) > 0.7).mean()), 3)
-            c["graphic"] = bool(sl(bad, c["start"], c["end"]).mean() > 0.45)
+            c["graphic"] = bool(sl(bad, c["start"], c["end"]).mean() > 0.45
+                               or (sl(wht, c["start"], c["end"]) > 0.30).mean() > 0.34)
             ng += c["green"] > 0.25; ngr += c["graphic"]
     np.savez(f"{ROOT}/badframes.npz", cfps=np.array([CFPS]), **bad_masks)
     json.dump(scenes, open(f"{ROOT}/scenes.json", "w"), indent=1)

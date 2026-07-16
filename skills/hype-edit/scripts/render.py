@@ -5,7 +5,7 @@ Writes out/edit.mp4 (or out/edit_draft.mp4). Reads project.json."""
 import sys, json, subprocess, os
 from concurrent.futures import ThreadPoolExecutor
 
-ROOT = sys.argv[1]
+ROOT = os.path.abspath(sys.argv[1])
 CFG = json.load(open(f"{ROOT}/project.json"))
 SEG = f"{ROOT}/seg"
 DRAFT = "--draft" in sys.argv

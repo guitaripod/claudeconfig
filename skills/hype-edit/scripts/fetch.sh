@@ -10,7 +10,7 @@ mkdir -p "$ROOT/src"
 dl() {  # id -> src/<id>.mp4  (<=1080p, avc1 preferred so it's edit-friendly)
   local id="$1"; local url="$id"
   [[ "$id" == http* ]] || url="https://youtu.be/$id"
-  local base; base=$(basename "$id"); base="${base##*=}"
+  local base; base=$(basename -- "$id"); base="${base##*=}"
   yt-dlp --no-playlist -N 1 \
     -f "bv*[height<=1080][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]" \
     --merge-output-format mp4 -o "$ROOT/src/${base}.%(ext)s" "$url" >/dev/null 2>&1
@@ -22,7 +22,7 @@ ok() {  # returns 0 if file decodes clean (few NAL/errors)
 }
 
 for id in "$@"; do
-  base=$(basename "$id"); base="${base##*=}"; f="$ROOT/src/${base}.mp4"
+  base=$(basename -- "$id"); base="${base##*=}"; f="$ROOT/src/${base}.mp4"
   dl "$id"
   if ok "$f"; then echo "OK   $base"; else
     rm -f "$f"; dl "$id"

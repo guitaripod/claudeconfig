@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """assign_clips.py <workdir> — Phase 3a: map clips to cutlist segments.
-Zero reuse, source diversity, quality floor, graphic-aware in-points, effect plan.
-Writes assign.json. project.json "hero_overrides": [{"src","in_tc","impact"}...]
-(in hero-time order) hand-pins marquee moments; empty = motion-driven heroes."""
+Zero reuse, source diversity, quality floor, graphic-aware in-points, effect plan,
+motion-centered framing for vertical output. Writes assign.json.
+project.json keys it honors:
+  "hero_overrides": [{"src","in_tc","impact"[,"crop"]}...] (hero-time order) — hand-pinned
+    marquee moments; empty = motion-driven heroes.
+  "exclude_clips": [clip_id...] — banned from the pool (visual-review rejects, or clips
+    already used by a sibling edit in a multi-video batch)."""
 import sys, json, subprocess, glob, os
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
-ROOT = sys.argv[1]
+ROOT = os.path.abspath(sys.argv[1])
 CFG = json.load(open(f"{ROOT}/project.json"))
 FPS = CFG["fps"]
 NOREPEAT, MARGIN = 8.0, 0.5
@@ -32,6 +37,64 @@ def detect_crop(p, dur):
     return c if (x > 4 or y > 4) else None
 
 
+def grab_gray(src, t, gw, gh):
+    """Fast-seek (-ss before -i) EXACTLY like render.py — on some downloads fast and
+    accurate seek land on different content, so framing must be computed under the
+    same seek semantics the renderer will use."""
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{max(t, 0):.3f}", "-i",
+        f"{ROOT}/src/{src}.mp4", "-frames:v", "1", "-vf", f"scale={gw}:{gh}",
+        "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True).stdout
+    if len(raw) < gw * gh: return None
+    return np.frombuffer(raw[:gw * gh], np.uint8).reshape(gh, gw).astype(np.float32)
+
+
+def motion_window_x(src, it, d, w, h, ww):
+    """Pick the x-offset of a ww-wide crop window over the local motion peak, so
+    vertical output keeps the action in frame. Each frame pair is first aligned by
+    the dominant horizontal shift (1D cross-correlation of column profiles): a
+    tracking camera keeps the subject frame-static while the background streams,
+    so uncompensated energy would frame the background instead of the player.
+    Known miss: full-frame close-ups can frame a moving limb instead of the face —
+    catch those on the --segs grid and hand-patch the segment crop."""
+    gw, gh = 192, 108
+    fr = [grab_gray(src, it + k * d / 3.0, gw, gh) for k in range(4)]
+    fr = [f for f in fr if f is not None]
+    if len(fr) < 2: return (w - ww) // 2
+    en = np.zeros(gw, np.float32)
+    for a, b in zip(fr, fr[1:]):
+        pa, pb = a.mean(0), b.mean(0)
+        pa, pb = pa - pa.mean(), pb - pb.mean()
+        cor = []
+        for sh in range(-24, 25):
+            v = (pa[sh:] * pb[:gw - sh]).sum() if sh >= 0 else (pa[:gw + sh] * pb[-sh:]).sum()
+            cor.append(v)
+        sh = int(np.argmax(cor)) - 24
+        if sh > 0: da = np.abs(a[:, sh:] - b[:, :-sh]); lo, hi = sh, gw
+        elif sh < 0: da = np.abs(a[:, :sh] - b[:, -sh:]); lo, hi = 0, gw + sh
+        else: da = np.abs(a - b); lo, hi = 0, gw
+        e = np.zeros(gw, np.float32); e[lo:hi] = da.sum(0); en += e
+    en = np.maximum(en - np.median(en), 0)
+    if en.sum() < 1e-6: return (w - ww) // 2
+    en *= 0.9 + 0.1 * np.hanning(gw)
+    win = max(int(round(ww / w * gw)), 4)
+    sums = np.convolve(en, np.ones(win, np.float32), "valid")
+    x = int(round(int(np.argmax(sums)) / gw * w))
+    return max(0, min(x, w - ww))
+
+
+def frame_segments_for_vertical(assign):
+    ar = CFG["out_w"] / CFG["out_h"]
+    todo = [a for a in assign if not a["_manual_crop"] and not a["crop"]
+            and a["_w"] and a["_h"] and a["_w"] / a["_h"] > ar * 1.05]
+    if not todo: return
+    def one(a):
+        ww = int(round(a["_h"] * ar / 2)) * 2
+        x = motion_window_x(a["src"], a["in_tc"], a["dur"], a["_w"], a["_h"], ww)
+        a["crop"] = f"{ww}:{a['_h']}:{x}:0"
+    with ThreadPoolExecutor(8) as ex: list(ex.map(one, todo))
+    print(f"vertical framing: motion-centered crop on {len(todo)} segments")
+
+
 def main():
     spine = json.load(open(f"{ROOT}/spine.json"))
     scenes = json.load(open(f"{ROOT}/scenes.json"))
@@ -44,10 +107,14 @@ def main():
 
     srcs = sorted(glob.glob(f"{ROOT}/src/*.mp4"))
     sdur = {os.path.splitext(os.path.basename(p))[0]: probe_dur(p) for p in srcs}
+    dims = {c["src"]: (c["w"], c["h"]) for c in clips}
     scrop = {s: detect_crop(f"{ROOT}/src/{s}.mp4", d) for s, d in sdur.items()}
     for c in clips: c["srcdur"] = sdur.get(c["src"], 0)
+    EXC = set(CFG.get("exclude_clips", []))
     usable = [c for c in clips if not c["dark"] and c.get("green", 0) <= 0.25
-              and not c.get("graphic", False) and c["motion_max"] >= 0.045 and c["srcdur"] > 0]
+              and not c.get("graphic", False) and c["motion_max"] >= 0.045 and c["srcdur"] > 0
+              and c["id"] not in EXC]
+    if EXC: print(f"exclude_clips: {len(EXC)} banned")
     print(f"usable pool: {len(usable)} clips / {len(set(c['src'] for c in usable))} sources")
     hero_pool = sorted([c for c in usable if c["dur"] >= 0.9], key=lambda c: -c["motion_max"])
     high = sorted(usable, key=lambda c: -c["motion"])
@@ -110,7 +177,7 @@ def main():
             ov = OV[hidx] if hidx < len(OV) else None; hidx += 1
             if ov:
                 clip = {"src": ov["src"], "id": -1 - hidx, "fps": fps_map.get(ov["src"], FPS),
-                        "label": lab_map.get(ov["src"], ov["src"])}
+                        "label": lab_map.get(ov["src"], ov["src"]), "crop_ov": ov.get("crop")}
                 manual = (round(ov["in_tc"], 3), round(ov.get("impact", 0.6), 3))
             else:
                 clip = pick(hero_pool, ot, d, True, exclude=hused); hused.add(clip["id"])
@@ -132,8 +199,14 @@ def main():
         it, imp = manual if manual else inpoint(clip, d + MARGIN, nth)
         assign.append({"i": i, "start": round(c["start"], 4), "dur": round(d, 4), "nf": nf,
             "tag": tag, "hero": c["hero"], "src": clip["src"], "clip_id": clip["id"],
-            "in_tc": it, "impact": imp, "crop": scrop.get(clip["src"]),
-            "effects": eff, "label": clip["label"]})
+            "in_tc": it, "impact": imp, "crop": clip.get("crop_ov") or scrop.get(clip["src"]),
+            "effects": eff, "label": clip["label"],
+            "_w": clip.get("w") or dims.get(clip["src"], (0, 0))[0],
+            "_h": clip.get("h") or dims.get(clip["src"], (0, 0))[1],
+            "_manual_crop": bool(clip.get("crop_ov"))})
+
+    frame_segments_for_vertical(assign)
+    for a in assign: a.pop("_w", None); a.pop("_h", None); a.pop("_manual_crop", None)
 
     tot = sum(a["nf"] for a in assign)
     exp = round(cut[-1]["end"] * FPS) - round(cut[0]["start"] * FPS)

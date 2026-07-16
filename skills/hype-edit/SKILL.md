@@ -72,12 +72,17 @@ python3 $S/colorscan.py <workdir>              # flag promo cards + synthetic gr
 ### Phase 2/3 — Assign + render
 
 ```bash
-$PY $S/assign_clips.py <workdir>            # zero reuse, diversity, quality floor, graphic-aware in-points
+$PY $S/assign_clips.py <workdir>            # zero reuse, diversity, graphic-aware in-points, motion-centered framing
 python3 $S/render.py   <workdir> --draft    # fast 540p pass to inspect the DIRECTION cheaply
-python3 $S/contact_sheet.py <workdir> --draft --n 40   # then READ frames/contact.png as an image
+python3 $S/contact_sheet.py <workdir> --draft --n 40   # READ frames/contact.png as an image
+python3 $S/contact_sheet.py <workdir> --segs           # READ frames/seggrid.png — one labeled frame per segment
 ```
 
-`assign_clips.py` maps a distinct, on-energy clip to every segment, picks each in-point on a **motivated, graphic-free** high-motion window, and writes an effect plan. **Always draft-render + read the contact sheet before the full render** — this is where you catch off-subject footage, leaked graphics, and weak frames for pennies. Fix (drop sources, tighten `colorscan.py` thresholds, raise the motion floor, hand-pick heroes) and re-run. Only then:
+The **segment grid is the precision review tool**: every defect maps to a segment index → `assign.json segments[i].clip_id` → append that id to `project.json "exclude_clips"` → re-run assign + draft. Loop until the grid is clean (typically 2–3 passes; ban billboards/typography/black/blur/refs/near-empty frames). Never edit scenes.json flags for this — `exclude_clips` is the audit trail.
+
+**Vertical output framing**: when `out_w/out_h` is taller than the source, the assigner auto-computes a motion-centered crop per segment (pan-compensated, so tracking-camera shots frame the player, not the streaming background). Known miss: full-frame close-ups may frame a moving limb — catch on the seg grid and hand-patch that segment's `crop` in assign.json (or `hero_overrides[].crop`). When hand-picking any crop/in-point, extract reference frames with **fast seek exactly like the renderer** (`ffmpeg -ss <t> -t <d> -i src.mp4`) — on some downloads fast and accurate seek land on different content.
+
+`assign_clips.py` maps a distinct, on-energy clip to every segment, picks each in-point on a **motivated, graphic-free** high-motion window, computes vertical framing, and writes an effect plan. It honors `project.json "exclude_clips"` (banned ids) and `"hero_overrides"` (`{src,in_tc,impact[,crop]}`). **Always draft-render + read the contact sheet before the full render** — this is where you catch off-subject footage, leaked graphics, and weak frames for pennies. Fix (drop sources, tighten `colorscan.py` thresholds, raise the motion floor, hand-pick heroes) and re-run. Only then:
 
 ```bash
 python3 $S/render.py <workdir>              # full-res NVENC/libx264 render → out/edit.mp4
@@ -87,7 +92,7 @@ python3 $S/contact_sheet.py <workdir> --n 48   # full-res visual pass
 
 ### Phase 4 — Iterate (at least twice; this is what makes it hype)
 
-Between passes, actually inspect. `qc.py` must be green (frames, format, zero A/V drift, no black/unexpected-freeze, 0-frame beat offset, density-in-drops). Then read the contact sheet: any bumper/wipe/dupe/weak frame is a defect → fix and re-render. Verify heroes landed on the real subject at full res (`ffmpeg -ss <hero_time> -i out/edit.mp4 -frames:v 1`).
+Between passes, actually inspect. `qc.py` must be green (frames, format, zero A/V drift, no black/unexpected-freeze, 0-frame beat offset, density-in-drops). Then read the seg grid + contact sheet: any bumper/wipe/dupe/weak frame is a defect → `exclude_clips` → re-render. **Verify heroes from their segment files** (`ffmpeg -i seg/seg_<i>.mp4 -frames:v 1` at a few offsets — output-timestamp sampling can miss the hero window): the subject must be THE subject of the brief, in frame, at peak moment. If the auto-pick is a keeper/teammate/empty grass, pin `hero_overrides` and re-run.
 
 ### Phase 5 — Deliver
 
@@ -97,9 +102,15 @@ Write `out/director_note.md` (choices + what you fixed between passes). Deliver 
 
 Baked per-segment by `assign_clips.py`/`render.py`, keyed to energy: **punch-in zoom** (driving beats), **beat-flash** (white hit on downbeats), **drop-flash** (bigger flash on drop entries), **camera shake** (decaying, on key hits), **RGB split** (chromatic aberration on the hardest), **freeze-frame + zoom + flash + shake** (reserved for the single biggest moment). Tune intensity in `render.py`; tune *when they fire* in `assign_clips.py`. To hand-pick hero moments, set `project.json` `hero_overrides` (see `reference/pipeline.md`).
 
+## Batch mode (N edits in one brief)
+
+- **One workdir per edit, one agent per workdir** — never share. If all edits draw on the same source pool, download once, then per extra workdir: symlink `src/*` and copy `scenes.json motion.npz badframes.npz` (they're source-derived; skip scenes.py/colorscan.py there).
+- **Zero cross-edit clip overlap**: build edits sequentially or cascade after parallel drafts — collect every `clip_id` from finished edits' `assign.json` and append to the next edit's `exclude_clips`. Distinct edits sharing the same viral moment read as reposts.
+- Different songs/sections per edit: re-run Phase 0 per workdir; the beat grid is per-edit state.
+
 ## Anti-patterns (do not ship)
 
-Metronomic cuts that ignore energy · every effect on every cut · black/frozen frames · audio drift by the end · a clip repeated too soon · the best moment anywhere but a peak · off-subject or club footage in a tournament edit · broadcast wipes/bumpers/score-graphics left in · declaring done without reading the render.
+Metronomic cuts that ignore energy · every effect on every cut · black/frozen frames · audio drift by the end · a clip repeated too soon · the best moment anywhere but a peak · off-subject or club footage in a tournament edit · broadcast wipes/bumpers/score-graphics left in · declaring done without reading the render · hero framing unverified at segment level.
 
 ## The hard parts (hard-won — read `reference/pipeline.md` for detail)
 
