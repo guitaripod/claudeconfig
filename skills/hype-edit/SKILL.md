@@ -35,6 +35,7 @@ PY=<workdir>/.venv/bin/python       # use THIS python for build_spine.py, scenes
 - **Cadence tracks energy**: long held shots in the lulls (2–3 s), machine-gun cuts in the drops (~0.4 s). Density must be highest in the drops.
 - **Best moments on the biggest hits.** Reserve the freeze-frame for the single loudest beat; spread hero moments across the song (~1 per 25 s).
 - **Every frame earns its place.** No black frames, no broadcast wipes, no sponsor/score bumpers, no static graphics, no near-duplicates.
+- **The subject never leaves the frame.** A vertical crop must hold the player for the segment's full duration — verified start/mid/end on the seg grid, not at a single instant.
 - **Diversity + zero reuse.** With a deep pool, no clip repeats and consecutive cuts come from different sources.
 - **Restraint reads as quality.** Effects punctuate; they don't smother. Never stack >2–3 on a cut.
 - **Zero A/V drift.** One continuous master audio muxed last; sum of segment frames == `total_frames`.
@@ -75,12 +76,12 @@ python3 $S/colorscan.py <workdir>              # flag promo cards + synthetic gr
 $PY $S/assign_clips.py <workdir>            # zero reuse, diversity, graphic-aware in-points, motion-centered framing
 python3 $S/render.py   <workdir> --draft    # fast 540p pass to inspect the DIRECTION cheaply
 python3 $S/contact_sheet.py <workdir> --draft --n 40   # READ frames/contact.png as an image
-python3 $S/contact_sheet.py <workdir> --segs           # READ frames/seggrid.png — one labeled frame per segment
+python3 $S/contact_sheet.py <workdir> --segs           # READ frames/seggrid.png — labeled frames per segment (start/mid/end for holds ≥1s)
 ```
 
-The **segment grid is the precision review tool**: every defect maps to a segment index → `assign.json segments[i].clip_id` → append that id to `project.json "exclude_clips"` → re-run assign + draft. Loop until the grid is clean (typically 2–3 passes; ban billboards/typography/black/blur/refs/near-empty frames). Never edit scenes.json flags for this — `exclude_clips` is the audit trail.
+The **segment grid is the precision review tool**: every defect maps to a segment index → `assign.json segments[i].clip_id` → append that id to `project.json "exclude_clips"` → re-run assign + draft. Loop until the grid is clean (typically 2–3 passes; ban billboards/typography/black/blur/refs/near-empty frames). Holds ≥1s show three tiles (`a/b/c` = start/mid/end): the subject must be in frame in **all three** — a crop that loses the player by `b` or `c` is a defect like any other (hand-patch that segment's `crop`, or exclude the clip). Never edit scenes.json flags for this — `exclude_clips` is the audit trail.
 
-**Vertical output framing**: when `out_w/out_h` is taller than the source, the assigner auto-computes a motion-centered crop per segment (pan-compensated, so tracking-camera shots frame the player, not the streaming background). Known miss: full-frame close-ups may frame a moving limb — catch on the seg grid and hand-patch that segment's `crop` in assign.json (or `hero_overrides[].crop`). When hand-picking any crop/in-point, probe with the **renderer's exact command shape** (`ffmpeg -ss <t> -t <d> -i src.mp4 -vf 'crop=<the crop>' -frames:v 1`) — on some downloads fast and accurate seek land on different content, and sources with broken seek indexes can land several seconds off a plain-strip probe. Never pin an in_tc from a probe that used a different seek form.
+**Vertical output framing**: when `out_w/out_h` is taller than the source, the assigner auto-computes a motion-centered crop per segment (pan-compensated, so tracking-camera shots frame the player, not the streaming background). Motion is a proxy, not a subject detector — a static crop centered on aggregate motion can lose a player who crosses the frame or stands still while the background moves, which is exactly what the `a/b/c` seg-grid tiles exist to catch. (A min-coverage-across-pairs scorer was A/B-tested against real footage 2026-07 and framed persistent background motion — bench staff, crowd — over the subject; don't re-derive it. The review loop is the framing guarantee.) Known miss: full-frame close-ups may frame a moving limb — catch on the seg grid and hand-patch that segment's `crop` in assign.json (or `hero_overrides[].crop`). When hand-picking any crop/in-point, probe with the **renderer's exact command shape** (`ffmpeg -ss <t> -t <d> -i src.mp4 -vf 'crop=<the crop>' -frames:v 1`) — on some downloads fast and accurate seek land on different content, and sources with broken seek indexes can land several seconds off a plain-strip probe. Never pin an in_tc from a probe that used a different seek form.
 
 **Openers are the retention gate.** Low-energy song intros make the assigner hold low-motion clips, and low-motion pool clips are usually static wides — a 5s distant wide opener kills TikTok retention. After the first draft, always check segments 0–2: if they're wides, hand-patch them (edit assign.json directly post-assign: set src/in_tc/crop to a subject close-up hold — celebration, face, name-shirt, aura walk — validated with a render-exact probe). Re-patch after every re-assign; direct assign.json edits don't survive assign_clips.py re-runs.
 
@@ -112,7 +113,7 @@ Baked per-segment by `assign_clips.py`/`render.py`, keyed to energy: **punch-in 
 
 ## Anti-patterns (do not ship)
 
-Metronomic cuts that ignore energy · every effect on every cut · black/frozen frames · audio drift by the end · a clip repeated too soon · the best moment anywhere but a peak · off-subject or club footage in a tournament edit · broadcast wipes/bumpers/score-graphics left in · declaring done without reading the render · hero framing unverified at segment level.
+Metronomic cuts that ignore energy · every effect on every cut · black/frozen frames · audio drift by the end · a clip repeated too soon · the best moment anywhere but a peak · off-subject or club footage in a tournament edit · broadcast wipes/bumpers/score-graphics left in · declaring done without reading the render · hero framing unverified at segment level · a vertical crop that loses the subject mid-segment.
 
 ## The hard parts (hard-won — read `reference/pipeline.md` for detail)
 
