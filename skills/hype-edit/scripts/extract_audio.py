@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""extract_audio.py <workdir> <song_path_or_url> [--fps 30] [--w 1920] [--h 1080]
-   [--start 0] [--end 0] [--keep-tail] [--pitch 1.0]
+"""extract_audio.py <workdir> <song_path_or_url> [--style classic|remaster]
+   [--fps N] [--w N] [--h N] [--start 0] [--end 0] [--keep-tail] [--pitch 1.0]
+
+--style picks the art direction and its canvas defaults (overridable with
+--fps/--w/--h): classic = 1920x1080@30 teal-orange montage; remaster =
+1080x1920@60 full-bleed 90deg-rotated landscape with a 4K-remaster grade and
+slow-mo interpolation (the TikTok "quality edit" genre).
 
 --pitch shifts pitch by the given ratio (e.g. 1.04 = +4%) with rubberband, tempo
 unchanged — use to dodge platform Content-ID matching. Applied before analysis so
@@ -17,6 +22,20 @@ import librosa
 
 SR_A = 22050
 
+GRADES = {
+    # teal-orange stadium-night montage
+    "classic":
+        "eq=contrast=1.12:saturation=1.14:brightness=-0.02:gamma=0.96,"
+        "colorbalance=rs=-0.06:gs=-0.02:bs=0.08:rm=0.02:bm=-0.02:rh=0.10:gh=0.03:bh=-0.08,"
+        "curves=master='0/0 0.10/0.03 0.5/0.5 0.9/0.97 1/1',vignette=angle=PI/6",
+    # AI-remaster look: clean painterly base, oversharpened detail, HDR-ish pop
+    "remaster":
+        "hqdn3d=1.5:1.0:2.5:2.5,unsharp=5:5:0.9:5:5:0.35,cas=0.55,"
+        "eq=contrast=1.09:saturation=1.30:gamma=0.99,vibrance=intensity=0.22,"
+        "curves=master='0/0 0.12/0.08 0.5/0.53 0.9/0.95 1/1'",
+}
+CANVAS = {"classic": (1920, 1080, 30), "remaster": (1080, 1920, 60)}
+
 
 def sh(a): return subprocess.run(a, capture_output=True, text=True)
 
@@ -24,8 +43,9 @@ def sh(a): return subprocess.run(a, capture_output=True, text=True)
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("root"); ap.add_argument("song")
-    ap.add_argument("--fps", type=int, default=30)
-    ap.add_argument("--w", type=int, default=1920); ap.add_argument("--h", type=int, default=1080)
+    ap.add_argument("--style", choices=("classic", "remaster"), default="classic")
+    ap.add_argument("--fps", type=int, default=None)
+    ap.add_argument("--w", type=int, default=None); ap.add_argument("--h", type=int, default=None)
     ap.add_argument("--start", type=float, default=0.0)
     ap.add_argument("--end", type=float, default=0.0, help="hard end (s); 0 = whole song")
     ap.add_argument("--keep-tail", action="store_true", help="don't trim trailing silence")
@@ -33,6 +53,8 @@ def main():
                     help="pitch ratio, tempo preserved (1.04 = +4%%; anti-Content-ID)")
     a = ap.parse_args()
     root = os.path.abspath(a.root)
+    cw, ch, cfps = CANVAS[a.style]
+    a.w = a.w or cw; a.h = a.h or ch; a.fps = a.fps or cfps
 
     song = a.song
     if song.startswith("http"):
@@ -87,22 +109,20 @@ def main():
     cfg = {}
     if os.path.exists(f"{root}/project.json"):
         cfg = json.load(open(f"{root}/project.json"))
+    grade = cfg.get("grade") if cfg.get("style") == a.style and cfg.get("grade") else GRADES[a.style]
     cfg.update({
         "root": root, "fps": a.fps, "dur": round(float(dur), 4),
         "total_frames": int(round(dur * a.fps)),
         "out_w": a.w, "out_h": a.h, "sr_analysis": SR_A,
         "audio_analysis": "song_22k_mono.wav", "audio_master": "master.wav",
-        # teal-orange stadium-night grade; override per project if you want a different look
-        "grade": cfg.get("grade",
-            "eq=contrast=1.12:saturation=1.14:brightness=-0.02:gamma=0.96,"
-            "colorbalance=rs=-0.06:gs=-0.02:bs=0.08:rm=0.02:bm=-0.02:rh=0.10:gh=0.03:bh=-0.08,"
-            "curves=master='0/0 0.10/0.03 0.5/0.5 0.9/0.97 1/1',vignette=angle=PI/6"),
+        "style": a.style,
+        "grade": grade,
         "hero_overrides": cfg.get("hero_overrides", []),
         "pitch": a.pitch,
     })
     json.dump(cfg, open(f"{root}/project.json", "w"), indent=1)
-    print(f"dur={dur:.3f}s ({cfg['total_frames']} frames @ {a.fps}fps) "
-          f"analysis={na} master={nm} samples → project.json")
+    print(f"style={a.style} dur={dur:.3f}s ({cfg['total_frames']} frames @ {a.fps}fps "
+          f"{a.w}x{a.h}) analysis={na} master={nm} samples → project.json")
 
 
 if __name__ == "__main__":

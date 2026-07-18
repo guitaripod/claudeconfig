@@ -25,6 +25,9 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
 ```jsonc
 {
   "root": "/abs/workdir",
+  "style": "classic",           // or "remaster" — set by extract_audio.py --style; drives
+                                // cadence (build_spine), speed/effects/framing (assign_clips),
+                                // rotation+interpolation (render), tile rotation (contact_sheet)
   "fps": 30, "out_w": 1920, "out_h": 1080,
   "dur": 174.0,                 // frame-aligned, silence-trimmed (set by extract_audio.py)
   "total_frames": 5220,         // dur*fps — the invariant render/qc enforce
@@ -50,8 +53,9 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
 - `sig = 1.5 * FPS` — structural smoothing so periodic kicks don't fragment sections. Raise for busier tracks.
 - Section thresholds: `peak >0.62`, `low <0.33` (hysteresis on the normalized energy `E`).
 - Drop detection: sustained forward energy jump on downbeats (`after>0.5`, `jump>0.28`), 8 s non-max-suppression.
-- Cadence by tag: `low`=8 beats/cut, `build`=4→2→1 ramp, `peak`=2 beats, `drop`=1 beat (`1,1,1,2` for breath), half-beat machine-gun in a ±1.5-beat window before heroes.
-- Heroes: main drop + strongest peak/drop downbeat per zone (`nz = max(3, dur/25)`), ≥6 s apart. Primary (nearest main drop) gets 3 beats + freeze-frame; others 2 beats.
+- Cadence by tag (classic): `low`=8 beats/cut, `build`=4→2→1 ramp, `peak`=2 beats, `drop`=1 beat (`1,1,1,2` for breath), half-beat machine-gun in a ±1.5-beat window before heroes.
+- Cadence (remaster): `low`=8, `build`=4→4→2, `peak`=2, `drop`=2 (`2,2,2,4` for breath), no machine-gun window, first cut floored at 2.2 s (the genre's opening hold).
+- Heroes: main drop + strongest peak/drop downbeat per zone (`nz = max(3, dur/25)`), ≥6 s apart. Primary (nearest main drop) gets 3 beats + freeze-frame; others 2 beats. Remaster: 4/3 beats, no freeze.
 
 ## assign_clips.py knobs
 
@@ -60,6 +64,15 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
 - `avoid_src` (last 3 sources) spreads consecutive cuts across sources — that's the diversity lever.
 - In-point: highest-motion window whose bad-frame fraction is ~0 (graphic-aware); `nth` picks a different window if a clip is ever reused. `impact` = motion peak within the window (drives freeze/flash timing).
 - `hero_overrides` (in hero-time order) bypass the pool for hand-picked marquee moments — the reliable way to guarantee a specific shot lands on a specific hit (e.g. a known goal at a known timestamp). Find timestamps by browsing a source with a labeled frame strip, then set `{src,in_tc,impact}`.
+
+## remaster style (full-bleed rotated "4K quality edit")
+
+- Geometry: `transpose=1` (90° clockwise — source bottom edge lands on the portrait LEFT edge, matching the genre reference) then scale-increase + center-crop to out_w×out_h. A 1920×1080 source maps 1:1 onto 1080×1920 with zero pixels lost. Letterbox `scrop` still applies BEFORE the transpose (bars would otherwise run down the sides).
+- Assigner: no vertical crop framing; per-segment `"speed"` (hero 0.5, drop/peak 0.65, build 0.75, low 0.85); source in-point windows and clip-length checks use `dur*speed` (real footage consumed).
+- Renderer: after the grade, `setpts=PTS/speed` then `minterpolate=fps=<fps>:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1` (full render; drafts use plain `fps=` — mci is ~50× slower and a draft only checks direction). Effects reduced to soft beat/drop flashes + 3% zoom.
+- Encoder bumped for the detail-porn look: nvenc cq17 maxrate 90M (libx264 crf16). Uploading fat bitrate is the point — platform re-encodes eat sharpening first.
+- contact_sheet auto-prepends `transpose=2` so review tiles read upright; grade lives in project.json like any style (`extract_audio.py` seeds the remaster preset: hqdn3d → unsharp → cas → eq/vibrance → curves).
+- Re-running `extract_audio.py` with a different `--style` resets `grade` to the new style's preset; same style preserves a hand-tuned grade.
 
 ## render.py knobs
 

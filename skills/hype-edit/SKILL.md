@@ -17,7 +17,16 @@ Not this skill: trimming one clip, plain concatenation, or a slideshow with no b
 
 ## Clarify first (only if genuinely ambiguous)
 
-Ask 2–4 crisp questions, then go. Good ones: **subject/scope** (which player/team/scene, whole thing vs a slice), **length** (full song vs a section — say `--start/--end`), **look** (default is a punchy teal-orange stadium-night grade; offer alternatives), **output** (default 1920×1080/30/16:9), and **delivery** (file, or send somewhere). If the brief is already clear, don't stall — act.
+Ask 2–4 crisp questions, then go. Good ones: **subject/scope** (which player/team/scene, whole thing vs a slice), **length** (full song vs a section — say `--start/--end`), **style** (see Styles below), and **delivery** (file, or send somewhere). If the brief is already clear, don't stall — act.
+
+## Styles (`extract_audio.py --style …`)
+
+Two art directions, chosen at Phase 0; `project.json "style"` drives every later stage.
+
+- **`remaster` — the TikTok default.** The "4K quality edit" genre (reference: 9s Messi edit, 5.5M views): the **full landscape broadcast frame rotated 90° clockwise** to fill 1080×1920 edge-to-edge — zero pixels cropped away, content runs under the TikTok UI, the viewer rotates their phone. On top: a **4K-remaster grade** (denoise → oversharpen → cas → saturation/vibrance → HDR-ish curve), **slow motion everywhere** (heroes 0.5×, drops/peaks 0.65×, builds 0.75×, lulls 0.85×) synthesized to **buttery 60fps** by motion-compensated interpolation on the full render, and **near-zero effects** — a soft flash on drop entries and occasional downbeats, a 3% drift zoom, nothing else. The detail and the slow-mo ARE the effect. Cadence is deliberate: ~2.2s+ opening hold, then ~1s beat-locked cuts, heroes held 3–4 beats. Short totals fit the genre (9–20s); every clip must be an **iconic moment** of the subject.
+- **`classic`** — the original 1920×1080@30 (or vertical-cropped) punchy montage: teal-orange grade, energy-mapped machine-gun cuts, punch zooms/flashes/shake/RGB-split, freeze-frame hero. Use for landscape deliveries, YouTube, or when the brief asks for aggressive effect-driven editing.
+
+Canvas defaults come from the style (remaster 1080×1920@60, classic 1920×1080@30); `--w/--h/--fps` override.
 
 ## Prerequisites
 
@@ -45,7 +54,7 @@ PY=<workdir>/.venv/bin/python       # use THIS python for build_spine.py, scenes
 ### Phase 0 — Audio is the boss
 
 ```bash
-$PY $S/extract_audio.py <workdir> "<song file or URL>" [--start S --end E] [--w 1920 --h 1080 --fps 30] [--pitch 1.04]
+$PY $S/extract_audio.py <workdir> "<song file or URL>" [--style remaster] [--start S --end E] [--pitch 1.04]
 $PY $S/build_spine.py <workdir>
 ```
 
@@ -60,7 +69,7 @@ yt-dlp --flat-playlist --dump-json "ytsearch12:<angle>" | \
   python3 -c "import sys,json;[print(d.get('id'),d.get('duration'),d.get('title','')[:70]) for d in map(json.loads,sys.stdin) if d.get('id')]"
 ```
 
-Pick sources on-subject and high-action (goals/skills/celebrations/moments — not talk-shows, previews, training, or club footage when the brief says a specific tournament). Watch for two trap source types that pass every automated filter: **EA FC/PES sim gameplay** (flat lighting, game HUD — ban the whole source via exclude_clips) and **fan comps with WATCH NEXT / SUBSCRIBE end-cards mid-file or at the tail** (check the last ~15s before trusting). Then download **robustly** (sequential — parallel yt-dlp on the same file corrupts it):
+Pick sources on-subject and high-action (goals/skills/celebrations/moments — not talk-shows, previews, training, or club footage when the brief says a specific tournament). For **remaster**, be pickier still: every segment is a slow-mo hold on the full frame, so only iconic, tightly-framed follow-cam moments earn a slot — and 50/60fps sources (fetch.sh already prefers them) are what make the slow-mo butter. Watch for two trap source types that pass every automated filter: **EA FC/PES sim gameplay** (flat lighting, game HUD — ban the whole source via exclude_clips) and **fan comps with WATCH NEXT / SUBSCRIBE end-cards mid-file or at the tail** (check the last ~15s before trusting). Then download **robustly** (sequential — parallel yt-dlp on the same file corrupts it):
 
 ```bash
 bash $S/fetch.sh <workdir> <id1> <id2> ...     # validates each by decoding; retries corrupt ones
@@ -81,7 +90,7 @@ python3 $S/contact_sheet.py <workdir> --segs           # READ frames/seggrid.png
 
 The **segment grid is the precision review tool**: every defect maps to a segment index → `assign.json segments[i].clip_id` → append that id to `project.json "exclude_clips"` → re-run assign + draft. Loop until the grid is clean (typically 2–3 passes; ban billboards/typography/black/blur/refs/near-empty frames). Holds ≥1s show three tiles (`a/b/c` = start/mid/end): the subject must be in frame in **all three** — a crop that loses the player by `b` or `c` is a defect like any other (hand-patch that segment's `crop`, or exclude the clip). Never edit scenes.json flags for this — `exclude_clips` is the audit trail.
 
-**Vertical output framing**: when `out_w/out_h` is taller than the source, the assigner auto-computes a motion-centered crop per segment (pan-compensated, so tracking-camera shots frame the player, not the streaming background). Motion is a proxy, not a subject detector — a static crop centered on aggregate motion can lose a player who crosses the frame or stands still while the background moves, which is exactly what the `a/b/c` seg-grid tiles exist to catch. (A min-coverage-across-pairs scorer was A/B-tested against real footage 2026-07 and framed persistent background motion — bench staff, crowd — over the subject; don't re-derive it. The review loop is the framing guarantee.) Known miss: full-frame close-ups may frame a moving limb — catch on the seg grid and hand-patch that segment's `crop` in assign.json (or `hero_overrides[].crop`). When hand-picking any crop/in-point, probe with the **renderer's exact command shape** (`ffmpeg -ss <t> -t <d> -i src.mp4 -vf 'crop=<the crop>' -frames:v 1`) — on some downloads fast and accurate seek land on different content, and sources with broken seek indexes can land several seconds off a plain-strip probe. Never pin an in_tc from a probe that used a different seek form.
+**Vertical output framing** (classic style only — **remaster keeps the whole rotated frame and never crops**, so this entire defect class disappears there; on remaster seg grids the tiles are auto counter-rotated upright, and what you review instead is *icon-worthiness*: reject anything that isn't a clean, tight, iconic moment): when `out_w/out_h` is taller than the source, the assigner auto-computes a motion-centered crop per segment (pan-compensated, so tracking-camera shots frame the player, not the streaming background). Motion is a proxy, not a subject detector — a static crop centered on aggregate motion can lose a player who crosses the frame or stands still while the background moves, which is exactly what the `a/b/c` seg-grid tiles exist to catch. (A min-coverage-across-pairs scorer was A/B-tested against real footage 2026-07 and framed persistent background motion — bench staff, crowd — over the subject; don't re-derive it. The review loop is the framing guarantee.) Known miss: full-frame close-ups may frame a moving limb — catch on the seg grid and hand-patch that segment's `crop` in assign.json (or `hero_overrides[].crop`). When hand-picking any crop/in-point, probe with the **renderer's exact command shape** (`ffmpeg -ss <t> -t <d> -i src.mp4 -vf 'crop=<the crop>' -frames:v 1`) — on some downloads fast and accurate seek land on different content, and sources with broken seek indexes can land several seconds off a plain-strip probe. Never pin an in_tc from a probe that used a different seek form.
 
 **Openers are the retention gate.** Low-energy song intros make the assigner hold low-motion clips, and low-motion pool clips are usually static wides — a 5s distant wide opener kills TikTok retention. After the first draft, always check segments 0–2: if they're wides, hand-patch them (edit assign.json directly post-assign: set src/in_tc/crop to a subject close-up hold — celebration, face, name-shirt, aura walk — validated with a render-exact probe). Re-patch after every re-assign; direct assign.json edits don't survive assign_clips.py re-runs.
 
@@ -103,7 +112,7 @@ Write `out/director_note.md` (choices + what you fixed between passes). Deliver 
 
 ## Effect catalog (restraint > quantity)
 
-Baked per-segment by `assign_clips.py`/`render.py`, keyed to energy: **punch-in zoom** (driving beats), **beat-flash** (white hit on downbeats), **drop-flash** (bigger flash on drop entries), **camera shake** (decaying, on key hits), **RGB split** (chromatic aberration on the hardest), **freeze-frame + zoom + flash + shake** (reserved for the single biggest moment). Tune intensity in `render.py`; tune *when they fire* in `assign_clips.py`. To hand-pick hero moments, set `project.json` `hero_overrides` (see `reference/pipeline.md`).
+Baked per-segment by `assign_clips.py`/`render.py`, keyed to energy. **Classic**: **punch-in zoom** (driving beats), **beat-flash** (white hit on downbeats), **drop-flash** (bigger flash on drop entries), **camera shake** (decaying, on key hits), **RGB split** (chromatic aberration on the hardest), **freeze-frame + zoom + flash + shake** (reserved for the single biggest moment). **Remaster**: soft drop-flash on drop entries and heroes, soft beat-flash on every 4th downbeat, a 3% drift zoom — shake/RGB-split/freeze are off by design; the slow-mo detail carries it. Tune intensity in `render.py`; tune *when they fire* in `assign_clips.py`. To hand-pick hero moments, set `project.json` `hero_overrides` (see `reference/pipeline.md`).
 
 ## Batch mode (N edits in one brief)
 

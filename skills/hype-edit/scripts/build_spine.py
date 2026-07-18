@@ -10,6 +10,7 @@ from scipy.ndimage import gaussian_filter1d
 
 ROOT = sys.argv[1]
 CFG = json.load(open(f"{ROOT}/project.json"))
+STYLE = CFG.get("style", "classic")
 SR, HOP, N_FFT = CFG["sr_analysis"], 512, 2048
 DUR, FPS_OUT = CFG["dur"], CFG["fps"]
 FPS = SR / HOP
@@ -142,7 +143,9 @@ def main():
             t = max(c, key=lambda x: x[1])[0]
             if all(abs(t - h) > 6 for h in heroes): heroes.append(t)
     heroes = sorted(set(heroes))
-    hero_dur = {round(h, 5): (3 * period if abs(h - prim) < 1e-3 else 2 * period) for h in heroes}
+    hb_prim, hb_rest = (4, 3) if STYLE == "remaster" else (3, 2)
+    hero_dur = {round(h, 5): (hb_prim * period if abs(h - prim) < 1e-3 else hb_rest * period)
+                for h in heroes}
 
     # cutlist: tile 0..DUR on the beat grid; cadence tracks energy
     half = np.unique(np.round(np.concatenate([beats, (beats[:-1] + beats[1:]) / 2]), 5))
@@ -153,16 +156,24 @@ def main():
         return float(min(grid[j], DUR))
     def hwin(t): return any(abs(t - h) <= 1.5 * period for h in heroes)
     B = [0.0, float(beats[0]) if beats[0] > 1e-6 else nb(0.0, 8)]
-    t, g = B[1], 0
+    t, g, first = B[1], 0, True
     while t < DUR - 1e-6 and g < 8000:
         g += 1; lb, fr = sfrac(t)
-        if lb == "low": step = 8
+        if STYLE == "remaster":
+            if lb == "low": step = 8
+            elif lb == "build": step = {0: 4, 1: 4, 2: 2}[min(int(fr * 3), 2)]
+            elif lb == "peak": step = 2
+            else:
+                bi = int(round((t - beats[0]) / period)); step = 4 if bi % 4 == 3 else 2
+            if first: step = max(step, int(np.ceil(2.2 / period)))
+        elif lb == "low": step = 8
         elif lb == "build": step = {0: 4, 1: 2, 2: 1}[min(int(fr * 3), 2)]
         elif lb == "peak": step = 2
         else:
             if hwin(t) and not any(abs(t - h) < 1e-3 for h in heroes): step = 0.5
             else:
                 bi = int(round((t - beats[0]) / period)); step = 2 if bi % 4 == 3 else 1
+        first = False
         x = nb(t, step)
         if x <= t + 1e-6: x = nb(t, max(step, 1) + 1)
         if x >= DUR - 1e-6: break

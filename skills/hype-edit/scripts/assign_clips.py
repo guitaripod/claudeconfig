@@ -14,7 +14,9 @@ import numpy as np
 ROOT = os.path.abspath(sys.argv[1])
 CFG = json.load(open(f"{ROOT}/project.json"))
 FPS = CFG["fps"]
+STYLE = CFG.get("style", "classic")
 NOREPEAT, MARGIN = 8.0, 0.5
+SPEED = {"hero": 0.5, "drop": 0.65, "peak": 0.65, "build": 0.75, "low": 0.85}
 
 
 def probe_dur(p):
@@ -83,6 +85,9 @@ def motion_window_x(src, it, d, w, h, ww):
 
 
 def frame_segments_for_vertical(assign):
+    if STYLE == "remaster":
+        print("remaster: full-bleed rotated landscape — no vertical crop framing")
+        return
     ar = CFG["out_w"] / CFG["out_h"]
     todo = [a for a in assign if not a["_manual_crop"] and not a["crop"]
             and a["_w"] and a["_h"] and a["_w"] / a["_h"] > ar * 1.05]
@@ -171,6 +176,8 @@ def main():
         i, tag, d, ot = c["i"], c["tag"], c["dur"], c["start"]
         nf = round(c["end"] * FPS) - round(c["start"] * FPS)
         entry = round(c["start"], 2) in drop_t; db = round(c["start"], 2) in db_set
+        speed = SPEED["hero" if c["hero"] else tag] if STYLE == "remaster" else 1.0
+        de = d * speed
         eff, manual = [], None
         if c["hero"]:
             prim = abs(c["start"] - min(drop_t, key=lambda x: abs(x - c["start"]))) < 0.6 and d > 1.0
@@ -180,26 +187,32 @@ def main():
                         "label": lab_map.get(ov["src"], ov["src"]), "crop_ov": ov.get("crop")}
                 manual = (round(ov["in_tc"], 3), round(ov.get("impact", 0.6), 3))
             else:
-                clip = pick(hero_pool, ot, d, True, exclude=hused); hused.add(clip["id"])
+                clip = pick(hero_pool, ot, de, True, exclude=hused); hused.add(clip["id"])
             eff = ["freezeflash", "shake"] if prim else ["punch", "shake", "rgbsplit"]
         elif tag == "low":
-            clip = pick(low, ot, d, True, avoid=recent); eff = ["punch"] if i == 0 else []
+            clip = pick(low, ot, de, True, avoid=recent); eff = ["punch"] if i == 0 else []
         elif tag == "build":
-            clip = pick(mid, ot, d, False, avoid=recent)
+            clip = pick(mid, ot, de, False, avoid=recent)
             eff = ["punch", "beatflash"] if (db and i % 4 == 0) else (["punch"] if i % 2 == 0 else [])
         else:
-            clip = pick(high, ot, d, False, avoid=recent)
+            clip = pick(high, ot, de, False, avoid=recent)
             if entry: eff = ["dropflash", "shake", "punch"]
             elif db:
                 eff = ["punch", "shake"] if i % 2 == 0 else ["punch", "beatflash"]
                 if tag == "drop" and clip["motion_max"] > 0.15 and i % 6 == 0: eff = [eff[0], "rgbsplit"]
             else: eff = ["punch"] if (tag == "drop" or i % 2 == 0) else []
+        if STYLE == "remaster":
+            if c["hero"]: eff = ["dropflash"] if prim else ["beatflash"]
+            elif entry: eff = ["dropflash"]
+            elif db and i % 4 == 0: eff = ["beatflash"]
+            else: eff = []
         recent = (recent + [clip["src"]])[-3:]
         nth = uc.get(clip["id"], 0); uc[clip["id"]] = nth + 1; lu[clip["id"]] = ot
-        it, imp = manual if manual else inpoint(clip, d + MARGIN, nth)
+        it, imp = manual if manual else inpoint(clip, de + MARGIN, nth)
         assign.append({"i": i, "start": round(c["start"], 4), "dur": round(d, 4), "nf": nf,
             "tag": tag, "hero": c["hero"], "src": clip["src"], "clip_id": clip["id"],
-            "in_tc": it, "impact": imp, "crop": clip.get("crop_ov") or scrop.get(clip["src"]),
+            "in_tc": it, "impact": imp, "speed": speed,
+            "crop": clip.get("crop_ov") or scrop.get(clip["src"]),
             "effects": eff, "label": clip["label"],
             "_w": clip.get("w") or dims.get(clip["src"], (0, 0))[0],
             "_h": clip.get("h") or dims.get(clip["src"], (0, 0))[1],

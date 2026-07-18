@@ -14,6 +14,7 @@ ROOT = os.path.abspath(sys.argv[1])
 CFG = json.load(open(f"{ROOT}/project.json"))
 DRAFT = "--draft" in sys.argv
 N = int(sys.argv[sys.argv.index("--n") + 1]) if "--n" in sys.argv else 40
+ROT = "transpose=2," if CFG.get("style") == "remaster" else ""
 os.makedirs(f"{ROOT}/frames", exist_ok=True)
 
 
@@ -25,7 +26,7 @@ def sheet():
     rows = math.ceil(N / cols)
     step = dur / N
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", vid,
-        "-vf", f"fps=1/{step:.3f},scale=340:191,tile={cols}x{rows}:margin=2:padding=2",
+        "-vf", f"fps=1/{step:.3f},{ROT}scale=340:191,tile={cols}x{rows}:margin=2:padding=2",
         "-frames:v", "1", out], check=True)
     print(f"contact sheet ({N} frames, {cols}x{rows}) → {out}")
     print("Read it as an image. Reject: black frames, broadcast wipes, sponsor/score bumpers,")
@@ -39,7 +40,7 @@ def seggrid():
     tmp = f"{ROOT}/frames/segtiles"
     os.makedirs(tmp, exist_ok=True)
     for f in glob.glob(f"{tmp}/*.jpg"): os.remove(f)
-    tall = CFG["out_h"] > CFG["out_w"]
+    tall = CFG["out_h"] > CFG["out_w"] and not ROT
     sw, sh = (126, 224) if tall else (224, 126)
     tiles = 0
     for f in segs:
@@ -49,7 +50,7 @@ def seggrid():
             (min(4, n - 1), "a"), (n // 2, "b"), (max(n - 2, 0), "c")]
         for k, sub in picks:
             subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", f,
-                "-vf", f"select=eq(n\\,{k}),scale={sw}:{sh},"
+                "-vf", f"select=eq(n\\,{k}),{ROT}scale={sw}:{sh},"
                        f"drawtext=text='{idx}{sub}':fontsize=34:fontcolor=yellow:box=1:boxcolor=black",
                 "-frames:v", "1", "-fps_mode", "passthrough", f"{tmp}/f{idx}{sub}.jpg"], check=True)
             tiles += 1

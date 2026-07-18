@@ -17,8 +17,14 @@ WORKERS = min(6, (os.cpu_count() or 4))
 
 _enc = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], capture_output=True, text=True).stdout
 NVENC = "h264_nvenc" in _enc
+STYLE = CFG.get("style", "classic")
 OSW, OSH = int(round(OW * 1.06 / 2)) * 2, int(round(OH * 1.06 / 2)) * 2
-GRADE = (f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,crop={OW}:{OH}," + CFG["grade"])
+if STYLE == "remaster":
+    GRADE = (f"transpose=1,scale={OW}:{OH}:force_original_aspect_ratio=increase,"
+             f"crop={OW}:{OH}," + CFG["grade"])
+else:
+    GRADE = (f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,crop={OW}:{OH}," + CFG["grade"])
+MCI = f"minterpolate=fps={FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
 
 
 def zoom(a, d):
@@ -32,10 +38,28 @@ def shake(a, tau):   # crop evaluates t per-frame natively — NO eval= option o
             f"y='(in_h-{OH})/2+{a}*cos(2*PI*13*t)*exp(-t/{tau})'")
 
 
+def slowmo(speed):
+    """Slow the graded stream to output tempo, then synthesize the missing frames:
+    motion-compensated interpolation on the full render (the butter), plain fps
+    duplication on drafts (minterpolate is far too slow for a direction check)."""
+    p = []
+    if speed < 0.999: p.append(f"setpts=PTS/{speed}")
+    p.append(f"fps={FPS}" if DRAFT else MCI)
+    return p
+
+
 def vf(s):
     d, F, eff = s["dur"], s["impact"], s["effects"]; p = []
     if s.get("crop"): p.append(f"crop={s['crop']}")
     p.append(GRADE); p.append("setpts=PTS-STARTPTS")
+    if STYLE == "remaster":
+        p += slowmo(s.get("speed", 1.0))
+        p.append(zoom(0.03, d))
+        if "beatflash" in eff: p.append("eq=brightness='if(lt(t\\,0.04)\\,0.35\\,0)':eval=frame")
+        if "dropflash" in eff:
+            p.append("eq=brightness='if(lt(t\\,0.06)\\,0.6\\,if(lt(t\\,0.18)\\,0.6*(1-(t-0.06)/0.12)\\,0))':eval=frame")
+        p.append(f"setsar=1,fps={FPS},format=yuv420p")
+        return ",".join(p)
     if "freezeflash" in eff:
         Fc = min(max(F, 0.35), max(d - 0.25, 0.35))
         p += [f"trim=0:{Fc:.3f},setpts=PTS-STARTPTS",
@@ -55,24 +79,27 @@ def vf(s):
 
 
 def enc(preset_draft=False):
+    cq, crf = ("17", "16") if STYLE == "remaster" else ("20", "18")
     if NVENC:
         return ["-c:v", "h264_nvenc", "-preset", "p1" if preset_draft else "p6", "-tune", "hq",
-                "-rc", "vbr", "-cq", "30" if preset_draft else "20", "-b:v", "0",
-                "-maxrate", "60M", "-bufsize", "120M", "-spatial-aq", "1", "-temporal-aq", "1"]
+                "-rc", "vbr", "-cq", "30" if preset_draft else cq, "-b:v", "0",
+                "-maxrate", "90M" if STYLE == "remaster" else "60M", "-bufsize", "180M",
+                "-spatial-aq", "1", "-temporal-aq", "1"]
     return ["-c:v", "libx264", "-preset", "veryfast" if preset_draft else "medium",
-            "-crf", "26" if preset_draft else "18"]
+            "-crf", "26" if preset_draft else crf]
 
 
 def render_one(s):
     out = f"{SEG}/seg_{s['i']:03d}.mp4"; src = f"{ROOT}/src/{s['src']}.mp4"
-    inp = round(s["dur"] + 1.2, 3)
+    inp = round(s["dur"] * s.get("speed", 1.0) + 1.2, 3)
     base = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(s["in_tc"]),
             "-t", str(inp), "-i", src, "-vf", vf(s), "-frames:v", str(s["nf"]), "-fps_mode", "cfr",
             *enc(DRAFT), "-profile:v", "high", "-pix_fmt", "yuv420p", "-g", str(FPS * 2),
             "-bf", "3", "-video_track_timescale", str(FPS * 1000), "-an", out]
     r = subprocess.run(base, capture_output=True, text=True)
     if r.returncode == 0: return s["i"], True, "ok"
-    vf2 = f"{('crop=' + s['crop'] + ',') if s.get('crop') else ''}{GRADE},setpts=PTS-STARTPTS,setsar=1,fps={FPS},format=yuv420p"
+    sm = ",".join(slowmo(s.get("speed", 1.0))) + "," if STYLE == "remaster" else ""
+    vf2 = f"{('crop=' + s['crop'] + ',') if s.get('crop') else ''}{GRADE},setpts=PTS-STARTPTS,{sm}setsar=1,fps={FPS},format=yuv420p"
     fb = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(s["in_tc"]),
           "-t", str(inp), "-i", src, "-vf", vf2, "-frames:v", str(s["nf"]), "-fps_mode", "cfr",
           "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
@@ -90,7 +117,7 @@ def nbf(p):
 def main():
     segs = json.load(open(f"{ROOT}/assign.json"))["segments"]
     want = sum(s["nf"] for s in segs); os.makedirs(SEG, exist_ok=True)
-    print(f"render {len(segs)} segs {OW}x{OH} {'DRAFT' if DRAFT else 'FULL'} "
+    print(f"render {len(segs)} segs {OW}x{OH} {STYLE} {'DRAFT' if DRAFT else 'FULL'} "
           f"enc={'nvenc' if NVENC else 'libx264'} x{WORKERS}")
     fails, fb = [], []
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
