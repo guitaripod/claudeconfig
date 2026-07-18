@@ -71,6 +71,7 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
 - Assigner: no vertical crop framing; per-segment `"speed"` (hero 0.5, drop/peak 0.65, build 0.75, low 0.85); source in-point windows and clip-length checks use `dur*speed` (real footage consumed).
 - Renderer: after the grade, `setpts=PTS/speed` then `minterpolate=fps=<fps>:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1` (full render; drafts use plain `fps=` — mci is ~50× slower and a draft only checks direction). Effects reduced to soft beat/drop flashes + 3% zoom.
 - Encoder bumped for the detail-porn look: nvenc cq17 maxrate 90M (libx264 crf16). Uploading fat bitrate is the point — platform re-encodes eat sharpening first.
+- `render.py --landscape` (remaster only, mandatory deliverable): same assign/spine on a swapped 1920×1080 canvas without the transpose → `out/edit_landscape.mp4`, segments in `seg_ls/`. qc.py gates the portrait master; the landscape render's Σframes printout is its check.
 - contact_sheet auto-prepends `transpose=2` so review tiles read upright; grade lives in project.json like any style (`extract_audio.py` seeds the remaster preset: hqdn3d → unsharp → cas → eq/vibrance → curves).
 - Re-running `extract_audio.py` with a different `--style` resets `grade` to the new style's preset; same style preserves a hand-tuned grade.
 

@@ -26,7 +26,7 @@ Two art directions, chosen at Phase 0; `project.json "style"` drives every later
 - **`remaster` — the TikTok default.** The "4K quality edit" genre (reference: 9s Messi edit, 5.5M views): the **full landscape broadcast frame rotated 90° clockwise** to fill 1080×1920 edge-to-edge — zero pixels cropped away, content runs under the TikTok UI, the viewer rotates their phone. On top: a **4K-remaster grade** (denoise → oversharpen → cas → saturation/vibrance → HDR-ish curve), **slow motion everywhere** (heroes 0.5×, drops/peaks 0.65×, builds 0.75×, lulls 0.85×) synthesized to **buttery 60fps** by motion-compensated interpolation on the full render, and **near-zero effects** — a soft flash on drop entries and occasional downbeats, a 3% drift zoom, nothing else. The detail and the slow-mo ARE the effect. Cadence is deliberate: ~2.2s+ opening hold, then ~1s beat-locked cuts, heroes held 3–4 beats. Short totals fit the genre (9–20s); every clip must be an **iconic moment** of the subject.
 - **`classic`** — the original 1920×1080@30 (or vertical-cropped) punchy montage: teal-orange grade, energy-mapped machine-gun cuts, punch zooms/flashes/shake/RGB-split, freeze-frame hero. Use for landscape deliveries, YouTube, or when the brief asks for aggressive effect-driven editing.
 
-Canvas defaults come from the style (remaster 1080×1920@60, classic 1920×1080@30); `--w/--h/--fps` override.
+Canvas defaults come from the style (remaster 1080×1920@60, classic 1920×1080@30); `--w/--h/--fps` override. **Remaster always ships two files**: the portrait master AND `render.py --landscape` — the same edit on a 1920×1080 canvas without the rotation.
 
 ## Prerequisites
 
@@ -98,6 +98,7 @@ The **segment grid is the precision review tool**: every defect maps to a segmen
 
 ```bash
 python3 $S/render.py <workdir>              # full-res NVENC/libx264 render → out/edit.mp4
+python3 $S/render.py <workdir> --landscape  # remaster: MANDATORY 1920x1080 companion (same edit, un-rotated) → out/edit_landscape.mp4
 python3 $S/qc.py     <workdir>             # numeric gates — must be ALL GATES PASS
 python3 $S/contact_sheet.py <workdir> --n 48   # full-res visual pass
 ```
@@ -108,7 +109,7 @@ Between passes, actually inspect. `qc.py` must be green (frames, format, zero A/
 
 ### Phase 5 — Deliver
 
-Write `out/director_note.md` (choices + what you fixed between passes). Deliver as asked — e.g. Taildrop to a phone: `tailscale file cp out/edit.mp4 <device>:` (check `tailscale status` for an online device first).
+Write `out/director_note.md` (choices + what you fixed between passes). **Default delivery is the hypebot Telegram bot** (token/chat in `~/.config/hypebot/secrets.env`): send each video (`sendVideo`; files ≥49MB get a ~46MB preview encode first — full-res stays on disk under `~/Videos/hype/<date>/`), then the TikTok caption as its **own separate message** so it copy-pastes clean. Never Taildrop unless explicitly asked.
 
 ## Effect catalog (restraint > quantity)
 

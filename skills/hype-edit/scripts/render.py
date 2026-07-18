@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""render.py <workdir> [--draft] — Phase 3b: render each segment (grade+effects),
-concat, mux the master audio. Auto-detects NVENC (falls back to libx264).
-Writes out/edit.mp4 (or out/edit_draft.mp4). Reads project.json."""
+"""render.py <workdir> [--draft] [--landscape] — Phase 3b: render each segment
+(grade+effects), concat, mux the master audio. Auto-detects NVENC (falls back to
+libx264). Writes out/edit.mp4 (or out/edit_draft.mp4). Reads project.json.
+--landscape (remaster only): companion render of the SAME edit on a swapped
+canvas (1920x1080) without the 90deg rotation → out/edit_landscape.mp4."""
 import sys, json, subprocess, os
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.abspath(sys.argv[1])
 CFG = json.load(open(f"{ROOT}/project.json"))
-SEG = f"{ROOT}/seg"
 DRAFT = "--draft" in sys.argv
+LS = "--landscape" in sys.argv
+if LS and CFG.get("style", "classic") != "remaster":
+    sys.exit("--landscape is only for the remaster style (classic is already landscape)")
+SEG = f"{ROOT}/seg_ls" if LS else f"{ROOT}/seg"
 FPS = CFG["fps"]
-FW, FH = CFG["out_w"], CFG["out_h"]
+FW, FH = (CFG["out_h"], CFG["out_w"]) if LS else (CFG["out_w"], CFG["out_h"])
 OW, OH = (FW // 2, FH // 2) if DRAFT else (FW, FH)
 SW, SH = int(round(OW * 1.06 / 2)) * 2, int(round(OH * 1.06 / 2)) * 2
 WORKERS = min(6, (os.cpu_count() or 4))
@@ -20,8 +25,9 @@ NVENC = "h264_nvenc" in _enc
 STYLE = CFG.get("style", "classic")
 OSW, OSH = int(round(OW * 1.06 / 2)) * 2, int(round(OH * 1.06 / 2)) * 2
 if STYLE == "remaster":
-    GRADE = (f"transpose=1,scale={OW}:{OH}:force_original_aspect_ratio=increase,"
-             f"crop={OW}:{OH}," + CFG["grade"])
+    GRADE = ((("" if LS else "transpose=1,") +
+             f"scale={OW}:{OH}:force_original_aspect_ratio=increase,"
+             f"crop={OW}:{OH},") + CFG["grade"])
 else:
     GRADE = (f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,crop={OW}:{OH}," + CFG["grade"])
 MCI = f"minterpolate=fps={FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
@@ -128,13 +134,14 @@ def main():
     if fails: print(f"  !! FAILED {len(fails)}: {fails[:8]}"); return 1
     tot = sum(nbf(f"{SEG}/seg_{s['i']:03d}.mp4") for s in segs)
     print(f"Σframes={tot} (want {want})" + (" ✓" if tot == want else " !! MISMATCH"))
-    with open(f"{ROOT}/work/concat.txt", "w") as f:
+    tag = "_ls" if LS else ""
+    with open(f"{ROOT}/work/concat{tag}.txt", "w") as f:
         for s in segs: f.write(f"file '{SEG}/seg_{s['i']:03d}.mp4'\n")
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat",
-        "-safe", "0", "-i", f"{ROOT}/work/concat.txt", "-c", "copy",
-        "-video_track_timescale", str(FPS * 1000), f"{ROOT}/work/video.mp4"], check=True)
-    out = f"{ROOT}/out/edit{'_draft' if DRAFT else ''}.mp4"
-    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", f"{ROOT}/work/video.mp4",
+        "-safe", "0", "-i", f"{ROOT}/work/concat{tag}.txt", "-c", "copy",
+        "-video_track_timescale", str(FPS * 1000), f"{ROOT}/work/video{tag}.mp4"], check=True)
+    out = f"{ROOT}/out/edit{'_landscape' if LS else ''}{'_draft' if DRAFT else ''}.mp4"
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", f"{ROOT}/work/video{tag}.mp4",
         "-i", f"{ROOT}/{CFG['audio_master']}", "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
         "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart", out], check=True)
     dur = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
