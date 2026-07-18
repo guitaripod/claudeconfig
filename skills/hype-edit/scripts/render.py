@@ -3,8 +3,11 @@
 (grade+effects), concat, mux the master audio. Auto-detects NVENC (falls back to
 libx264). Writes out/edit.mp4 (or out/edit_draft.mp4). Reads project.json.
 --landscape (remaster only): companion render of the SAME edit on a swapped
-canvas (1920x1080) without the 90deg rotation → out/edit_landscape.mp4."""
-import sys, json, subprocess, os
+canvas (1920x1080) without the 90deg rotation → out/edit_landscape.mp4.
+Remaster full renders interpolate with RIFE (rife-ncnn-vulkan, optical flow on
+the GPU) when the binary is on PATH — HYPE_NO_RIFE=1 forces the legacy
+minterpolate chain, which also remains the per-segment fallback."""
+import sys, json, subprocess, os, shutil, threading
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.abspath(sys.argv[1])
@@ -32,6 +35,28 @@ else:
     GRADE = (f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,crop={OW}:{OH}," + CFG["grade"])
 MCI = f"minterpolate=fps={FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
 
+_RIFE_BIN = os.environ.get("HYPE_RIFE_BIN") or shutil.which("rife-ncnn-vulkan")
+_RIFE_MODEL = os.environ.get("HYPE_RIFE_MODEL") or (
+    os.path.join(os.path.dirname(os.path.realpath(_RIFE_BIN)), "rife-v4.6") if _RIFE_BIN else "")
+RIFE = (STYLE == "remaster" and not DRAFT and os.environ.get("HYPE_NO_RIFE") != "1"
+        and bool(_RIFE_BIN) and os.path.isdir(_RIFE_MODEL))
+RIFE_SLOTS = threading.Semaphore(2)
+_FPSC, _FPSC_LOCK = {}, threading.Lock()
+
+
+def src_fps(path):
+    with _FPSC_LOCK:
+        if path in _FPSC: return _FPSC[path]
+    o = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+        "stream=r_frame_rate", "-of", "csv=p=0", path], capture_output=True, text=True).stdout.strip()
+    try:
+        n, d = o.split("/"); v = float(n) / float(d)
+    except ValueError:
+        v = 30.0
+    with _FPSC_LOCK:
+        _FPSC[path] = v
+    return v
+
 
 def zoom(a, d):
     return (f"scale=w='{OW}*(1+{a}*min(t\\,{d})/{d})':h='{OH}*(1+{a}*min(t\\,{d})/{d})':eval=frame,"
@@ -54,16 +79,23 @@ def slowmo(speed):
     return p
 
 
+def remaster_fx(s):
+    """Output-timeline effects for a remaster segment: drift zoom plus the soft
+    flashes — applied after retiming, so t is edit time."""
+    d, eff = s["dur"], s["effects"]; p = [zoom(0.03, d)]
+    if "beatflash" in eff: p.append("eq=brightness='if(lt(t\\,0.04)\\,0.35\\,0)':eval=frame")
+    if "dropflash" in eff:
+        p.append("eq=brightness='if(lt(t\\,0.06)\\,0.6\\,if(lt(t\\,0.18)\\,0.6*(1-(t-0.06)/0.12)\\,0))':eval=frame")
+    return p
+
+
 def vf(s):
     d, F, eff = s["dur"], s["impact"], s["effects"]; p = []
     if s.get("crop"): p.append(f"crop={s['crop']}")
     p.append(GRADE); p.append("setpts=PTS-STARTPTS")
     if STYLE == "remaster":
         p += slowmo(s.get("speed", 1.0))
-        p.append(zoom(0.03, d))
-        if "beatflash" in eff: p.append("eq=brightness='if(lt(t\\,0.04)\\,0.35\\,0)':eval=frame")
-        if "dropflash" in eff:
-            p.append("eq=brightness='if(lt(t\\,0.06)\\,0.6\\,if(lt(t\\,0.18)\\,0.6*(1-(t-0.06)/0.12)\\,0))':eval=frame")
+        p += remaster_fx(s)
         p.append(f"setsar=1,fps={FPS},format=yuv420p")
         return ",".join(p)
     if "freezeflash" in eff:
@@ -95,15 +127,48 @@ def enc(preset_draft=False):
             "-crf", "26" if preset_draft else crf]
 
 
+def render_rife(s, src, out, inp):
+    """RIFE segment path: graded frames at source fps → optical-flow retime to
+    exactly nf frames (rife-v4 target-frame-count mode does slow-mo + 60fps
+    synthesis in one uniform resample) → output-timeline effects + encode."""
+    if s["nf"] < 2: return False
+    n_in = max(2, int(round(s["dur"] * s.get("speed", 1.0) * src_fps(src))))
+    tmp = f"{SEG}/rife_{s['i']:03d}"; ind, outd = f"{tmp}/a", f"{tmp}/b"
+    shutil.rmtree(tmp, ignore_errors=True); os.makedirs(ind); os.makedirs(outd)
+    try:
+        pre = ",".join(([f"crop={s['crop']}"] if s.get("crop") else [])
+                       + [GRADE, "setpts=PTS-STARTPTS"])
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-ss", str(s["in_tc"]), "-t", str(inp), "-i", src, "-vf", pre,
+            "-frames:v", str(n_in), f"{ind}/%05d.png"], capture_output=True, text=True)
+        if r.returncode != 0 or len(os.listdir(ind)) < 2: return False
+        with RIFE_SLOTS:
+            r = subprocess.run([_RIFE_BIN, "-i", ind, "-o", outd, "-m", _RIFE_MODEL,
+                "-n", str(s["nf"]), "-j", "4:4:4", "-f", "%05d.png"],
+                capture_output=True, text=True)
+        if r.returncode != 0 or len(os.listdir(outd)) != s["nf"]: return False
+        post = ",".join(remaster_fx(s) + [f"setsar=1,fps={FPS},format=yuv420p"])
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-framerate", str(FPS), "-i", f"{outd}/%05d.png", "-vf", post,
+            "-frames:v", str(s["nf"]), "-fps_mode", "cfr", *enc(False),
+            "-profile:v", "high", "-pix_fmt", "yuv420p", "-g", str(FPS * 2), "-bf", "3",
+            "-video_track_timescale", str(FPS * 1000), "-an", out], capture_output=True, text=True)
+        return r.returncode == 0
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def render_one(s):
     out = f"{SEG}/seg_{s['i']:03d}.mp4"; src = f"{ROOT}/src/{s['src']}.mp4"
     inp = round(s["dur"] * s.get("speed", 1.0) + 1.2, 3)
+    if RIFE and render_rife(s, src, out, inp):
+        return s["i"], True, "rife"
     base = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(s["in_tc"]),
             "-t", str(inp), "-i", src, "-vf", vf(s), "-frames:v", str(s["nf"]), "-fps_mode", "cfr",
             *enc(DRAFT), "-profile:v", "high", "-pix_fmt", "yuv420p", "-g", str(FPS * 2),
             "-bf", "3", "-video_track_timescale", str(FPS * 1000), "-an", out]
     r = subprocess.run(base, capture_output=True, text=True)
-    if r.returncode == 0: return s["i"], True, "ok"
+    if r.returncode == 0: return s["i"], True, "mci" if RIFE else "ok"
     sm = ",".join(slowmo(s.get("speed", 1.0))) + "," if STYLE == "remaster" else ""
     vf2 = f"{('crop=' + s['crop'] + ',') if s.get('crop') else ''}{GRADE},setpts=PTS-STARTPTS,{sm}setsar=1,fps={FPS},format=yuv420p"
     fb = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(s["in_tc"]),
@@ -124,12 +189,14 @@ def main():
     segs = json.load(open(f"{ROOT}/assign.json"))["segments"]
     want = sum(s["nf"] for s in segs); os.makedirs(SEG, exist_ok=True)
     print(f"render {len(segs)} segs {OW}x{OH} {STYLE} {'DRAFT' if DRAFT else 'FULL'} "
-          f"enc={'nvenc' if NVENC else 'libx264'} x{WORKERS}")
-    fails, fb = [], []
+          f"enc={'nvenc' if NVENC else 'libx264'} interp={'rife' if RIFE else 'mci'} x{WORKERS}")
+    fails, fb, mci = [], [], []
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         for i, ok, m in ex.map(render_one, segs):
             if not ok: fails.append((i, m))
             elif m == "fallback": fb.append(i)
+            elif m == "mci": mci.append(i)
+    if mci: print(f"  {len(mci)} RIFE-fallback (minterpolate) segments: {mci[:12]}")
     if fb: print(f"  {len(fb)} CPU-fallback segments: {fb[:12]}")
     if fails: print(f"  !! FAILED {len(fails)}: {fails[:8]}"); return 1
     tot = sum(nbf(f"{SEG}/seg_{s['i']:03d}.mp4") for s in segs)
