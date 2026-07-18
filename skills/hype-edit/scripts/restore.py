@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""restore.py <workdir> --segs 0,5,12 | --heroes — opt-in SeedVR2 restoration of
-chosen segments' source windows before the full render. Extracts each segment's
-exact render input window (same fast-seek -ss, so pinned in_tcs stay valid),
-runs SeedVR2 3B fp8 on it at native resolution (~2.7s/frame on the RTX 5080;
-needs ~10GB free VRAM), writes src/<id>__srNNN.mp4 and repoints the segment at
-it (in_tc rebased to 0). assign.json is backed up to assign.json.presr; re-run
-render.py afterwards. Re-running assign_clips.py discards the repointing, like
-any hand-patch. HYPE_SEEDVR2 overrides the tool root."""
+"""restore.py <workdir> [--segs 0,5,12 | --heroes] — SeedVR2 restoration of
+segments' source windows before the final render. Default is EVERY segment
+(production optimizes for quality, not speed); --segs/--heroes narrow it.
+Extracts each segment's exact render input window (same fast-seek -ss, so
+pinned in_tcs stay valid), runs SeedVR2 3B fp8 on it at native resolution
+(~2.7s/frame on the RTX 5080; needs ~10GB free VRAM — run it without other
+heavy GPU jobs), writes src/<id>__srNNN.mp4 and repoints the segment at it
+(in_tc rebased to 0). Already-restored segments are skipped, so re-running
+after a redo only processes changed segments. assign.json is backed up to
+assign.json.presr; re-run render.py (both orientations) afterwards. Re-running
+assign_clips.py discards the repointing, like any hand-patch. A failed segment
+keeps its original source (graceful per-segment). HYPE_SEEDVR2 overrides the
+tool root."""
 import sys, json, os, shutil, subprocess
 
 ROOT = os.path.abspath(sys.argv[1])
@@ -23,7 +28,8 @@ if "--heroes" in sys.argv:
 elif "--segs" in sys.argv:
     targets = [int(x) for x in sys.argv[sys.argv.index("--segs") + 1].split(",")]
 else:
-    sys.exit("pass --segs i,j,k or --heroes")
+    targets = [s["i"] for s in segs]
+print(f"restoring {len(targets)}/{len(segs)} segments")
 
 
 def probe(path, entries):
