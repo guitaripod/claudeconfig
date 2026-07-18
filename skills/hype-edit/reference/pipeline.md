@@ -102,3 +102,9 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
 - Corrupt sources: `for f in src/*.mp4; do ffmpeg -v error -i "$f" -map 0:v:0 -f null - 2>&1 | grep -icE 'NAL|error'; done` → re-`fetch.sh` any nonzero.
 - Mismatched frames after render: a segment's `nf` didn't materialize (usually a bad effect string forcing CPU fallback that still under-produced) — check `render.py`'s fallback list, fix the filter, re-run (only changed segments re-encode if you delete just those `seg_###.mp4`).
 - Two agents in one workdir: `ps -eo pid,cmd | grep 'claude -p'` — kill the stale one before it clobbers scripts/state.
+
+## restore.py (opt-in SeedVR2 segment restoration)
+
+- Tool root: `/mnt/games-nvme-gen4/tools/seedvr2` (`HYPE_SEEDVR2` overrides) — ComfyUI-SeedVR2 CLI in its own venv, 3B fp8 weights auto-downloaded. Needs ~10GB free VRAM (OOMs beside heavy GPU jobs — run it alone); ~2.7s/frame at 1080p on the RTX 5080.
+- Per target segment: extract the render-exact input window (`-ss in_tc -t dur*speed+1.2`, fast seek → pinned in_tcs stay valid) to a crf10 intermediate → SeedVR2 at native short-side resolution, batch_size 5, tiled VAE → `src/<id>__srNNN.mp4`, segment repointed (`src=…__srNNN`, `in_tc=0`). `assign.json.presr` is the backup; frame-loss >10% keeps the original.
+- Run it AFTER the cut is locked (it repoints assign.json like a hand-patch — re-running assign_clips.py discards it), then re-render both orientations. Use on compressed/soft hero sources; skip crisp official 1080p50 — the remaster grade already over-sharpens restored footage slightly, so restraint applies.
