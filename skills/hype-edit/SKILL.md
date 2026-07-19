@@ -17,11 +17,11 @@ Not this skill: trimming one clip, plain concatenation, or a slideshow with no b
 
 ## Clarify first (only if genuinely ambiguous)
 
-Ask 2–4 crisp questions, then go. Good ones: **subject/scope** (which player/team/scene, whole thing vs a slice), **length** (full song vs a section — say `--start/--end`), **style** (see Styles below), and **delivery** (file, or send somewhere). If the brief is already clear, don't stall — act.
+Ask 2–4 crisp questions, then go. Good ones: **subject/scope** (which player/team/scene, whole thing vs a slice) and **length** (full song vs a section — say `--start/--end`). **Never ask about style, format, or delivery — they are fixed, not choices:** every edit is built in the `remaster` (vertical TikTok) style, *always* also renders the `--landscape` companion, and *always* delivers by sending the landscape render to the hypebot Telegram bot followed by the caption as its own message (Phase 5). Do not surface a format/style/delivery picker. If the brief is already clear, don't stall — act.
 
 ## Styles (`extract_audio.py --style …`)
 
-Two art directions, chosen at Phase 0; `project.json "style"` drives every later stage.
+The workflow is **fixed to `remaster`** — always build the vertical TikTok edit; never ask the user to pick a style. `classic` is kept below for reference and rare landscape-only experiments, but it is not part of the standard path. `project.json "style"` drives every later stage.
 
 - **`remaster` — the TikTok default.** The "4K quality edit" genre (reference: 9s Messi edit, 5.5M views): the **full landscape broadcast frame rotated 90° clockwise** to fill 1080×1920 edge-to-edge — zero pixels cropped away, content runs under the TikTok UI, the viewer rotates their phone. On top: a **4K-remaster grade** (denoise → oversharpen → cas → saturation/vibrance → HDR-ish curve), **slow motion everywhere** (heroes 0.5×, drops/peaks 0.65×, builds 0.75×, lulls 0.85×) synthesized to **buttery 60fps** by RIFE optical-flow interpolation on the full render (GPU, via `rife-ncnn-vulkan`; falls back to ffmpeg minterpolate per segment if the binary is missing — `HYPE_NO_RIFE=1` forces the fallback), and **near-zero effects** — a soft flash on drop entries and occasional downbeats, a 3% drift zoom, nothing else. The detail and the slow-mo ARE the effect. Cadence is deliberate: ~2.2s+ opening hold, then ~1s beat-locked cuts, heroes held 3–4 beats. Short totals fit the genre (9–20s); every clip must be an **iconic moment** of the subject.
 - **`classic`** — the original 1920×1080@30 (or vertical-cropped) punchy montage: teal-orange grade, energy-mapped machine-gun cuts, punch zooms/flashes/shake/RGB-split, freeze-frame hero. Use for landscape deliveries, YouTube, or when the brief asks for aggressive effect-driven editing.
@@ -56,7 +56,7 @@ PY=<workdir>/.venv/bin/python       # use THIS python for build_spine.py, scenes
 ### Phase 0 — Audio is the boss
 
 ```bash
-$PY $S/extract_audio.py <workdir> "<song file or URL>" [--style remaster] [--start S --end E] [--pitch 1.04]
+$PY $S/extract_audio.py <workdir> "<song file or URL>" --style remaster [--start S --end E] [--pitch 1.04]
 $PY $S/build_spine.py <workdir>
 ```
 
