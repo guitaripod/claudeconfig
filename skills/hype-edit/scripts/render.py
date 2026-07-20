@@ -12,17 +12,38 @@ DRAFT = "--draft" in sys.argv
 FPS = CFG["fps"]
 FW, FH = CFG["out_w"], CFG["out_h"]
 OW, OH = (FW // 2, FH // 2) if DRAFT else (FW, FH)
-SW, SH = int(round(OW * 1.06 / 2)) * 2, int(round(OH * 1.06 / 2)) * 2
+# frame_overscan >1 = tighter center crop (1.06 default landscape; ~1.18–1.25 for vertical)
+OVER = float(CFG.get("frame_overscan", 1.06))
+SW, SH = int(round(OW * OVER / 2)) * 2, int(round(OH * OVER / 2)) * 2
 WORKERS = min(6, (os.cpu_count() or 4))
 
 _enc = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], capture_output=True, text=True).stdout
 NVENC = "h264_nvenc" in _enc
-OSW, OSH = int(round(OW * 1.06 / 2)) * 2, int(round(OH * 1.06 / 2)) * 2
-GRADE = (f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,crop={OW}:{OH}," + CFG["grade"])
+OSW, OSH = int(round(OW * OVER / 2)) * 2, int(round(OH * OVER / 2)) * 2
+# Optional vertical bias: crop_y_bias 0=center, + = lower (good for pitch-level players)
+YBIAS = float(CFG.get("crop_y_bias", 0.0))
+VERTICAL = OH > OW
+
+
+def grade_chain(sx=0.5):
+    """Fill-frame scale then crop so subject_x (0–1) lands at horizontal center."""
+    sx = max(0.05, min(0.95, float(sx)))
+    # x such that subject is centered: clamp to valid crop range
+    xexpr = f"max(0\\,min(in_w-{OW}\\,{sx}*in_w-{OW}/2))"
+    yexpr = (f"(in_h-{OH})/2+{YBIAS}*(in_h-{OH})/2" if abs(YBIAS) > 1e-6
+             else f"(in_h-{OH})/2")
+    return (f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,"
+            f"crop={OW}:{OH}:{xexpr}:{yexpr}," + CFG["grade"])
 
 
 def zoom(a, d):
     return (f"scale=w='{OW}*(1+{a}*min(t\\,{d})/{d})':h='{OH}*(1+{a}*min(t\\,{d})/{d})':eval=frame,"
+            f"crop={OW}:{OH}:(in_w-{OW})/2:(in_h-{OH})/2")
+
+
+def stomp(a, tau=0.09):
+    # Front-loaded slam: max zoom on the cut (the beat), settles fast.
+    return (f"scale=w='{OW}*(1+{a}*exp(-t/{tau}))':h='{OH}*(1+{a}*exp(-t/{tau}))':eval=frame,"
             f"crop={OW}:{OH}:(in_w-{OW})/2:(in_h-{OH})/2")
 
 
@@ -32,24 +53,45 @@ def shake(a, tau):   # crop evaluates t per-frame natively — NO eval= option o
             f"y='(in_h-{OH})/2+{a}*cos(2*PI*13*t)*exp(-t/{tau})'")
 
 
+def whip(amp=36, dur=0.055):
+    # Directional smear into the cut — reads as a whip pan landing on the beat.
+    sw = int(round(OW * 1.12 / 2)) * 2
+    sh = int(round(OH * 1.12 / 2)) * 2
+    return (f"scale={sw}:{sh},"
+            f"crop={OW}:{OH}:"
+            f"x='(in_w-{OW})/2+if(lt(t\\,{dur})\\,{amp}*(1-t/{dur})\\,0)':"
+            f"y='(in_h-{OH})/2',"
+            f"gblur=sigma=10:enable='lt(t\\,{dur})'")
+
+
 def vf(s):
     d, F, eff = s["dur"], s["impact"], s["effects"]; p = []
     if s.get("crop"): p.append(f"crop={s['crop']}")
-    p.append(GRADE); p.append("setpts=PTS-STARTPTS")
+    sx = s.get("subject_x", 0.5)
+    p.append(grade_chain(sx)); p.append("setpts=PTS-STARTPTS")
+    # Vertical needs gentler zoom or the subject gets crushed out of frame
+    z_hi, z_mid, z_lo = (0.08, 0.06, 0.03) if VERTICAL else (0.14, 0.09, 0.05)
+    z_stomp = 0.09 if VERTICAL else 0.14
     if "freezeflash" in eff:
         Fc = min(max(F, 0.35), max(d - 0.25, 0.35))
         p += [f"trim=0:{Fc:.3f},setpts=PTS-STARTPTS",
-              f"tpad=stop_mode=clone:stop_duration={d - Fc + 0.7:.3f}", zoom(0.12, d),
-              f"eq=brightness='if(between(t\\,{Fc:.3f}\\,{Fc + 0.06:.3f})\\,0.85*(1-(t-{Fc:.3f})/0.06)\\,0)':eval=frame"]
-        if "shake" in eff: p.append(shake(16, 0.30))
+              f"tpad=stop_mode=clone:stop_duration={d - Fc + 0.7:.3f}", zoom(z_hi, d),
+              f"eq=brightness='if(between(t\\,{Fc:.3f}\\,{Fc + 0.07:.3f})\\,0.95*(1-(t-{Fc:.3f})/0.07)\\,0)':eval=frame"]
+        if "shake" in eff: p.append(shake(12 if VERTICAL else 18, 0.28))
     else:
-        if "punch" in eff: p.append(zoom(0.08, d))
-        else: p.append(zoom(0.06, d))
-        if "beatflash" in eff: p.append("eq=brightness='if(lt(t\\,0.04)\\,0.5\\,0)':eval=frame")
+        if "stomp" in eff: p.append(stomp(z_stomp if "dropflash" in eff else z_stomp * 0.85))
+        elif "punch" in eff: p.append(zoom(z_mid, d))
+        else: p.append(zoom(z_lo, d))
+        if "whip" in eff: p.append(whip(28 if VERTICAL else 40 if "dropflash" in eff else 30))
         if "dropflash" in eff:
-            p.append("eq=brightness='if(lt(t\\,0.06)\\,0.85\\,if(lt(t\\,0.18)\\,0.85*(1-(t-0.06)/0.12)\\,0))':eval=frame")
-        if "rgbsplit" in eff: p.append("rgbashift=rh=4:bh=-4")
-        if "shake" in eff: p.append(shake(13, 0.26))
+            p.append("eq=brightness='if(lt(t\\,0.04)\\,0.78\\,if(lt(t\\,0.14)\\,0.78*(1-(t-0.04)/0.10)\\,0))':eval=frame")
+        elif "beatflash" in eff:
+            p.append("eq=brightness='if(lt(t\\,0.03)\\,0.58\\,if(lt(t\\,0.07)\\,0.58*(1-(t-0.03)/0.04)\\,0))':eval=frame")
+        if "rgbsplit" in eff:
+            rh = 7 if ("dropflash" in eff or "stomp" in eff) else 4
+            p.append(f"rgbashift=rh={rh}:bh={-rh}")
+        if "shake" in eff:
+            p.append(shake(10 if VERTICAL else 16 if "dropflash" in eff else 12, 0.22))
     p.append(f"setsar=1,fps={FPS},format=yuv420p")
     return ",".join(p)
 

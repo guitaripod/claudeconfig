@@ -63,9 +63,10 @@ def main():
         return arr[i0:i1] if i1 <= len(arr) else arr[i0:]
 
     def inpoint(c, d, nth=0):
-        s, se = c["start"], min(c["end"] + MARGIN, c["srcdur"]); hi = max(se - d, s)
+        # Stay inside the scene (tiny pad only). Do not bleed into next scene/outro.
+        s, se = c["start"], min(c["end"] + 0.08, c["srcdur"]); hi = max(se - d, s)
         if hi <= s + 1e-3:
-            it = max(0.0, min(s, c["srcdur"] - d))
+            it = max(0.0, min(s, max(0.0, c["srcdur"] - d)))
         else:
             a = mot[c["src"]] if c["src"] in mot.files else np.zeros(1)
             bad = badf[c["src"]] if c["src"] in badf.files else np.zeros(1, np.uint8)
@@ -86,17 +87,19 @@ def main():
         return round(it, 3), round(min(float(np.argmax(seg)) / MFPS if len(seg) else d * 0.5, d), 3)
 
     def pick(pool, out_t, d, want_long, exclude=(), avoid=()):
-        lok = lambda c: (c["dur"] + MARGIN) >= d
+        # Always require enough real scene length for the segment. The old
+        # want_long=False path let short clips bleed into the next scene (or
+        # black outro) via MARGIN and produced black frames in the edit.
+        lok = lambda c: c["dur"] >= d + 0.05
         free = lambda c: lu.get(c["id"], -99) <= out_t - NOREPEAT
-        fresh = [c for c in pool if c["id"] not in exclude and uc.get(c["id"], 0) == 0
-                 and (not want_long or lok(c))]
+        fresh = [c for c in pool if c["id"] not in exclude and uc.get(c["id"], 0) == 0 and lok(c)]
         if fresh:
             div = [c for c in fresh if c["src"] not in avoid]; return (div or fresh)[0]
-        cand = [c for c in pool if c["id"] not in exclude and free(c) and (not want_long or lok(c))]
+        cand = [c for c in pool if c["id"] not in exclude and free(c) and lok(c)]
         if cand:
             div = [c for c in cand if c["src"] not in avoid] or cand
             return min(div, key=lambda c: uc.get(c["id"], 0))
-        cand = [c for c in pool if lok(c)] or pool
+        cand = [c for c in pool if lok(c)] or [c for c in pool if (c["dur"] + MARGIN) >= d] or pool
         return min(cand, key=lambda c: (uc.get(c["id"], 0), lu.get(c["id"], -99)))
 
     assign, hidx = [], 0
@@ -129,7 +132,7 @@ def main():
             else: eff = ["punch"] if (tag == "drop" or i % 2 == 0) else []
         recent = (recent + [clip["src"]])[-3:]
         nth = uc.get(clip["id"], 0); uc[clip["id"]] = nth + 1; lu[clip["id"]] = ot
-        it, imp = manual if manual else inpoint(clip, d + MARGIN, nth)
+        it, imp = manual if manual else inpoint(clip, d, nth)
         assign.append({"i": i, "start": round(c["start"], 4), "dur": round(d, 4), "nf": nf,
             "tag": tag, "hero": c["hero"], "src": clip["src"], "clip_id": clip["id"],
             "in_tc": it, "impact": imp, "crop": scrop.get(clip["src"]),

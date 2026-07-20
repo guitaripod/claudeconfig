@@ -57,8 +57,10 @@ def main():
     dur = np.floor((end - start) * a.fps) / a.fps         # frame-aligned
     na, nm = int(round(dur * SR_A)), int(round(dur * 44100))
     ss = f"{start}"
-    af_a = f"aresample={SR_A}:resampler=soxr,atrim=end_sample={na},apad=whole_len={na},asetpts=N/SR/TB"
-    af_m = f"aresample=44100:resampler=soxr,atrim=end_sample={nm},apad=whole_len={nm},asetpts=N/SR/TB"
+    # Prefer soxr when available; fall back to swr (Homebrew ffmpeg often omits libsoxr)
+    resampler = "soxr" if "soxr" in (sh(["ffmpeg", "-hide_banner", "-filters"]).stdout or "") else "swr"
+    af_a = f"aresample={SR_A}:resampler={resampler},atrim=end_sample={na},apad=whole_len={na},asetpts=N/SR/TB"
+    af_m = f"aresample=44100:resampler={resampler},atrim=end_sample={nm},apad=whole_len={nm},asetpts=N/SR/TB"
     sh(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", ss, "-i", song,
         "-t", str(dur + 1), "-vn", "-af", af_a, "-ac", "1", "-ar", str(SR_A),
         "-c:a", "pcm_s16le", f"{root}/song_22k_mono.wav"])

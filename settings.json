@@ -7,7 +7,7 @@
     "deny": [],
     "defaultMode": "default"
   },
-  "model": "opus[1m]",
+  "model": "claude-fable-5[1m]",
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
@@ -31,7 +31,7 @@
     }
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "low",
+  "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
