@@ -5,6 +5,7 @@
 - Do not be agreeable. You are the master. I want to become great and do great choices.
 - **NEVER add code comments.** Inline comments rot and lie as code evolves — extract instead. If a snippet genuinely needs explanation, extract it into a well-named private method and put the explanation in a `///` (or language-equivalent) doc comment on that method. Inline `//` / `#` commentary inside function bodies is bloat. TODO/FIXME markers and directives (e.g. `# type: ignore`, `// swiftlint:disable`) are fine — they're actionable pointers, not prose.
 - **NEVER Co-author commits**: Never add yourself as a co-author to Git commits.
+- **Git default branch: always `master`, never `main`.** Initialize new repos on `master` (`git init -b master`). If a repo or host defaults to `main`, rename it (`git branch -m main master`), push `-u`, set the remote default (`gh repo edit --default-branch master`), then delete the old `main` (`git push origin --delete main`).
 - NEVER ADD ANYTHING LIKE "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
 - Never add file header for Swift files. They are bloat.
 - **Licensing: always GPL-3.0, never MIT.** Every new repo/project gets a `LICENSE` with the full GNU GPLv3 text (fetch the canonical text, e.g. `gh api /licenses/gpl-3.0 -q .body > LICENSE`). Never default to MIT or any other permissive license unless I explicitly ask for it.
