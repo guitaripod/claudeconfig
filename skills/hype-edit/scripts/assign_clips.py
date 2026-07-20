@@ -206,6 +206,11 @@ def main():
             elif entry: eff = ["dropflash"]
             elif db and i % 4 == 0: eff = ["beatflash"]
             else: eff = []
+        elif not c["hero"]:
+            eff = ["punch", "dropflash" if db else "beatflash"]
+            if entry or i % 3 == 0: eff.append("shake")
+            if i % 3 == 1: eff.append("rgbsplit")
+            if i == 0: eff = ["punch", "dropflash", "shake"]
         recent = (recent + [clip["src"]])[-3:]
         nth = uc.get(clip["id"], 0); uc[clip["id"]] = nth + 1; lu[clip["id"]] = ot
         it, imp = manual if manual else inpoint(clip, de + MARGIN, nth)

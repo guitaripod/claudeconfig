@@ -92,7 +92,7 @@ def remaster_fx(s):
 def vf(s):
     d, F, eff = s["dur"], s["impact"], s["effects"]; p = []
     if s.get("crop"): p.append(f"crop={s['crop']}")
-    p.append(GRADE); p.append("setpts=PTS-STARTPTS")
+    p.append(s.get("grade") or GRADE); p.append("setpts=PTS-STARTPTS")
     if STYLE == "remaster":
         p += slowmo(s.get("speed", 1.0))
         p += remaster_fx(s)
@@ -101,17 +101,17 @@ def vf(s):
     if "freezeflash" in eff:
         Fc = min(max(F, 0.35), max(d - 0.25, 0.35))
         p += [f"trim=0:{Fc:.3f},setpts=PTS-STARTPTS",
-              f"tpad=stop_mode=clone:stop_duration={d - Fc + 0.7:.3f}", zoom(0.12, d),
+              f"tpad=stop_mode=clone:stop_duration={d - Fc + 0.7:.3f}", zoom(0.16, d),
               f"eq=brightness='if(between(t\\,{Fc:.3f}\\,{Fc + 0.06:.3f})\\,0.85*(1-(t-{Fc:.3f})/0.06)\\,0)':eval=frame"]
-        if "shake" in eff: p.append(shake(16, 0.30))
+        if "shake" in eff: p.append(shake(24, 0.30))
     else:
-        if "punch" in eff: p.append(zoom(0.08, d))
-        else: p.append(zoom(0.06, d))
+        if "punch" in eff: p.append(zoom(0.12, d))
+        else: p.append(zoom(0.09, d))
         if "beatflash" in eff: p.append("eq=brightness='if(lt(t\\,0.04)\\,0.5\\,0)':eval=frame")
         if "dropflash" in eff:
             p.append("eq=brightness='if(lt(t\\,0.06)\\,0.85\\,if(lt(t\\,0.18)\\,0.85*(1-(t-0.06)/0.12)\\,0))':eval=frame")
-        if "rgbsplit" in eff: p.append("rgbashift=rh=4:bh=-4")
-        if "shake" in eff: p.append(shake(13, 0.26))
+        if "rgbsplit" in eff: p.append("rgbashift=rh=7:bh=-7")
+        if "shake" in eff: p.append(shake(20, 0.26))
     p.append(f"setsar=1,fps={FPS},format=yuv420p")
     return ",".join(p)
 
@@ -170,7 +170,7 @@ def render_one(s):
     r = subprocess.run(base, capture_output=True, text=True)
     if r.returncode == 0: return s["i"], True, "mci" if RIFE else "ok"
     sm = ",".join(slowmo(s.get("speed", 1.0))) + "," if STYLE == "remaster" else ""
-    vf2 = f"{('crop=' + s['crop'] + ',') if s.get('crop') else ''}{GRADE},setpts=PTS-STARTPTS,{sm}setsar=1,fps={FPS},format=yuv420p"
+    vf2 = f"{('crop=' + s['crop'] + ',') if s.get('crop') else ''}{s.get('grade') or GRADE},setpts=PTS-STARTPTS,{sm}setsar=1,fps={FPS},format=yuv420p"
     fb = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(s["in_tc"]),
           "-t", str(inp), "-i", src, "-vf", vf2, "-frames:v", str(s["nf"]), "-fps_mode", "cfr",
           "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
