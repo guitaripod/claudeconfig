@@ -36,7 +36,10 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
   "audio_master": "master.wav",
   "grade": "eq=...,colorbalance=...,curves=...,vignette=...",   // ffmpeg filter chain
   "catalog": { "<srcid>": ["Nice Label", "hero_goal|goal|skills"] },   // optional
-  "hero_overrides": [ {"src":"<srcid>", "in_tc": 96.7, "impact": 0.7}, ... ]  // optional
+  "hero_overrides": [ {"src":"<srcid>", "in_tc": 96.7, "impact": 0.7}, ... ],  // optional
+  "exclude_clips": [ 811, 972, ... ],                          // optional — banned clip ids (review rejects)
+  "narration": { "duck_db": -8.5,                             // optional — narrate.py voice-over
+    "lines": [ {"src": "<yt-id|url|path>", "phrase": "words to locate", "at": 0.3, "gain": 1.0} ] }
 }
 ```
 
@@ -55,7 +58,7 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
 - Drop detection: sustained forward energy jump on downbeats (`after>0.5`, `jump>0.28`), 8 s non-max-suppression.
 - Cadence by tag (classic): `low`=8 beats/cut, `build`=4→2→1 ramp, `peak`=2 beats, `drop`=1 beat (`1,1,1,2` for breath), half-beat machine-gun in a ±1.5-beat window before heroes.
 - Cadence (remaster): `low`=8, `build`=4→4→2, `peak`=2, `drop`=2 (`2,2,2,4` for breath), no machine-gun window, first cut floored at 2.2 s (the genre's opening hold).
-- Heroes: main drop + strongest peak/drop downbeat per zone (`nz = max(3, dur/25)`), ≥6 s apart. Primary (nearest main drop) gets 3 beats + freeze-frame; others 2 beats. Remaster: 4/3 beats, no freeze.
+- Heroes: main drop + strongest peak/drop downbeat per zone (`nz = max(3, dur/25)`), ≥6 s apart. Primary (nearest main drop) gets 3 beats + freeze-frame; others 2 beats. Remaster: 4/3 beats, no freeze. Each `hero_time` flags its **nearest** cutlist entry — robust to the float-round drift (`round()` vs `np.round()` set membership) that used to silently drop the freeze slot so it rendered as a normal cut.
 
 ## assign_clips.py knobs
 
@@ -108,3 +111,14 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
 - Tool root: `/mnt/games-nvme-gen4/tools/seedvr2` (`HYPE_SEEDVR2` overrides) — ComfyUI-SeedVR2 CLI in its own venv, 3B fp8 weights auto-downloaded. Needs ~10GB free VRAM (OOMs beside heavy GPU jobs — run it alone); ~2.7s/frame at 1080p on the RTX 5080.
 - Per target segment: extract the render-exact input window (`-ss in_tc -t dur*speed+1.2`, fast seek → pinned in_tcs stay valid) to a crf10 intermediate → SeedVR2 at native short-side resolution, batch_size 5, tiled VAE → `src/<id>__srNNN.mp4`, segment repointed (`src=…__srNNN`, `in_tc=0`). `assign.json.presr` is the backup; frame-loss >10% keeps the original.
 - Run it AFTER the cut is locked (it repoints assign.json like a hand-patch — re-running assign_clips.py discards it), then re-render both orientations + re-run qc. **OFF by default (Marcus, 2026-07-19: the detail gain is imperceptible after TikTok re-encode + phone downscale and costs ~1hr exclusive GPU per edit — this reverses the 2026-07-18 quality-first default).** Opt-in only for a non-social / large-screen master, whole edit or `--heroes`/`--segs`. Failed segments keep their originals; re-runs skip `__sr` segments, so redo rounds are incremental.
+
+## narrate.py (voice-over / narration — OPT-IN, off the default path)
+
+- Deps: `setup.sh <workdir> --narration` builds `<workdir>/asr-venv` (torch CPU + openai-whisper + demucs + soundfile/scipy, ~2 GB). Run narrate.py with THAT python.
+- Spec: `project.json["narration"]` (see schema). Per line: `src` (yt id / url / local audio path), `phrase` (words to locate), `at` (timeline start in s), `gain`.
+- Pipeline per source, all cached under `narration/`: download → Whisper `word_timestamps` → locate each phrase by **difflib token alignment**, extending over unmatched boundary words (whisper mishears edges, e.g. "zoos"→"Zeus") → Demucs `--two-stems=vocals` isolation → slice phrase from the isolated voice, highpass + peak-normalize + 28 ms fades → place at `at` → build a VO-presence duck gate (dilate + gaussian ramp) → `music × gate + voice` → `master.wav` **sample-exact** (`round(dur*44100)`; the untouched OST is preserved to `music_master.wav` first). The music-only analysis WAV is never touched, so the beat grid stays clean.
+- `at` is the phrase START; to land a word on a beat set `at = beat − word_onset_within_phrase`. Idempotent (skips cached downloads/ASR/stems). Validate by re-transcribing `master.wav`.
+
+## ask.py (surface questions / status to the phone — SEND-ONLY)
+
+- `ask.py "<text>"` → sends via the hypebot bot (`~/.config/hypebot/secrets.env`: `HYPEBOT_TOKEN`, `HYPEBOT_CHAT_ID`). **Send-only by design:** hypebot runs its own Telegram `getUpdates` poller, so a second consumer `409 Conflict`s with it and can't read replies (and would disrupt the live bot) — surface the question, Marcus answers in the terminal. No-ops (exit 0) if the secrets are absent, so the skill stays terminal-only-safe. Use it for clarify-first questions and long-render heads-ups.

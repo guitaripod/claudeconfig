@@ -19,6 +19,8 @@ Not this skill: trimming one clip, plain concatenation, or a slideshow with no b
 
 Ask 2–4 crisp questions, then go. Good ones: **subject/scope** (which player/team/scene, whole thing vs a slice) and **length** (full song vs a section — say `--start/--end`). **Never ask about style, format, or delivery — they are fixed, not choices:** there is one style (§*The style* — aggressive, effect-driven, built landscape) and it *always* delivers as the immersive **tall-fill vertical (~1080×2340)** — the full-res, descriptively-named file **Taildropped to the phone** (Marcus posts to TikTok from the phone), with the caption sent as its own message on the hypebot Telegram bot (Phase 5). Do not surface a format/style/delivery picker. If the brief is already clear, don't stall — act.
 
+**Surface every question to the phone, not just the terminal.** Marcus posts from his phone and is often away from the keyboard, so any clarifying question must also reach the hypebot bot: `python3 $S/ask.py "<the questions — and tell him to reply in the terminal>"`, paired with `AskUserQuestion` for the terminal side. It is **send-only**: the hypebot bot already runs its own Telegram `getUpdates` poller, so a second consumer 409-conflicts with it and can't read replies back — he reads on his phone and answers in the terminal. `ask.py` no-ops when the secrets are absent (terminal-only still works), and doubles as a status heads-up: `ask.py "rendering, ~5 min"`.
+
 ## The style — aggressive pacing, your artistic direction
 
 There is nothing to pick, and **one thing above all is fixed: relentless aggressive pacing so the viewer's attention never drops.** Everything about the *look* is yours to direct.
@@ -77,7 +79,7 @@ yt-dlp --flat-playlist --dump-json "ytsearch12:<angle>" | \
   python3 -c "import sys,json;[print(d.get('id'),d.get('duration'),d.get('title','')[:70]) for d in map(json.loads,sys.stdin) if d.get('id')]"
 ```
 
-Pick sources on-subject and high-action (goals/skills/celebrations/moments — not talk-shows, previews, training, or club footage when the brief says a specific tournament). Because every cut carries heavy effects and fast pacing, favor **iconic, high-action, readable** moments — a muddy or ambiguous clip won't survive the flashes and shake; 50/60fps sources (fetch.sh already prefers them) cut cleaner. Watch for two trap source types that pass every automated filter: **EA FC/PES sim gameplay** (flat lighting, game HUD — ban the whole source via exclude_clips) and **fan comps with WATCH NEXT / SUBSCRIBE end-cards mid-file or at the tail** (check the last ~15s before trusting). Then download **robustly** (sequential — parallel yt-dlp on the same file corrupts it):
+Pick sources on-subject and high-action (goals/skills/celebrations/moments — not talk-shows, previews, training, or club footage when the brief says a specific tournament). Because every cut carries heavy effects and fast pacing, favor **iconic, high-action, readable** moments — a muddy or ambiguous clip won't survive the flashes and shake; 50/60fps sources (fetch.sh already prefers them) cut cleaner. Watch for trap source types that pass every automated filter: **EA FC/PES sim gameplay** (flat lighting, game HUD — ban the whole source via exclude_clips); **fan comps with WATCH NEXT / SUBSCRIBE end-cards mid-file or at the tail** (check the last ~15s before trusting); and — for **game footage** (AMV / gaming edits) — in-game overlays that appear on only some frames and sail through the motion/graphic filters: **combo/hit counters** ("18 HITS"), **QTE button prompts / controller-glyph overlays** (L1/R2/△/○), **PlayStation-button HUD**, and **burned subtitles / intro text cards** in cutscene rips. These leak into specific clips, not whole sources — catch them on the seg grid + clean single-frame probes and ban by `clip_id`. Then download **robustly** (sequential — parallel yt-dlp on the same file corrupts it):
 
 ```bash
 bash $S/fetch.sh <workdir> <id1> <id2> ...     # validates each by decoding; retries corrupt ones
@@ -100,7 +102,7 @@ The **segment grid is the precision review tool**: every defect maps to a segmen
 
 **Seg-grid review = icon-worthiness, not crop-framing.** The build is the full 1920×1080 frame — there's **no per-segment vertical crop**, so the "subject lost in the crop" defect class doesn't exist. What you review is quality: reject anything that isn't a clean, readable, on-subject moment (billboards/typography/menus/HUD/black/blur/refs/near-empty frames), and keep the key action out of the extreme top/bottom ~9% (the tall-fill trims those at delivery). When hand-picking any in-point, probe with the **renderer's exact seek shape** (`ffmpeg -ss <t> -t <d> -i src.mp4 -frames:v 1`) — on some downloads fast and accurate seek land on different content, and sources with broken seek indexes can land several seconds off a plain-strip probe. Never pin an in_tc from a probe that used a different seek form.
 
-**Openers are the retention gate — the subject must be clearly in view from frame one (hard requirement, any subject domain).** Low-energy song intros make the assigner hold low-motion clips, and low-motion pool clips are usually static wides — a 5s distant wide opener kills TikTok retention. After the first draft, always check segments 0–2: segment 0 must show the subject unmistakably (face/helmet/name/kit — a viewer who knows the subject recognizes them instantly); if the opener is a wide, gear-only, or ambiguous shot, hand-patch it (edit assign.json directly post-assign: set src/in_tc/crop to a subject close-up hold — celebration, face, name-shirt, aura walk — validated with a render-exact probe). Re-patch after every re-assign; direct assign.json edits don't survive assign_clips.py re-runs.
+**Openers are the retention gate — the subject must be clearly in view from frame one (hard requirement, any subject domain).** Low-energy song intros make the assigner hold low-motion clips, and low-motion pool clips are usually static wides — a 5s distant wide opener kills TikTok retention. After the first draft, always check segments 0–2: segment 0 must show the subject unmistakably (face/helmet/name/kit — a viewer who knows the subject recognizes them instantly); if the opener is a wide, gear-only, or ambiguous shot, hand-patch it (edit assign.json directly post-assign: set src/in_tc/crop to a subject close-up hold — celebration, face, name-shirt, aura walk — validated with a render-exact probe). Re-patch after every re-assign; direct assign.json edits don't survive assign_clips.py re-runs. **Watch the opener's own effects:** a `dropflash` (the seg-0 default) over a very short segment 0 whites out the subject for most of its length — clear seg 0 to `["punch"]` and, if it's only a few frames, hand-hold the same shot across seg 0–1 (continuous `in_tc`) so the face registers before the machine-gun starts.
 
 **No AI restoration by default (dropped 2026-07-19).** SeedVR2 detail restoration is OFF the standard path. It measurably recovers face/skin/edge detail on compressed sources (~2.9× sharpness on close-ups, verified), but that detail is imperceptible after TikTok's upload re-encode + phone downscale, and it costs ~1hr of exclusive GPU (~10GB VRAM, ~2.7s/frame) per edit — a bad trade for social delivery. Critically, restoration does **not** create the look — the grade and dense beat-locked effects (in `render.py`) do. `restore.py` is retained only for a rare non-social / large-screen master — run it after the cut is locked, then re-render + re-run qc — never as a default step. See `reference/pipeline.md → restore.py`.
 
@@ -128,6 +130,24 @@ Write `out/director_note.md` (choices + what you fixed between passes). **Delive
 
 Keep both the landscape master and the vertical full-res on disk under `~/Videos/hype/<date>/`. **Fallback only if the phone is offline** (`tailscale status` shows `iphone-air` offline/unreachable): send a ~44MB preview encode (`-b:v 11M`) via Telegram `sendVideo` instead, and say so.
 
+## Narration / voice-over edits (opt-in)
+
+When the brief is a *story told by a voice* over the OST ("tell the story of X with X narrating"), keep the aggressive pacing but let the narration ride the lulls and detonate the hook. The voice is composited into `master.wav` **under** the OST; the music-only analysis WAV stays untouched, so the beat grid is unaffected and cuts stay locked.
+
+1. **Install once:** `bash $S/setup.sh <workdir> --narration` (adds `asr-venv` — torch CPU + Whisper + Demucs, ~2 GB, opt-in).
+2. **Source authentic voice** (don't synthesize — a cloned actor is worse and dubious): grab the exact iconic lines from YouTube cutscene / quote clips. `narrate.py` downloads them.
+3. **Spec the lines** in `project.json` (this is the source of truth `narrate.py` reads):
+   ```json
+   "narration": { "duck_db": -8.5, "lines": [
+     {"src": "<yt-id|url|path>", "phrase": "the exact words to locate", "at": 0.3, "gain": 1.0}
+   ] }
+   ```
+   `at` = where the phrase STARTS on the timeline. To land a word on a beat, set `at = beat − (the word's onset within the phrase)` — e.g. detonate "WAR!" exactly on the drop/freeze.
+4. **Compose:** `<workdir>/asr-venv/bin/python $S/narrate.py <workdir>` — per source it downloads → Whisper word-timestamps → locates each phrase (difflib alignment, tolerant of misheard boundary words) → Demucs isolates the voice → slices, highpasses, ducks the OST under the speech → rewrites `master.wav` **sample-exact**. Everything caches under `narration/`, so re-runs are cheap.
+5. **Validate:** re-transcribe `master.wav` (Whisper) — every line must still read over the music. Then render as normal; `render.py` muxes `master.wav`.
+
+**Placement:** identity over the intro, deeds over the build, the signature line on the drop/freeze, resolution over the outro; leave a wide VO gap right before the drop so the hook lands clean. **Heroes in a narrated edit must be clean, high-contrast subjects** — a low-motion / dark / subtitled cutscene frame black- or freeze-flags in qc and reads as a dead-spot.
+
 ## Effect catalog (density is the point)
 
 Baked per-segment by `assign_clips.py` (dense plan, automatic) and `render.py` (cranked intensities), locked to the beat: **punch-in zoom** (every cut), **beat-flash** (white hit, most cuts), **drop-flash** (bigger flash on downbeats / drop entries), **camera shake** (section entries + ~⅓ of cuts), **RGB-split** (~⅓ of cuts), **freeze-frame + zoom + flash + shake** (the single biggest beat only). Effects fire on ~every cut by design — that density serves the relentless pacing; the opener detonates (`punch+drop-flash+shake`). This is the aggressive baseline, not a mandate on the *look*: tune strength in `render.py`, when-they-fire in `assign_clips.py`, and set the grade (global or per-segment `seg["grade"]`) however the piece wants — the pacing is the constant, the styling is yours. To hand-pick hero moments, set `project.json` `hero_overrides` (see `reference/pipeline.md`).
@@ -140,7 +160,7 @@ Baked per-segment by `assign_clips.py` (dense plan, automatic) and `render.py` (
 
 ## Anti-patterns (do not ship)
 
-Metronomic cuts that ignore energy · all effects stacked on one cut (muddy — cap ~3) · a limp/draggy stretch that stops banging · black/frozen frames · audio drift by the end · a clip repeated too soon · the best moment anywhere but a peak · off-subject or wrong-game/wrong-event footage · menus/HUD/typography/wipes/bumpers/score-graphics left in · declaring done without reading the render · hero unverified at segment level · shipping landscape or a cropped/letterboxed vertical instead of the rotated tall-fill.
+Metronomic cuts that ignore energy · all effects stacked on one cut (muddy — cap ~3) · a limp/draggy stretch that stops banging · black/frozen frames · audio drift by the end · a clip repeated too soon · the best moment anywhere but a peak · off-subject or wrong-game/wrong-event footage · menus/HUD/typography/wipes/bumpers/score-graphics left in · declaring done without reading the render · hero unverified at segment level · shipping landscape or a cropped/letterboxed vertical instead of the rotated tall-fill · **[gaming]** combo/hit counters, QTE prompts, or controller-glyph overlays left in · a flash-washed opener (dropflash hides a short seg 0) · a hero **freeze on a low-motion, dark, or subtitled cutscene frame** (it black/freeze-flags in qc and reads as a pacing dead-spot — freeze on a clean high-contrast subject).
 
 ## The hard parts (hard-won — read `reference/pipeline.md` for detail)
 
@@ -154,4 +174,4 @@ Metronomic cuts that ignore energy · all effects stacked on one cut (muddy — 
 
 ## Files
 
-`scripts/`: `setup.sh` `extract_audio.py` `fetch.sh` `build_spine.py` `scenes.py` `colorscan.py` `assign_clips.py` `render.py` `restore.py` `qc.py` `contact_sheet.py`. `reference/pipeline.md`: data-flow, `project.json` schema, tuning knobs, hero overrides, ffmpeg recipe details.
+`scripts/`: `setup.sh` `extract_audio.py` `fetch.sh` `build_spine.py` `scenes.py` `colorscan.py` `assign_clips.py` `render.py` `restore.py` `qc.py` `contact_sheet.py` `ask.py` (surface questions/status to Telegram, send-only) `narrate.py` (opt-in voice-over). `reference/pipeline.md`: data-flow, `project.json` schema, tuning knobs, hero overrides, narration spec, ffmpeg recipe details.

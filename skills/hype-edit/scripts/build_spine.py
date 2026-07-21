@@ -187,10 +187,12 @@ def main():
         if b - m[-1] < 0.15: m[-1] = b
         else: m.append(b)
     m[-1] = DUR; B = np.array(m); B[0] = 0.0
-    hset = set(np.round(heroes, 3))
     cut = [{"i": k, "start": round(float(B[k]), 4), "end": round(float(B[k + 1]), 4),
             "dur": round(float(B[k + 1] - B[k]), 4), "tag": sat(float(B[k])),
-            "hero": round(float(B[k]), 3) in hset} for k in range(len(B) - 1)]
+            "hero": False} for k in range(len(B) - 1)]
+    for h in heroes:                                  # flag the nearest cut to each hero time —
+        j = min(range(len(cut)), key=lambda i: abs(cut[i]["start"] - h))  # robust to float-round
+        cut[j]["hero"] = True                         # drift that silently dropped the freeze slot
     for k in range(len(cut) - 1):
         assert abs(cut[k]["end"] - cut[k + 1]["start"]) < 1e-6 and cut[k]["dur"] > 0
     assert abs((cut[-1]["end"] - cut[0]["start"]) - DUR) < 1e-3
