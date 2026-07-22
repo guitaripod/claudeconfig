@@ -1,13 +1,13 @@
 export const meta = {
   name: 'kaytetty-best',
   description:
-    'Recommend the best USED-market buy in Finland — a specific thing to buy second-hand, or the best used model in a category — priced live across Tori.fi and Huuto.net, with a fair-price band and scam / overprice flags',
+    'Recommend the best USED-market buy in Finland — a specific thing to buy second-hand, the best used model in a category, or a whole multi-part build (e.g. a gaming PC) assembled from used parts — priced live across Tori.fi and Huuto.net, with a fair-price band and scam / overprice flags',
   whenToUse:
-    'When you want a "what should I buy second-hand" answer checked against live Finnish used listings. Two modes, auto-detected: a SPECIFIC thing you have decided to buy used ("/kaytetty-best iphone 13 128gb", "/kaytetty-best rtx 3080", "/kaytetty-best herman miller aeron") finds the best-value live listing plus the fair price band and flags the scams; an OPEN category ("/kaytetty-best good used road bike under 800", "/kaytetty-best cheap used oled tv") shortlists models then checks what is actually for sale used right now.',
+    'When you want a "what should I buy second-hand" answer checked against live Finnish used listings. Three modes, auto-detected: a SPECIFIC thing you have decided to buy used ("/kaytetty-best iphone 13 128gb", "/kaytetty-best rtx 3080") finds the best-value live listing plus the fair band; an OPEN category ("/kaytetty-best good used road bike under 800") shortlists models then checks what is for sale used; a BUILD ("/kaytetty-best gaming pc around a 1080 ti", "/kaytetty-best home office setup under 600") scopes a compatible parts/kit list around any anchor and sources every part used, then totals a coherent in-budget build with the used-vs-new saving.',
   phases: [
     { title: 'Scope', detail: 'classify the request and build the used-market search plan' },
     { title: 'Hunt', detail: 'pull live listings from Tori.fi + Huuto.net (+ new-price reference)', model: 'claude-haiku-4-5-20251001' },
-    { title: 'Appraise', detail: 'compute the fair band, flag scams, pick the best-value listing' },
+    { title: 'Appraise', detail: 'compute the fair band, flag scams, pick the best-value listing / assemble the build' },
   ],
 }
 
@@ -31,6 +31,10 @@ if (!query) {
     '- `/kaytetty-best good used road bike under 800`',
     '- `/kaytetty-best cheap used 55 inch oled tv`',
     '',
+    'Whole build / kit (compatible parts, each sourced used, totalled):',
+    '- `/kaytetty-best gaming pc around a 1080 ti`',
+    '- `/kaytetty-best home office setup under 600`',
+    '',
     'Sources: Tori.fi + Huuto.net (Facebook Marketplace needs a login and is not searchable).',
   ].join('\n')
 }
@@ -40,9 +44,9 @@ const SCOPE_SCHEMA = {
   properties: {
     mode: {
       type: 'string',
-      enum: ['product', 'category'],
+      enum: ['product', 'category', 'build'],
       description:
-        "'product' if the request already names ONE specific thing the user has decided to buy used (e.g. 'iphone 13 128gb', 'rtx 3080', 'herman miller aeron', 'canon 6d'). 'category' if it is an open 'what used thing is best' question (e.g. 'good used road bike under 800', 'cheap used oled tv') — then we shortlist competing models and check each on the used market.",
+        "'product' if the request names ONE specific thing to buy used (e.g. 'iphone 13 128gb', 'rtx 3080'). 'category' if it is an open 'what used thing is best' question (e.g. 'good used road bike under 800'). 'build' if the request asks to ASSEMBLE a multi-part system or kit from used parts — a PC/gaming rig, a home-office/desk setup, a camera kit, etc. — usually anchored on one part the user names (e.g. 'gaming pc around a 1080 ti', 'home office setup under 600').",
     },
     category: { type: 'string', description: 'normalized thing/category, e.g. "Apple iPhone 13 128GB" or "used road bike"' },
     interpretation: { type: 'string', description: 'one sentence: what we are buying used + constraints + use-case' },
@@ -89,8 +93,31 @@ const SCOPE_SCHEMA = {
         required: ['model', 'searchQuery', 'tier', 'why'],
       },
     },
+    platform: { type: ['string', 'null'], description: 'BUILD mode: the single coherent platform the parts share, so they are compatible by construction, e.g. "AMD AM4 (DDR4)". null otherwise.' },
+    buildRationale: { type: ['string', 'null'], description: 'BUILD mode: one sentence on why this platform/part mix is the right value balance around the anchor. null otherwise.' },
+    components: {
+      type: 'array',
+      description: 'BUILD mode only: the ordered part list for the build (typically 6-9 parts for a PC: gpu, cpu, motherboard, ram, storage, psu, case, and cooler only if the chosen CPU has no boxed cooler). Empty otherwise.',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string', description: 'stable slug, e.g. "gpu", "cpu", "motherboard", "ram", "storage", "psu", "case", "cooler"' },
+          label: { type: 'string', description: 'human label, e.g. "GPU", "CPU", "Motherboard"' },
+          role: { type: 'string', enum: ['buy', 'owned'], description: '"buy" = source it used; "owned" = the user already has this part, include only for compatibility and do NOT hunt or price it' },
+          searchQuery: { type: 'string', description: 'precise used-market search string for the chosen part, e.g. "gtx 1080 ti", "ryzen 5 5600", "b550 tomahawk", "corsair rm650"' },
+          coreQuery: { type: 'string', description: 'broad core words for strict-AND engines (Huuto), e.g. "1080 ti", "ryzen 5600", "b550"' },
+          mustMatch: { type: 'array', items: { type: 'string' }, description: 'lowercase tokens a real listing of this part must contain' },
+          accessoryTerms: { type: 'array', items: { type: 'string' }, description: 'lowercase terms marking accessories/lookalikes to drop for this part' },
+          targetSpec: { type: 'string', description: 'one line: what we need + why it fits, e.g. "AM4, 6c/12t, no bottleneck for a 1080 Ti" or "650W 80+ Gold, has the 8+6-pin the 1080 Ti needs"' },
+          estBudgetEur: { type: ['number', 'null'], description: 'rough used allocation for this part in EUR, else null' },
+          optional: { type: 'boolean', description: 'true if the build works without buying it (e.g. cooler when the CPU is boxed, or a part the user may already own)' },
+          newPriceQuery: { type: ['string', 'null'], description: 'query for the NEW price via the hinta CLI if this part is still sold new (RAM/SSD/PSU/case/current CPUs); null for discontinued parts like a GTX 1080 Ti' },
+        },
+        required: ['key', 'label', 'role', 'searchQuery', 'coreQuery', 'mustMatch', 'accessoryTerms', 'targetSpec', 'estBudgetEur', 'optional', 'newPriceQuery'],
+      },
+    },
   },
-  required: ['mode', 'category', 'interpretation', 'searchQuery', 'coreQuery', 'mustMatch', 'accessoryTerms', 'budgetEur', 'regionHint', 'newPriceQuery', 'candidates'],
+  required: ['mode', 'category', 'interpretation', 'searchQuery', 'coreQuery', 'mustMatch', 'accessoryTerms', 'budgetEur', 'regionHint', 'newPriceQuery', 'candidates', 'platform', 'buildRationale', 'components'],
 }
 
 phase('Scope')
@@ -104,13 +131,19 @@ First run \`date +%F\` (Bash) for today's date; the used market and what is desi
 
 Decide the MODE:
 - 'product' — the request already names ONE specific thing to buy used (e.g. "iphone 13 128gb", "rtx 3080", "herman miller aeron"). Set 'searchQuery' to the short exact string a used marketplace would match, and 'coreQuery' to the broadest core words that still name it with capacity/colour/spec qualifiers dropped (searchQuery "iphone 13 128gb" -> coreQuery "iphone 13") — some engines match all words strictly, so a specific query returns nothing and the broad one is filtered down later. Set 'mustMatch' to the defining tokens (model + capacity/size) and 'accessoryTerms' to the noise terms to drop (cases/screens/chargers/cables for a phone, etc.). Leave 'candidates' empty. If the item is electronics that new-goods shops carry, set 'newPriceQuery' so we can show the used-vs-new saving; else null.
-- 'category' — an open "what used thing is best" question (e.g. "good used road bike under 800", "cheap used oled tv"). Use WebSearch to find the CURRENT well-regarded picks as of today, then set 'candidates' to 4-6 concrete, currently-buyable-used models spanning tiers. Each 'model' is an EXACT name incl. defining size/spec, each 'searchQuery' a short used-market string. Leave 'searchQuery'/'coreQuery'/'newPriceQuery' null.
+- 'category' — an open "what used thing is best" question (e.g. "good used road bike under 800", "cheap used oled tv"). Use WebSearch to find the CURRENT well-regarded picks as of today, then set 'candidates' to 4-6 concrete, currently-buyable-used models spanning tiers. Each 'model' is an EXACT name incl. defining size/spec, each 'searchQuery' a short used-market string. Leave 'searchQuery'/'coreQuery'/'newPriceQuery' null and 'components' empty.
+- 'build' — assemble a multi-part SYSTEM/kit from used parts (a gaming PC, a home-office setup, a camera kit…), usually anchored on one part the user named. Design ONE coherent, compatible, non-bottlenecked build and express it as 'components':
+  * Pick a single 'platform' so the parts are compatible by construction (for a PC that means one CPU socket + matching motherboard chipset + right RAM generation — e.g. AMD AM4 with DDR4 is the used-market value sweet spot). Put the reasoning in 'buildRationale'.
+  * Respect the ANCHOR: if the user names a specific part ("around a 1080 Ti"), that part IS in the build. If the wording says they already OWN it, set its role='owned' (include for compatibility, do not hunt/price). Otherwise role='buy' (source it used too) — and say which you assumed in 'interpretation'.
+  * Choose parts that MATCH the anchor's level (do not pair a flagship CPU with a mid GPU) and that satisfy real constraints: the PSU must have the connectors + wattage the GPU needs (a GTX 1080 Ti draws ~250W and needs 8+6-pin, so ~650W+); the case must fit the motherboard form factor and the GPU length; skip a separate 'cooler' if the chosen CPU ships with a boxed cooler.
+  * For each component set key/label/role/searchQuery/coreQuery/mustMatch/accessoryTerms/targetSpec/estBudgetEur/optional, and 'newPriceQuery' when the part is still sold new (RAM/SSD/PSU/case/current CPUs) or null for discontinued parts (a 1080 Ti has no new price). If the user gave a total budget, allocate estBudgetEur across parts to fit it.
+  * Leave the product/category fields ('searchQuery','coreQuery','mustMatch','accessoryTerms','newPriceQuery','candidates') null/empty at the TOP level — the per-part queries live inside 'components'.
 
-For both: respect hard constraints. Set 'budgetEur' to the user's max (else null) and 'regionHint' to a preferred Finnish city/region for pickup if the user named one (else null). 'category' = normalized name, 'interpretation' = one sentence.`,
+For all modes: respect hard constraints. Set 'budgetEur' to the user's max total (else null) and 'regionHint' to a preferred Finnish city/region for pickup if named (else null). 'category' = normalized name of the thing/build, 'interpretation' = one sentence (for a build, state the platform + anchor + whether the anchor is being bought or is owned). In product/category modes leave 'platform'/'buildRationale' null and 'components' empty.`,
   { label: 'scope', phase: 'Scope', schema: SCOPE_SCHEMA }
 )
 
-log(`${scope.mode === 'product' ? 'Product' : 'Category'}: ${scope.interpretation}`)
+log(`${scope.mode === 'product' ? 'Product' : scope.mode === 'build' ? 'Build' : 'Category'}: ${scope.interpretation}`)
 
 const enc = s => encodeURIComponent(String(s || '').trim())
 
@@ -230,7 +263,115 @@ function flagOutliers(listings, band) {
   })
 }
 
+const NEW_SCHEMA = {
+  type: 'object',
+  properties: {
+    foundInFinland: { type: 'boolean' },
+    cheapestNewEur: { type: ['number', 'null'] },
+    retailer: { type: ['string', 'null'] },
+    url: { type: ['string', 'null'] },
+  },
+  required: ['foundInFinland', 'cheapestNewEur', 'retailer', 'url'],
+}
+
+function newRefAgent(newPriceQuery, label) {
+  return agent(
+    `Run EXACTLY this command (new-goods price across Finnish electronics retailers) and parse its JSON stdout:
+
+\`\`\`
+hinta compare "${String(newPriceQuery).replace(/"/g, '\\"')}" --enrich --devices-only --json
+\`\`\`
+
+It returns a "groups" array; each group has "attributes" (brand, capacity_gb…) and "offers" [{ source, price_euro, in_stock, url }] cheapest first. Pick the ONE group that best matches "${newPriceQuery}" (right capacity/variant, plain not bundle). Report the cheapest in-stock offer as the NEW reference price: foundInFinland, cheapestNewEur, retailer, url. If the command errors or nothing matches, foundInFinland=false and the rest null. NEVER invent a price.`,
+    { label, phase: 'Hunt', schema: NEW_SCHEMA, model: 'claude-haiku-4-5-20251001' }
+  )
+}
+
 phase('Hunt')
+
+if (scope.mode === 'build') {
+  const comps = (scope.components || []).filter(c => c && c.searchQuery)
+  const toBuy = comps.filter(c => c.role !== 'owned')
+  const owned = comps.filter(c => c.role === 'owned')
+  if (!toBuy.length) return `Couldn't derive a parts list for: "${query}".\n\n${scope.interpretation || ''}`
+  log(`Sourcing ${toBuy.length} part${toBuy.length > 1 ? 's' : ''} for a ${scope.platform || 'used'} build across Tori.fi + Huuto.net…`)
+
+  const built = await parallel(
+    toBuy.map(c => async () => {
+      const [ls, newRef] = await parallel([
+        () => huntListings(c.searchQuery, c.coreQuery || c.searchQuery, c.mustMatch || [], c.accessoryTerms || [], `part:${c.key}`),
+        () => (c.newPriceQuery ? newRefAgent(c.newPriceQuery, `new-ref:${c.key}`) : Promise.resolve(null)),
+      ])
+      const band = priceBand(ls || [])
+      const flagged = flagOutliers(ls || [], band).sort((a, b) => (a.priceEur ?? Infinity) - (b.priceEur ?? Infinity))
+      const legit = flagged.filter(l => l.flag !== 'suspicious-low')
+      const suspicious = flagged.filter(l => l.flag === 'suspicious-low')
+      return {
+        key: c.key,
+        label: c.label,
+        targetSpec: c.targetSpec,
+        estBudgetEur: c.estBudgetEur,
+        optional: !!c.optional,
+        band,
+        newRef: newRef && newRef.foundInFinland ? { eur: newRef.cheapestNewEur, retailer: newRef.retailer, url: newRef.url } : null,
+        listings: [...legit.slice(0, 6), ...suspicious.slice(0, 2)].map(l => ({
+          title: l.title,
+          priceEur: l.priceEur,
+          source: l.source,
+          location: l.location,
+          url: l.url,
+          condition: l.condition,
+          warrantyMonths: l.warrantyMonths,
+          auction: l.auction,
+          closingTime: l.closingTime,
+          flag: l.flag,
+        })),
+      }
+    })
+  )
+
+  const parts = built.filter(Boolean)
+  const foundCount = parts.filter(p => p.listings.some(l => l.flag !== 'suspicious-low')).length
+  const cheapestLegit = p => p.listings.find(l => l.flag !== 'suspicious-low' && l.priceEur != null) || null
+  const cheapestLegitTotal = Math.round(parts.reduce((s, p) => s + (cheapestLegit(p)?.priceEur || 0), 0))
+  const newTotalKnown = Math.round(parts.reduce((s, p) => s + (p.newRef?.eur || 0), 0))
+  const partsWithNew = parts.filter(p => p.newRef).map(p => p.label)
+
+  log(`Found live listings for ${foundCount}/${toBuy.length} parts${owned.length ? ` · ${owned.length} owned` : ''} · cheapest-legit build ≈ ${cheapestLegitTotal} €`)
+
+  phase('Appraise')
+
+  return await agent(
+    `You are assembling the best-value USED gaming/PC-style build for Finland from LIVE Tori.fi + Huuto.net listings.
+
+Request: "${query}"
+Platform: ${scope.platform || '(unspecified)'} — ${scope.buildRationale || ''}
+Scope: ${scope.interpretation}
+${scope.budgetEur ? `Total budget ceiling: ${scope.budgetEur} EUR.` : 'No explicit total budget — target a balanced, non-bottlenecked build and report the total.'}
+${scope.regionHint ? `Preferred pickup region: ${scope.regionHint}.` : ''}
+${owned.length ? `Parts the user ALREADY OWNS (do not buy; assume present for compatibility): ${owned.map(o => o.label + (o.targetSpec ? ` (${o.targetSpec})` : '')).join(', ')}.` : ''}
+
+Deterministic anchors (already computed — use, do not recompute):
+- Cheapest-legit-per-part total ≈ ${cheapestLegitTotal} EUR (a FLOOR; you may pick a slightly pricier listing for better condition/warranty).
+${newTotalKnown ? `- Sum of NEW prices for the parts still sold new (${partsWithNew.join(', ')}) ≈ ${newTotalKnown} EUR — use for the used-vs-new saving on those parts.` : '- No new-price references resolved (mostly discontinued parts) — describe the saving qualitatively.'}
+
+Per-part live data (JSON; each part has its fair band, an optional new-price newRef, and up to 8 listings. flag="suspicious-low" = far under the part's median, likely broken/parts/scam — NEVER pick one; "overpriced" = far over; auction=true = live Huuto bid that can still climb):
+${JSON.stringify(parts, null, 2)}
+
+On the Finnish used market, loose PC components (CPU, motherboard, RAM, PSU, case) are often scarce — sellers flip WHOLE computers instead. So a part's "listings" may actually be entire PCs that merely CONTAIN that part: treat those as a GAP for the loose part (don't pretend you can buy just the CPU out of a 400 € PC), but DO harvest them for the donor route below.
+
+Assemble the build and pick the better of two routes:
+1. **The build (component route)** — pick EXACTLY ONE listing per buyable part: the best VALUE that is (a) a genuine loose part, NOT a whole PC, (b) NOT suspicious-low, and (c) compatible with the other picks and the platform. One line per part: **<Label>** — <title>, **<price> €**, <source>, <location> — <listing URL> · one clause on why. Mark 'optional' parts, list owned parts as "you provide", and mark any part with no loose listing as a **GAP** with its new-price fallback (cite newRef price + retailer).
+2. **Donor route** — if several parts are gaps, look in the data for ONE whole used PC on the SAME platform that already bundles most of them (CPU+board+RAM+storage+PSU+case), and add the anchor part to it (swapping/reselling any GPU it already has). Give the donor listing + the anchor listing with URLs.
+3. **Total & recommendation** — state the EUR total of BOTH routes (component route = used loose parts + gaps bought new; donor route = donor PC + anchor), the saving vs new for each${newTotalKnown ? ` (the new-covered parts new-sum ≈ ${newTotalKnown} EUR)` : ''}${scope.budgetEur ? `, and whether each fits the ${scope.budgetEur} EUR budget` : ''}, then **recommend the lower coherent total**. If loose parts were plentiful, the component route may simply win — say so.
+4. **Compatibility check** — in 2-3 lines confirm the recommended route's picks fit together: CPU socket = motherboard socket, RAM generation matches the board, the PSU has the wattage + PCIe connectors the GPU needs, and the case fits the board form factor + GPU length. For a donor PC, verify its PSU wattage/connectors and case clearance actually accept the anchor GPU. If your picks would MISMATCH, swap to compatible listings from the data and say so.
+5. **Watch out** — name any suspicious-low listings you rejected and why, any whole-PC listings you excluded from the component route, and any live auction whose current bid understates the real cost.
+6. **Buyer advice** — 1-2 lines specific to used PC parts: stress-test the GPU for artifacts and check for mining wear/repaste, inspect the CPU socket/pins, confirm PSU age (avoid 7+ yr units), and test-boot before paying; meet in person.
+
+Rules: prices are EUR and live. Never invent a listing, price, seller, or URL not in the JSON. Never pick a suspicious-low listing. Keep every pick compatible. Coverage is Tori.fi + Huuto.net only (Facebook Marketplace is not searchable). Be factual and tight — the buyer should know exactly which listings to open and what it totals.`,
+    { label: 'assemble-build', phase: 'Appraise' }
+  )
+}
 
 let newPrice = null
 let listings = []
@@ -239,32 +380,8 @@ if (scope.mode === 'product') {
   const sq = scope.searchQuery || scope.category
   log(`Hunting "${sq}" across Tori.fi + Huuto.net…`)
 
-  const NEW_SCHEMA = {
-    type: 'object',
-    properties: {
-      foundInFinland: { type: 'boolean' },
-      cheapestNewEur: { type: ['number', 'null'] },
-      retailer: { type: ['string', 'null'] },
-      url: { type: ['string', 'null'] },
-    },
-    required: ['foundInFinland', 'cheapestNewEur', 'retailer', 'url'],
-  }
-
   const tasks = [() => huntListings(sq, scope.coreQuery || sq, scope.mustMatch || [], scope.accessoryTerms || [], 'product')]
-  if (scope.newPriceQuery) {
-    tasks.push(() =>
-      agent(
-        `Run EXACTLY this command (new-goods price across Finnish electronics retailers) and parse its JSON stdout:
-
-\`\`\`
-hinta compare "${String(scope.newPriceQuery).replace(/"/g, '\\"')}" --enrich --devices-only --json
-\`\`\`
-
-It returns a "groups" array; each group has "attributes" (brand, capacity_gb…) and "offers" [{ source, price_euro, in_stock, url }] cheapest first. Pick the ONE group that best matches "${scope.newPriceQuery}" (right capacity/variant, plain not bundle). Report the cheapest in-stock offer as the NEW reference price: foundInFinland, cheapestNewEur, retailer, url. If the command errors or nothing matches, foundInFinland=false and the rest null. NEVER invent a price.`,
-        { label: `new-ref:${sq}`, phase: 'Hunt', schema: NEW_SCHEMA, model: 'claude-haiku-4-5-20251001' }
-      )
-    )
-  }
+  if (scope.newPriceQuery) tasks.push(() => newRefAgent(scope.newPriceQuery, `new-ref:${sq}`))
 
   const [hunted, newRef] = await parallel(tasks)
   listings = hunted || []
