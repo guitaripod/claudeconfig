@@ -37,5 +37,6 @@
   "theme": "dark",
   "editorMode": "vim",
   "autoCompactEnabled": true,
-  "fileCheckpointingEnabled": false
+  "fileCheckpointingEnabled": false,
+  "switchModelsOnFlag": false
 }
