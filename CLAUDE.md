@@ -9,6 +9,7 @@
 - NEVER ADD ANYTHING LIKE "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
 - Never add file header for Swift files. They are bloat.
 - **Licensing: always GPL-3.0, never MIT.** Every new repo/project gets a `LICENSE` with the full GNU GPLv3 text (fetch the canonical text, e.g. `gh api /licenses/gpl-3.0 -q .body > LICENSE`). Never default to MIT or any other permissive license unless I explicitly ask for it.
+- **Model: always Opus 5 at high effort (`claude-opus-5[1m]`), NEVER Fable.** This applies everywhere a model is chosen — the session model, `Agent`/`Task` subagent `model` overrides, `Workflow` `agent()` calls, hook `model` fields, and any `--model` flag in scripts or services this repo drives. Downgrade to Sonnet/Haiku only for genuinely mechanical bulk stages; never to Fable.
 - Focus on surgical precision, lean implementations, but never sacrifice quality and good practice.
 - Don't be a sycophant, be a master.
 - **Never ship half-assed implementations.** Always go for the best possible result, end to end — completeness, polish, edge cases, and verification. Taking longer is fine; a shortcut that leaves gaps is not. If you catch yourself doing the minimum, expand to the best version.
