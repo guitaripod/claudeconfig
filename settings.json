@@ -37,12 +37,12 @@
     }
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "high",
+  "effortLevel": "low",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
   "editorMode": "vim",
   "autoCompactEnabled": true,
-  "fileCheckpointingEnabled": false,
-  "switchModelsOnFlag": false
+  "switchModelsOnFlag": false,
+  "fileCheckpointingEnabled": false
 }
