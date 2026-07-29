@@ -18,6 +18,19 @@
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
   },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/claudeconfig/hooks/brevity.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
   "enabledPlugins": {
     "pyright@claude-code-lsps": true,
     "vtsls@claude-code-lsps": true,
@@ -37,7 +50,7 @@
     }
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "low",
+  "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
