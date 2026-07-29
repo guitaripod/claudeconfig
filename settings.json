@@ -19,6 +19,17 @@
     "command": "bash ~/.claude/statusline-command.sh"
   },
   "hooks": {
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/claudeconfig/hooks/brevity-midrun.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
@@ -55,6 +66,9 @@
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
   "editorMode": "vim",
+  "viewMode": "focus",
+  "showThinkingSummaries": false,
+  "spinnerTipsEnabled": false,
   "autoCompactEnabled": true,
   "switchModelsOnFlag": false,
   "fileCheckpointingEnabled": false

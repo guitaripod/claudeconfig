@@ -39,6 +39,12 @@ echo "=== Linking ~/claudeconfig -> ~/.claude/ ==="
 link CLAUDE.md
 link settings.json
 link statusline-command.sh
+link hooks
 link skills
 link workflows
+
+BIN_DIR="$HOME/.local/bin"
+mkdir -p "$BIN_DIR"
+ln -sfn "$REPO_DIR/scripts/brevity-report.py" "$BIN_DIR/brevity-report"
+echo "  link $BIN_DIR/brevity-report"
 echo "=== Done ==="
