@@ -43,6 +43,13 @@ link hooks
 link skills
 link workflows
 
+OPENCODE_DIR="$HOME/.config/opencode"
+if [ -d "$OPENCODE_DIR" ]; then
+    ln -sfn "$REPO_DIR/CLAUDE.md" "$OPENCODE_DIR/AGENTS.md"
+    ln -sfn "$REPO_DIR/opencode/plugin" "$OPENCODE_DIR/plugin"
+    echo "  link $OPENCODE_DIR/{AGENTS.md,plugin}"
+fi
+
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
 ln -sfn "$REPO_DIR/scripts/brevity-report.py" "$BIN_DIR/brevity-report"
