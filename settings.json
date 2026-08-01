@@ -12,7 +12,9 @@
     "claude-opus-5[1m]",
     "opus",
     "sonnet",
-    "haiku"
+    "haiku",
+    "fable",
+    "claude-fable-5"
   ],
   "statusLine": {
     "type": "command",
