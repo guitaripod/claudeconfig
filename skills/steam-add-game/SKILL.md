@@ -1,5 +1,5 @@
 ---
-description: Install a DRM-free/scene PC game from an archive set and integrate it fully into Steam on Linux — extract, install the Windows installer under wine, add a non-Steam shortcut with the right Proton and launch options, fetch SteamGridDB artwork and a multi-res icon, then launch it and verify it actually runs. Use when asked to "get this game running on Steam", "add artwork to it", set up a downloaded game folder, or fix icons/launch options on existing non-Steam shortcuts.
+description: Install a DRM-free/scene PC game from an archive set and integrate it fully into Steam on Linux — triage the release type, extract, install the Windows installer under wine, add a non-Steam shortcut with the right Proton and launch options, fetch SteamGridDB artwork and a multi-res icon, then launch it and verify it actually runs. Use when asked to "get this game running on Steam", "add artwork to it", set up a downloaded game folder, judge whether a release/repack will install at all, or fix icons/launch options on existing non-Steam shortcuts.
 ---
 
 # Game → fully integrated Steam entry (Linux)
@@ -37,6 +37,41 @@ Not for owned Steam games that just need installing — that's the client's job.
    `launch_policy.py --merge` re-attaches anything after `%command%` plus game-side env.
 5. **The icon comes from the `icon` field, not the grid folder.** A `<appid>_icon.png` in
    `grid/` alone leaves the library entry blank. Point `icon` at a real `.ico` on disk.
+
+## Phase 0 — Triage the release type, before downloading anything
+
+Two families, and only one of them installs on this box.
+
+**Scene releases — fine.** RUNE, EMPRESS, CODEX, TENOKE, FLT, DODI's *ISO* rips. Shipped
+as a RAR set containing an ISO with `setup.exe` + `setup-N.bin`, an Inno Setup or plain
+file-copy installer, and a crack directory that mirrors the install tree. These run
+silently under plain wine — continue to Phase 1.
+
+**Repacks — dead end, say so instead of starting.** FitGirl, DODI's repacks, Xatab,
+KaOsKrew, ElAmigos when it ships `ISDone.dll`. They decompress at install time through
+`ISDone.dll` + `unarc` with Razor12911's codecs, which fails under Wine/Proton
+(`unarc` error `-11`, bogus "not enough memory"). Not fixable with a Proton version, a
+prefix tweak, or `winetricks`. Confirmed on DODI; FitGirl is the canonical case.
+
+**Marcus does not use FitGirl repacks.** If the only release for a title is a repack,
+tell him up front and stop — don't sink hours into a VM install he didn't ask for.
+The fallback, if he does want it, is the scripted qemu Windows VM. At repack sizes
+(100 GB+) do **not** use the HTTP-over-`10.0.2.2` transfer from that note: attach the
+target storage to the VM as a virtio block device (raw disk or partition, NTFS), install
+into it, then mount it on the host — `ntfs3` reads it and Proton runs the game in place,
+so there is no copy step. FitGirl installers also want Windows 7 compatibility mode and
+≥4 GB free RAM; give the guest 8 GB+ and 8 vCPUs or a 1.5 h install becomes 3 h.
+
+**EMPRESS cracks are a second, independent blocker.** Even installed correctly from a
+Windows VM, the EMPRESS build of AC Odyssey silently exits ~20 s in under every Proton and
+wine configuration tried (DXVK and wined3d, gamescope, esync/fsync/ntsync off, nvapi off,
+core-affinity limits). The crack, not the install, is what fails. For anything that has to
+run on Linux, prefer a non-EMPRESS release — and note AC Odyssey specifically was already
+taken all the way through the VM route on 2026-07-28 and still did not run.
+
+Tells, from the release notes alone: "Repack by …", "compression library by Razor12911",
+"Selective Download", `fg-selective-*.bin`, "lossless … all files identical to originals
+after installation", a multi-hour CPU-bound install time. Any of those means repack.
 
 ## Phase 1 — Identify and extract
 
@@ -89,8 +124,8 @@ cp -rv "$MOUNT/RUNE/." "$INSTALL/"
 Afterwards unmount, delete the ISO and the throwaway prefix — Steam builds its own
 prefix under `compatdata/<appid>`.
 
-DODI/ISDone/InstallShield repacks still fail under wine (`unarc -11`). Those need the
-scripted qemu Windows VM, not this path.
+If `strings` turns up `ISDone` or `unarc` rather than an installer name, you have a repack
+and Phase 0 applies — stop here.
 
 ## Phase 3 — Shortcut, Proton, launch options
 
