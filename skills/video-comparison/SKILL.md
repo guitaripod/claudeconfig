@@ -1,4 +1,5 @@
 ---
+name: video-comparison
 description: This skill should be used when the user asks to create a comparison video, side-by-side video, combine screen recordings, or make a demo video from multiple recordings.
 ---
 

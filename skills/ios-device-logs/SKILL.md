@@ -1,4 +1,5 @@
 ---
+name: ios-device-logs
 description: Reliably pull iOS app logs from a physical device via devicectl. Use this whenever `log stream` / `log show` / `idevicesyslog` aren't working (common on iOS 17+ / 26) and the app writes to a file-based logger inside its sandbox.
 ---
 

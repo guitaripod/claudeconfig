@@ -1,4 +1,5 @@
 ---
+name: steam-add-game
 description: Install a DRM-free/scene PC game from an archive set and integrate it fully into Steam on Linux — triage the release type, extract, install the Windows installer under wine, add a non-Steam shortcut with the right Proton and launch options, fetch SteamGridDB artwork and a multi-res icon, then launch it and verify it actually runs. Use when asked to "get this game running on Steam", "add artwork to it", set up a downloaded game folder, judge whether a release/repack will install at all, or fix icons/launch options on existing non-Steam shortcuts.
 ---
 
@@ -30,7 +31,11 @@ Not for owned Steam games that just need installing — that's the client's job.
    Steam silently does nothing.
 3. **`pgrep -f <exe>` matches the shell that's watching for it.** A wait loop like
    `while pgrep -f eldenring.exe; do sleep 20; done` never exits, because the loop's own
-   command line contains the pattern. Use `pgrep -x`.
+   command line contains the pattern. Use `pgrep -x` — and when the exe name is over 15
+   characters `pgrep -x` cannot match it at all, so fall back to
+   `ps aux | grep -F <exe> | grep -v grep` with the *agent's own* command line filtered out
+   too: a `/steam-add-game <dir>` invocation carries the game's name, and grepping for it
+   reports a game that is not running as alive.
 4. **Launch options carry game arguments you must not drop.** Diablo III's is
    `--exec="launch D3"`; several titles carry `+com_skipIntroVideo 1`,
    `WINEDLLOVERRIDES=`, `-dx11`. Rewriting the string wholesale destroys them —
@@ -68,6 +73,11 @@ wine configuration tried (DXVK and wined3d, gamescope, esync/fsync/ntsync off, n
 core-affinity limits). The crack, not the install, is what fails. For anything that has to
 run on Linux, prefer a non-EMPRESS release — and note AC Odyssey specifically was already
 taken all the way through the VM route on 2026-07-28 and still did not run.
+
+**The crack is the variable, not the title.** The CPY ISO of that same AC Odyssey installs
+under plain wine and reaches its main menu on GE-Proton10-34 with no tuning at all
+(2026-08-03) — a title that "does not run" under one group's crack is worth one attempt
+under another's before it is written off.
 
 Tells, from the release notes alone: "Repack by …", "compression library by Razor12911",
 "Selective Download", `fg-selective-*.bin`, "lossless … all files identical to originals
@@ -115,6 +125,13 @@ wine setup.exe /SP- /SILENT /SUPPRESSMSGBOXES /NOCANCEL /NORESTART /NOICONS \
 Watch `/tmp/inno.log` for `Installation process succeeded.` — the wine stderr is full of
 harmless `libEGL`/`wineusb` noise and is not a progress signal.
 
+**"There is not enough of free space on selected disk!" on a drive with terabytes free is a
+32-bit overflow, not a real check.** Inno's free-space value wraps past 2^31 KB (≈2 TB), so
+a target with 3.4 TB free aborts at the first wizard page while a 760 GB one sails through.
+Install to a drive with under ~2 TB free, then `mv` the tree to where it belongs — the
+shortcut is written afterwards, so nothing points at the temporary path. (Ghost of Tsushima
+DC, 2026-08-03: aborted on `/mnt/nvme8tb`, installed on `/mnt/GamesSSD1TB`, moved back.)
+
 Then, if the release ships a crack directory that mirrors the install layout:
 
 ```bash
@@ -124,6 +141,22 @@ cp -rv "$MOUNT/RUNE/." "$INSTALL/"
 Afterwards unmount, delete the ISO and the throwaway prefix — Steam builds its own
 prefix under `compatdata/<appid>`.
 
+**An `installscript.vdf` in the install root is a prerequisite Steam would have run and a
+non-Steam shortcut never will.** Ghost of Tsushima DC ships one that installs the
+PlayStation PC SDK; without it the game reaches `[SCE] SDK is not detected` in its own log
+and dies on `Unhandled exception 0x80000003` half a second later — a crash that reads like
+a broken crack but is a missing prerequisite. The MSI cannot install normally under Wine
+(`CreateAntiTamperCatcache: … exitCode = 0xc0000005`, then rollback), so extract it with an
+administrative install, which skips the custom action, and drop the tree in by hand:
+
+```bash
+proton run msiexec /a "PsPcSdkRuntimeInstaller.msi" /qn TARGETDIR="Z:\tmp\pspc-admin"
+cp -r "/tmp/pspc-admin/Sony Interactive Entertainment Inc" "$PFX/drive_c/ProgramData/"
+```
+
+Read the game's own log (`Documents/<Game>/<Game>.log` in the prefix) before blaming the
+crack — it names the missing piece where the Proton log only shows the int3.
+
 If `strings` turns up `ISDone` or `unarc` rather than an installer name, you have a repack
 and Phase 0 applies — stop here.
 
@@ -131,6 +164,14 @@ and Phase 0 applies — stop here.
 
 Pick the exe that bypasses anti-cheat when the release is offline-only
 (`eldenring.exe`, not `start_protected_game.exe`).
+
+For an Unreal Engine game, point at `<Game>/Binaries/Win64/<Game>-Win64-Shipping.exe`, not
+the launcher shim in the install root — the shim exits 0 without starting anything under
+Proton, so Steam shows the game "running" for a second and nothing appears. (OCTOPATH
+TRAVELER 0, 2026-08-03.) Getting this wrong costs the appid: it hashes the exe, so
+repointing means removing the old entry from `shortcuts.vdf` and re-installing artwork
+under the new one. There is no `remove` verb — delete the entry, renumber the remaining
+keys, and note that `AppName` comparisons are case-sensitive (`OCTOPATH` ≠ `Octopath`).
 
 ```bash
 python3 scripts/launch_policy.py --profile nonshooter        # or shooter

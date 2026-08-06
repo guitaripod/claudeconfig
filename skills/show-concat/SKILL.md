@@ -1,4 +1,5 @@
 ---
+name: show-concat
 description: Concatenate every episode of a TV show into a single mkv with intros/outros stripped. Use when the user asks to "make one video of the whole show", binge-watch a series as a single file, or remove all intro/outro music across a season/series. Handles mixed NTSC/PAL sources, multi-part super-sized episodes, and works across encoders.
 ---
 
