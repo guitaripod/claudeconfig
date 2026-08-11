@@ -200,8 +200,27 @@ python3 scripts/steam_artwork.py install --appid 3828612727 --game 5452291 --pic
 python3 scripts/steam_shortcut.py set-icon --appid 3828612727 --apply
 ```
 
+To sweep the whole library instead of one entry — "make sure everything has all its art":
+
+```bash
+python3 scripts/steam_artwork.py audit               # per-shortcut gaps + a total
+python3 scripts/steam_artwork.py audit --fix-icons   # synthesise the two icon forms
+```
+
+`--fix-icons` only rebuilds `_icon.png`/`_icon.ico` from art the entry already has (icon →
+portrait → wide; never the logo, which smears at 16px). A missing capsule/hero/logo is a
+real gap and still needs `install` against a game id. Entries added by EmuDeck or
+steam-rom-manager typically ship four art types and exactly one of the two icon forms, so
+this closes most of a library in a single pass. Grid files can be written while Steam runs;
+the `icon` **field** cannot — batch those into one stop/start window.
+
 The SteamGridDB key already lives at `~/.config/steamgriddb/key` on this box (machine-local,
 never in this repo). The API 403s the default urllib User-Agent, which the script sets.
+
+SteamGridDB entries for *programs* are often polluted with a same-named game — the
+`Moonlight` entry mixes the game-streaming client with an indie platformer, so its only logo
+and icon are the wrong product. Prefer the explicit `… (Program)` entry when the search
+offers one, and check the per-kind previews rather than trusting one entry wholesale.
 
 Look at the previews. SteamGridDB scores are usually all zero, so "first result" is not
 "best result" — and the first `.ico` is often a 4-bit 48x48 relic while a 512px `.png`
@@ -258,7 +277,7 @@ driver (`PROTON_ENABLE_WAYLAND=1`, no gamescope). Don't burn time re-deriving th
 | --- | --- |
 | `scripts/steamlib.py` | paths, appid/rungameid math, binary+text VDF read/write, Steam stop/start guards |
 | `scripts/steam_shortcut.py` | `list` / `add` / `set-launch` / `set-icon` / `set-proton` / `gameid` |
-| `scripts/steam_artwork.py` | `search` / `preview` / `install` against SteamGridDB |
+| `scripts/steam_artwork.py` | `search` / `preview` / `install` against SteamGridDB, `audit` for library-wide gaps |
 | `scripts/launch_policy.py` | build a launch string per profile, merging existing game args |
 
 All mutating commands are dry-run until `--apply`, and every write leaves a

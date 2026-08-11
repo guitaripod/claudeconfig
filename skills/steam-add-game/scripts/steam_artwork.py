@@ -4,6 +4,7 @@
     steam_artwork.py search "elden ring"
     steam_artwork.py preview --game 5452291 [--limit 4] [--out /tmp/preview]
     steam_artwork.py install --appid 3828612727 --game 5452291 [--pick grid=2,hero=1]
+    steam_artwork.py audit [--fix-icons]
 
 Filenames Steam reads out of grid/ (all optional, all keyed by the 32-bit appid):
     <appid>p.png       600x900   portrait capsule (library list + grid)
@@ -171,6 +172,76 @@ def cmd_install(args):
         print('icon: none available')
 
 
+AUDIT_KINDS = {
+    'portrait': ('p.png', 'p.jpg'),
+    'wide': ('.png', '.jpg'),
+    'hero': ('_hero.png', '_hero.jpg'),
+    'logo': ('_logo.png', '_logo.jpg'),
+    'icon_png': ('_icon.png', '_icon.jpg'),
+    'icon_ico': ('_icon.ico',),
+}
+
+
+def _art_file(grid: str, appid: int, suffixes) -> str | None:
+    for s in suffixes:
+        p = os.path.join(grid, f'{appid}{s}')
+        if os.path.isfile(p) and os.path.getsize(p) > 0:
+            return p
+    return None
+
+
+def _icon_source(grid: str, appid: int) -> str | None:
+    """Best in-library source to synthesise a missing icon from.
+
+    A real icon asset first, then the portrait, then the wide capsule. The logo is
+    deliberately excluded — it is a wide transparent title treatment and squashes
+    into an unreadable smear at 16px.
+    """
+    for kind in ('icon_ico', 'icon_png', 'portrait', 'wide'):
+        hit = _art_file(grid, appid, AUDIT_KINDS[kind])
+        if hit:
+            return hit
+    return None
+
+
+def cmd_audit(args):
+    """Report which non-Steam shortcuts are missing artwork, optionally filling icons.
+
+    Only the two icon forms can be synthesised locally; a missing capsule, hero or logo
+    is a real gap that needs `install` against a SteamGridDB game id. The `icon` field in
+    shortcuts.vdf is checked too — a `<appid>_icon.ico` on disk that nothing points at
+    still leaves the library entry blank.
+    """
+    grid = S.grid_dir(args.user)
+    tree, _, _ = S.load_shortcuts(args.user)
+    ents = S.entries(tree)
+    incomplete = 0
+    for _, (_, e) in ents.items():
+        appid = S.entry_appid(e)
+        name = e.get('AppName', ('str', '?'))[1]
+        missing = [k for k, sfx in AUDIT_KINDS.items() if not _art_file(grid, appid, sfx)]
+        if args.fix_icons and {'icon_png', 'icon_ico'} & set(missing):
+            src = _icon_source(grid, appid)
+            if src:
+                if 'icon_png' in missing:
+                    magick(f'{src}[0]', '-background', 'none', '-alpha', 'on',
+                           '-resize', '256x256', os.path.join(grid, f'{appid}_icon.png'))
+                    missing.remove('icon_png')
+                if 'icon_ico' in missing:
+                    make_ico(src, os.path.join(grid, f'{appid}_icon.ico'))
+                    missing.remove('icon_ico')
+        icon_field = e.get('icon', ('str', ''))[1]
+        if not (icon_field and os.path.isfile(icon_field)):
+            missing.append('icon_field')
+        if missing:
+            incomplete += 1
+        status = 'COMPLETE' if not missing else 'MISSING: ' + ','.join(missing)
+        print(f'{appid:>12}  {name[:44]:<44} {status}')
+    print(f'\n{len(ents)} shortcuts, {incomplete} incomplete')
+    if args.fix_icons:
+        print('icon_field fixes need Steam stopped: steam_shortcut.py --apply set-icon --appid N')
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -193,6 +264,11 @@ def main():
     i.add_argument('--game', type=int, required=True)
     i.add_argument('--pick', help='e.g. grid=2,hero=1,icon=3 (1-based, default 1)')
     i.set_defaults(fn=cmd_install)
+
+    a = sub.add_parser('audit')
+    a.add_argument('--fix-icons', action='store_true',
+                   help='synthesise missing _icon.png/_icon.ico from existing art')
+    a.set_defaults(fn=cmd_audit)
 
     args = p.parse_args()
     args.fn(args)
