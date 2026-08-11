@@ -6,7 +6,13 @@ project.json keys it honors:
   "hero_overrides": [{"src","in_tc","impact"[,"crop"]}...] (hero-time order) — hand-pinned
     marquee moments; empty = motion-driven heroes.
   "exclude_clips": [clip_id...] — banned from the pool (visual-review rejects, or clips
-    already used by a sibling edit in a multi-video batch)."""
+    already used by a sibling edit in a multi-video batch).
+  "motion_floor": 0.045 — the quality floor on clip motion_max. Sports footage earns the
+    default; a domain whose whole frame is synthetic (a UI, a menu, an interface demo) reads
+    an order of magnitude lower and needs it dropped or the pool comes back empty.
+  "ignore_graphic": false — colorscan's graphic/bumper flag is a sports heuristic (little
+    pitch + flat or oversaturated). Set true when the subject IS a rendered interface, or
+    every clip is banned as a bumper."""
 import sys, json, subprocess, glob, os
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
@@ -116,10 +122,16 @@ def main():
     scrop = {s: detect_crop(f"{ROOT}/src/{s}.mp4", d) for s, d in sdur.items()}
     for c in clips: c["srcdur"] = sdur.get(c["src"], 0)
     EXC = set(CFG.get("exclude_clips", []))
+    FLOOR = float(CFG.get("motion_floor", 0.045))
+    GRAPHIC_OK = bool(CFG.get("ignore_graphic", False))
     usable = [c for c in clips if not c["dark"] and c.get("green", 0) <= 0.25
-              and not c.get("graphic", False) and c["motion_max"] >= 0.045 and c["srcdur"] > 0
+              and (GRAPHIC_OK or not c.get("graphic", False))
+              and c["motion_max"] >= FLOOR and c["srcdur"] > 0
               and c["id"] not in EXC]
     if EXC: print(f"exclude_clips: {len(EXC)} banned")
+    if FLOOR != 0.045 or GRAPHIC_OK:
+        print(f"quality floor: motion_max>={FLOOR}"
+              + (" graphic flag ignored" if GRAPHIC_OK else ""))
     print(f"usable pool: {len(usable)} clips / {len(set(c['src'] for c in usable))} sources")
     hero_pool = sorted([c for c in usable if c["dur"] >= 0.9], key=lambda c: -c["motion_max"])
     high = sorted(usable, key=lambda c: -c["motion"])

@@ -34,6 +34,8 @@ if STYLE == "remaster":
 else:
     GRADE = (f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,crop={OW}:{OH}," + CFG["grade"])
 MCI = f"minterpolate=fps={FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
+FLASH = float(CFG.get("flash_gain", 1.0))
+RGB = int(CFG.get("rgb_shift", 7))
 
 _RIFE_BIN = os.environ.get("HYPE_RIFE_BIN") or shutil.which("rife-ncnn-vulkan")
 _RIFE_MODEL = os.environ.get("HYPE_RIFE_MODEL") or (
@@ -102,15 +104,17 @@ def vf(s):
         Fc = min(max(F, 0.35), max(d - 0.25, 0.35))
         p += [f"trim=0:{Fc:.3f},setpts=PTS-STARTPTS",
               f"tpad=stop_mode=clone:stop_duration={d - Fc + 0.7:.3f}", zoom(0.16, d),
-              f"eq=brightness='if(between(t\\,{Fc:.3f}\\,{Fc + 0.06:.3f})\\,0.85*(1-(t-{Fc:.3f})/0.06)\\,0)':eval=frame"]
+              f"eq=brightness='if(between(t\\,{Fc:.3f}\\,{Fc + 0.06:.3f})\\,{0.85 * FLASH:.3f}*(1-(t-{Fc:.3f})/0.06)\\,0)':eval=frame"]
         if "shake" in eff: p.append(shake(24, 0.30))
     else:
         if "punch" in eff: p.append(zoom(0.12, d))
         else: p.append(zoom(0.09, d))
-        if "beatflash" in eff: p.append("eq=brightness='if(lt(t\\,0.04)\\,0.5\\,0)':eval=frame")
+        if "beatflash" in eff:
+            p.append(f"eq=brightness='if(lt(t\\,0.04)\\,{0.5 * FLASH:.3f}\\,0)':eval=frame")
         if "dropflash" in eff:
-            p.append("eq=brightness='if(lt(t\\,0.06)\\,0.85\\,if(lt(t\\,0.18)\\,0.85*(1-(t-0.06)/0.12)\\,0))':eval=frame")
-        if "rgbsplit" in eff: p.append("rgbashift=rh=7:bh=-7")
+            b = 0.85 * FLASH
+            p.append(f"eq=brightness='if(lt(t\\,0.06)\\,{b:.3f}\\,if(lt(t\\,0.18)\\,{b:.3f}*(1-(t-0.06)/0.12)\\,0))':eval=frame")
+        if "rgbsplit" in eff: p.append(f"rgbashift=rh={RGB}:bh=-{RGB}")
         if "shake" in eff: p.append(shake(20, 0.26))
     p.append(f"setsar=1,fps={FPS},format=yuv420p")
     return ",".join(p)
