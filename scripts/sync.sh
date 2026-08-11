@@ -24,7 +24,7 @@ sync_local() {
         git -C "$r" status --porcelain | sed 's/^/   /'
         prune_junk "$r"
     done
-    [ "$dirty" -eq 1 ] && echo "NOTE: dirty repos above — check before pushing"
+    if [ "$dirty" -eq 1 ]; then echo "NOTE: dirty repos above — check before pushing"; fi
 }
 
 main() {
