@@ -17,6 +17,11 @@
 - **Never ship half-assed implementations.** Always go for the best possible result, end to end — completeness, polish, edge cases, and verification. Taking longer is fine; a shortcut that leaves gaps is not. If you catch yourself doing the minimum, expand to the best version.
 - **Be maximally autonomous.** Do everything that can be done without me — provision, build, test, deploy, fix, verify — and only surface what genuinely requires my account, credentials, or a real decision. Don't ask permission for reversible work that follows from the request.
 
+## Shipping a build to me
+
+- **"Done" means installed, not built.** Whatever I actually launch — the app in `/Applications`, the binary on my `PATH`, the desktop entry — must be the code you just wrote, every time, without me asking. A build that only exists under `build-*/`, `target/` or `.build/` is a change nobody can use, and the symptom of getting this wrong is me reporting bugs you already fixed. Installing is part of the task, not a follow-up: prefer the repo's own install script (`scripts/install-macapp.sh`, `scripts/install-linuxapp.sh`, `cargo install --path .`), and verify afterwards that the installed thing reports the new version.
+- macOS apps: release-build, replace `/Applications/<App>.app`, ad-hoc `codesign --force --deep --sign -` when the project signs that way, then run `--version` out of `/Applications` to confirm.
+
 ## Rust CLI / binary development
 
 - **When iterating on a Rust binary I run from my PATH, actually install what you just changed — don't leave me on a stale build.** A `cargo build` only writes `target/`, but I invoke the binary from `~/.cargo/bin/<name>` (cargo install), the AUR, or a release. After building + verifying a change, **update the binary I actually run** (`cargo install --path .` for the local iteration) and confirm with `which <name>` + `<name> --version`/`--help` that it matches the code you just wrote. Symptom of getting this wrong: I report bugs you "already fixed" — because I'm running the old binary (e.g. imago: I built 0.1.3 in `target/` while `~/.cargo/bin/imago` was still 0.1.0). If a fix matters to me now, `cargo install --path .` is part of "done," not an afterthought.
