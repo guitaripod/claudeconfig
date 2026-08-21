@@ -4,8 +4,8 @@ segments' source windows before the final render. Default is EVERY segment
 (production optimizes for quality, not speed); --segs/--heroes narrow it.
 Extracts each segment's exact render input window (same fast-seek -ss, so
 pinned in_tcs stay valid), runs SeedVR2 3B fp8 on it at native resolution
-(~2.7s/frame on the RTX 5080; needs ~10GB free VRAM — run it without other
-heavy GPU jobs), writes src/<id>__srNNN.mp4 and repoints the segment at it
+(~2.7s/frame on the RTX PRO 6000 Blackwell; needs ~10GB free VRAM, which
+the 96GB card leaves free alongside most other jobs), writes src/<id>__srNNN.mp4 and repoints the segment at it
 (in_tc rebased to 0). Already-restored segments are skipped, so re-running
 after a redo only processes changed segments. assign.json is backed up to
 assign.json.presr; re-run render.py (both orientations) afterwards. Re-running
