@@ -227,6 +227,16 @@ Look at the previews. SteamGridDB scores are usually all zero, so "first result"
 of the same art sits two entries down. `install` always rebuilds the icon at
 256/128/64/48/32/16 from the largest source available.
 
+Once the shortcut's art is in place, run `steam-taskbar-icons` so the entry also gets a
+`steam_app_<appid>.desktop` — without it Plasma matches nothing against the game's
+`steam_app_<appid>` window class and the taskbar shows a blank placeholder while it runs.
+The path unit behind it only watches the Steam libraries, so non-Steam shortcuts need the
+manual pass:
+
+```bash
+steam-taskbar-icons          # picks up every new shortcut; unchanged entries cost nothing
+```
+
 ## Phase 5 — Verify
 
 ```bash
