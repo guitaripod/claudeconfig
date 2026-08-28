@@ -52,13 +52,20 @@
     "pyright-lsp@claude-plugins-official": true,
     "cloudflare@claude-plugins-official": true,
     "revenuecat@claude-plugins-official": true,
-    "frontend-design@claude-plugins-official": true
+    "frontend-design@claude-plugins-official": true,
+    "asc@rorkai": true
   },
   "extraKnownMarketplaces": {
     "claude-code-lsps": {
       "source": {
         "source": "git",
         "url": "https://github.com/Piebald-AI/claude-code-lsps.git"
+      }
+    },
+    "rorkai": {
+      "source": {
+        "source": "github",
+        "repo": "rorkai/app-store-connect-cli-skills"
       }
     }
   },
