@@ -1,7 +1,7 @@
 # delegate configuration (shared across machines; per-machine overrides live in host.yml).
 mode: normal
 
-order: [t1, t2, t3]
+order: [t1, t2]
 
 tiers:
   t1:
@@ -19,31 +19,25 @@ tiers:
       - runner: omp
         model: ollama-cloud/glm-5.3-flash
         thinking: low
-  t3:
-    label: frontier
-    chain:
-      - runner: omp
-        model: anthropic/claude-fable-5-1
-        thinking: high
       - runner: omp
         model: ollama-cloud/kimi-k2.6
-        thinking: high
+        thinking: low
 
 classes:
   default:
     tier: t2
-    ceiling: t3
+    ceiling: t2
   rust-mech:
     tier: t1
     ceiling: t2
     verify: cargo build && cargo test
   rust-impl:
     tier: t1
-    ceiling: t3
+    ceiling: t2
     verify: cargo build && cargo clippy --all-targets -- -D warnings && cargo test
   swift-impl:
     tier: t2
-    ceiling: t3
+    ceiling: t2
   strings:
     tier: t1
     ceiling: t2
@@ -51,16 +45,11 @@ classes:
     tier: t1
     ceiling: t2
     verified: false
-  review:
-    tier: t3
-    ceiling: t3
-    verified: false
 
 modes:
   conserve:
     shift: -1
-    ceiling_verified: t2
-    ask_before: t3
+    ask_before: t2
   rush:
     shift: 1
 

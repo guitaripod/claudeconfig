@@ -134,7 +134,7 @@ const RUN_FLAG_NAMES = ["tier", "ceiling", "mode"] as const;
 
 const SUBCOMMANDS = ["help", "new", "run", "replay", "log", "stats", "tiers", "show"] as const;
 
-const HELP_TEXT = `delegate - run task packets through the local/cheap/frontier tier ladder
+const HELP_TEXT = `delegate - run task packets through the local/cheap tier ladder
 
 /delegate new <class> <goal...>      create a packet, edit it, optionally run it
 /delegate run <packet.yml> [--tier t] [--ceiling t] [--mode m]
@@ -666,7 +666,7 @@ export default function delegateExtension(pi: ExtensionAPI): void {
 	ensureAugmentedPath();
 
 	pi.registerCommand("delegate", {
-		description: "Run and manage delegate task packets (local/cheap/frontier tier ladder)",
+		description: "Run and manage delegate task packets (local/cheap tier ladder)",
 		getArgumentCompletions(argumentPrefix) {
 			if (argumentPrefix.includes(" ")) return null;
 			const lower = argumentPrefix.toLowerCase();
