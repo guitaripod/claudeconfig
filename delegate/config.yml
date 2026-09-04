@@ -23,7 +23,10 @@ tiers:
     label: frontier
     chain:
       - runner: omp
-        model: openrouter/anthropic/claude-fable-5.1
+        model: anthropic/claude-fable-5-1
+        thinking: high
+      - runner: omp
+        model: ollama-cloud/kimi-k2.6
         thinking: high
 
 classes:
