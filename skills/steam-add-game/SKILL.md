@@ -281,6 +281,14 @@ above it; the swapchain comes up `R8G8B8A8_UNORM / SRGB_NONLINEAR`.
 `PROTON_ENABLE_HDR=1` does not change it. The only untried route is Proton's Wayland
 driver (`PROTON_ENABLE_WAYLAND=1`, no gamescope). Don't burn time re-deriving this.
 
+Known fix: **UE5 titles can GPUCrash on GE-Proton10-34 on this Blackwell box** — device
+loss detected on `RHIInterruptThread` ("GPU Crash dump Triggered" in the UE crash dumps,
+no XID or ECC errors, crack and memory fine). The Blood of Dawnwalker (2026-09-03)
+crashed 7× on 10-34 (once during the hardware benchmark, once after 2 h idle on the setup
+screen, then a rapid re-crash cluster) and ran stable on `GE-Proton11-6-x86_64` — the
+newer DXVK is the fix. If a title GPUCrashes on 10-34, try 11-6 before blaming the
+crack, the driver, or VRAM contention.
+
 ## Scripts
 
 | script | purpose |

@@ -71,6 +71,37 @@ def shake(a, tau):   # crop evaluates t per-frame natively — NO eval= option o
             f"y='(in_h-{OH})/2+{a}*cos(2*PI*13*t)*exp(-t/{tau})'")
 
 
+def transition(kind):
+    """Beat-locked in-transition: the segment enters displaced/zoomed/rotated and snaps
+    to frame over a few frames. Everything decays to an exact identity at settle, so the
+    shot is pixel-clean for the rest of its duration. Expressed with the two filters that
+    evaluate t per-frame (scale with eval=frame, crop natively), so NVENC stays on the
+    fast path — see the crop/eval note on shake()."""
+    A, dx, dy, tau = _TRANS[kind]
+    z = f"1+{A}*exp(-t/{tau})"
+    p = [f"scale=w='{OW}*({z})':h='{OH}*({z})':eval=frame"]
+    if kind == "spinin":
+        p.append(f"rotate=a='0.42*exp(-t/{tau})':ow=iw:oh=ih:c=black@0")
+    if kind == "tearin":
+        p.append(f"crop={OW}:{OH}:x='(in_w-{OW})/2+{0.30 * OW * A}*sin(2*PI*38*t)"
+                 f"*exp(-t/{tau})':y='(in_h-{OH})/2'")
+    else:
+        p.append(f"crop={OW}:{OH}:x='(in_w-{OW})/2+{dx}*{OW}*{A}*exp(-t/{tau})':"
+                 f"y='(in_h-{OH})/2+{dy}*{OH}*{A}*exp(-t/{tau})'")
+    return p
+
+
+_TRANS = {
+    "whipl":  (0.55, -0.50, 0.0, 0.045),
+    "whipr":  (0.55, 0.50, 0.0, 0.045),
+    "slideu": (0.55, 0.0, -0.50, 0.050),
+    "slided": (0.55, 0.0, 0.50, 0.050),
+    "zoomsnap": (0.95, 0.0, 0.0, 0.055),
+    "spinin": (0.50, 0.0, 0.0, 0.070),
+    "tearin": (0.35, 0.0, 0.0, 0.050),
+}
+
+
 def slowmo(speed):
     """Slow the graded stream to output tempo, then synthesize the missing frames:
     motion-compensated interpolation on the full render (the butter), plain fps
@@ -107,7 +138,9 @@ def vf(s):
               f"eq=brightness='if(between(t\\,{Fc:.3f}\\,{Fc + 0.06:.3f})\\,{0.85 * FLASH:.3f}*(1-(t-{Fc:.3f})/0.06)\\,0)':eval=frame"]
         if "shake" in eff: p.append(shake(24, 0.30))
     else:
-        if "punch" in eff: p.append(zoom(0.12, d))
+        tr = next((e for e in eff if e in _TRANS), None)
+        if tr: p += transition(tr)
+        elif "punch" in eff: p.append(zoom(0.12, d))
         else: p.append(zoom(0.09, d))
         if "beatflash" in eff:
             p.append(f"eq=brightness='if(lt(t\\,0.04)\\,{0.5 * FLASH:.3f}\\,0)':eval=frame")
