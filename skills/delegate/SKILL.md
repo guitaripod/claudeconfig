@@ -18,14 +18,15 @@ Other fields: `class` (selects tier/ceiling/verify defaults below), `id` (ULID, 
 ## Classes (default tier → ceiling)
 | class | tier | ceiling | verify |
 |---|---|---|---|
-| default | t2 | t2 | — |
+| default | t2 | t3 | — |
 | rust-mech | t1 | t2 | `cargo build && cargo test` |
-| rust-impl | t1 | t2 | `cargo build && cargo clippy --all-targets -- -D warnings && cargo test` |
-| swift-impl | t2 | t2 | — |
+| rust-impl | t1 | t3 | `cargo build && cargo clippy --all-targets -- -D warnings && cargo test` |
+| swift-impl | t2 | t3 | — |
 | strings | t1 | t2 | — |
 | docs | t1 | t2 | unverified |
+| review | t3 | t3 | unverified |
 
-Tiers: t1 local (llama-swap Qwen 27B), t2 cheap cloud (ollama-cloud glm-5.3-flash, Kimi K2.6 as failover). There is no frontier tier: frontier work stays in the session that writes the packets. `delegate tiers` shows the resolved chain plus live health on this host.
+Tiers: t1 local (llama-swap Qwen 27B), t2 cheap cloud (ollama-cloud glm-5.3-flash, Kimi K2.6 as failover), t3 frontier (Claude Fable 5.1 through Claude Code headless on the user's subscription). `delegate tiers` shows the resolved chain plus live health on this host.
 
 ## CLI
 - `delegate new --class <c> --goal <text> [--path <p>]... [--verify <cmd>] [--read <file>]... [--notes <text>] [--tier <t>] [--ceiling <t>] [--mode normal|conserve|rush] [--effort low|medium|high] [--timeout <secs>] [--attempts <n>] [--repo <dir>] [-o <file>] [--edit] [--run]` — prints the packet path.
