@@ -45,8 +45,10 @@ link workflows
 
 OPENCODE_DIR="$HOME/.config/opencode"
 if [ -d "$OPENCODE_DIR" ]; then
-    ln -sfn "$REPO_DIR/CLAUDE.md" "$OPENCODE_DIR/AGENTS.md"
-    ln -sfn "$REPO_DIR/opencode/plugin" "$OPENCODE_DIR/plugin"
+    rel="../../claudeconfig"
+    [ "$REPO_DIR" = "$HOME/claudeconfig" ] || rel="$REPO_DIR"
+    ln -sfn "$rel/CLAUDE.md" "$OPENCODE_DIR/AGENTS.md"
+    ln -sfn "$rel/opencode/plugin" "$OPENCODE_DIR/plugin"
     echo "  link $OPENCODE_DIR/{AGENTS.md,plugin}"
 fi
 
