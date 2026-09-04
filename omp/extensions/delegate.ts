@@ -596,7 +596,7 @@ function registerDelegateTool(pi: ExtensionAPI): void {
 			verify: z.string().optional().describe("Shell command run after the worker finishes; exit 0 passes."),
 			read: z.array(z.string()).optional().describe("Files the worker should read before starting."),
 			notes: z.string().optional().describe("Free-form context appended to the worker prompt."),
-			tier: z.string().optional().describe("Start tier override, e.g. t1, t2, t3."),
+			tier: z.string().optional().describe("Start tier override, e.g. t1 or t2."),
 			ceiling: z.string().optional().describe("Highest tier escalation may reach."),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {

@@ -184,7 +184,7 @@ export function renderRunSummary(lines: string[]): string {
 
 export default tool({
   description:
-    "Dispatch a bounded task packet through the delegate tier ladder (t1 local, t2 cheap cloud, t3 frontier) or inspect delegate runs. Only use when the user explicitly asks to delegate a task, write or run a packet, or check delegate log/stats/show/tiers — never to offload work opportunistically, and never choosing tier/ceiling unless the user says to.",
+    "Dispatch a bounded task packet through the delegate tier ladder (t1 local, t2 cheap cloud) or inspect delegate runs. Only use when the user explicitly asks to delegate a task, write or run a packet, or check delegate log/stats/show/tiers — never to offload work opportunistically, and never choosing tier/ceiling unless the user says to.",
   args: {
     op: tool.schema.enum(["run", "new", "log", "stats", "show", "tiers"]).describe("Delegate subcommand to perform."),
     packet: tool.schema.string().optional().describe("Packet YAML path for op=run; run id for op=show."),
