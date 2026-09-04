@@ -1,0 +1,73 @@
+# delegate configuration (shared across machines; per-machine overrides live in host.yml).
+mode: normal
+
+order: [t1, t2, t3]
+
+tiers:
+  t1:
+    label: local
+    chain:
+      - runner: omp
+        model: llama-swap/qwen38-nvfp4
+        thinking: low
+        health: http://127.0.0.1:8081/v1/models
+        settings:
+          temperature: 0
+  t2:
+    label: cheap cloud
+    chain:
+      - runner: omp
+        model: ollama-cloud/glm-5.3-flash
+        thinking: low
+  t3:
+    label: frontier
+    chain:
+      - runner: omp
+        model: openrouter/anthropic/claude-fable-5.1
+        thinking: high
+
+classes:
+  default:
+    tier: t2
+    ceiling: t3
+  rust-mech:
+    tier: t1
+    ceiling: t2
+    verify: cargo build && cargo test
+  rust-impl:
+    tier: t1
+    ceiling: t3
+    verify: cargo build && cargo clippy --all-targets -- -D warnings && cargo test
+  swift-impl:
+    tier: t2
+    ceiling: t3
+  strings:
+    tier: t1
+    ceiling: t2
+  docs:
+    tier: t1
+    ceiling: t2
+    verified: false
+  review:
+    tier: t3
+    ceiling: t3
+    verified: false
+
+modes:
+  conserve:
+    shift: -1
+    ceiling_verified: t2
+    ask_before: t3
+  rush:
+    shift: 1
+
+runners:
+  omp:
+    bin: omp
+    no_lsp: true
+
+server:
+  listen: 0.0.0.0:4100
+  user: delegate
+  password_env: DELEGATE_PASSWORD
+  env_file: ~/.config/delegate/serve.env
