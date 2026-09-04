@@ -7,7 +7,7 @@
     "deny": [],
     "defaultMode": "default"
   },
-  "model": "opus[1m]",
+  "model": "fable",
   "availableModels": [
     "claude-opus-5[1m]",
     "opus",
@@ -80,5 +80,6 @@
   "editorMode": "vim",
   "autoCompactEnabled": true,
   "switchModelsOnFlag": false,
-  "fileCheckpointingEnabled": false
+  "fileCheckpointingEnabled": false,
+  "agentPushNotifEnabled": true
 }
