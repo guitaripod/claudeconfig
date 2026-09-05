@@ -90,10 +90,10 @@ link_abs "$REPO_DIR/delegate/config.yml" "$HOME/.config/delegate/config.yml"
 echo "=== Linking omp delegate extension ==="
 link_abs "$REPO_DIR/omp/extensions/delegate.ts" "$HOME/.omp/agent/extensions/delegate.ts"
 
-echo "=== Linking workflow shims into omp prompts ==="
-mkdir -p "$HOME/.omp/agent/prompts"
+echo "=== Linking workflow shims into omp commands ==="
+mkdir -p "$HOME/.omp/agent/commands"
 for shim in flyr hinta-best kaytetty-best; do
-    link_abs "$REPO_DIR/opencode/command/$shim.md" "$HOME/.omp/agent/prompts/$shim.md"
+    link_abs "$REPO_DIR/opencode/command/$shim.md" "$HOME/.omp/agent/commands/$shim.md"
 done
 
 BIN_DIR="$HOME/.local/bin"
