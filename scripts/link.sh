@@ -89,6 +89,7 @@ link_abs "$REPO_DIR/delegate/config.yml" "$HOME/.config/delegate/config.yml"
 
 echo "=== Linking omp delegate extension ==="
 link_abs "$REPO_DIR/omp/extensions/delegate.ts" "$HOME/.omp/agent/extensions/delegate.ts"
+link_abs "$REPO_DIR/omp/mcp.json" "$HOME/.omp/agent/mcp.json"
 
 echo "=== Linking workflow shims into omp commands ==="
 mkdir -p "$HOME/.omp/agent/commands"

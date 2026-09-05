@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "flyr": {
+      "type": "stdio",
+      "command": "flyr",
+      "args": ["mcp"]
+    }
+  }
+}
