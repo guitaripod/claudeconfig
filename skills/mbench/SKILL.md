@@ -13,7 +13,7 @@ description: Benchmark a local model that llama-swap serves on the Arch box with
 mbench run <llama-swap id> --detach          full suite (1–4 h); returns immediately
 mbench run <id> --quick --detach             30–60 min, ranked as provisional
 mbench run <id> --smoke                      ~5 min pipeline check, never ranked
-mbench run <id> --effort high --detach       the model at its maximum effort; ranked separately from medium
+mbench run <id> --effort max --detach        the model's highest declared effort; ranked separately from medium
 mbench run <id> --submit [all|speed|evals]   also localmaxxing: verified speed runs and/or GSM8K/HellaSwag shards
 mbench status   ·   mbench logs -f   ·   mbench cancel   ·   mbench resume <run>
 mbench ls       ·   mbench board --open   ·   mbench profile <id>
