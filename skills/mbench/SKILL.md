@@ -5,7 +5,7 @@ description: Benchmark a local model that llama-swap serves on the Arch box with
 
 # mbench
 
-`mbench` (source `~/Dev/python/mbench`, installed with `uv tool install --editable`) runs a fixed suite against any llama-swap model and writes results to `~/.local/share/mbench/bench.db`. It then rebuilds `~/.local/share/mbench/leaderboard.html`.
+`mbench` (source `~/Dev/python/mbench`, public at github.com/guitaripod/mbench; installed here with `uv tool install --editable`, so edits are live) runs a fixed suite against any llama-swap model and writes results to `~/.local/share/mbench/bench.db`. It then rebuilds `~/.local/share/mbench/leaderboard.html`.
 
 ## Running
 
