@@ -7,7 +7,6 @@
     "deny": [],
     "defaultMode": "default"
   },
-  "model": "claude-fable-5-1",
   "availableModels": [
     "claude-opus-5[1m]",
     "opus",
