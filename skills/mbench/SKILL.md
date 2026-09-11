@@ -13,7 +13,8 @@ description: Benchmark a local model that llama-swap serves on the Arch box with
 mbench run <llama-swap id> --detach          full suite (1–4 h); returns immediately
 mbench run <id> --quick --detach             30–60 min, ranked as provisional
 mbench run <id> --smoke                      ~5 min pipeline check, never ranked
-mbench run <id> --submit                     also localmaxxing speed runs + GSM8K/HellaSwag shards
+mbench run <id> --effort high --detach       the model at its maximum effort; ranked separately from medium
+mbench run <id> --submit [all|speed|evals]   also localmaxxing: verified speed runs and/or GSM8K/HellaSwag shards
 mbench status   ·   mbench logs -f   ·   mbench cancel   ·   mbench resume <run>
 mbench ls       ·   mbench board --open   ·   mbench profile <id>
 ```
@@ -34,4 +35,5 @@ mbench ls       ·   mbench board --open   ·   mbench profile <id>
 - Speed runs are greedy. Quality runs use each model's recommended sampling, with repeats and 95% intervals.
 - llama.cpp servers get per-question seeds. SGLang servers never do: its FlashInfer sampler asserts on seeded top-k/top-p requests and would stop the server.
 - The suite version lives in `mbench/suite.py`. Changing a budget, a sample count or a dataset pin means bumping `VERSION`, because runs under different versions are not comparable.
-- The board ranks each model by its newest complete full run. Quick and legacy runs stand in, marked provisional. Smoke runs are never shown.
+- The board ranks each effort level separately, by each model's newest complete full run at that effort. Quick and legacy runs stand in, marked provisional. Smoke runs are never shown.
+- `mbench -h` and `mbench run -h` list every option with examples.
