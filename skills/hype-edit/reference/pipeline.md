@@ -34,7 +34,15 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
   "sr_analysis": 22050,
   "audio_analysis": "song_22k_mono.wav",
   "audio_master": "master.wav",
-  "grade": "eq=...,colorbalance=...,curves=...,vignette=...",   // ffmpeg filter chain
+  "grade": "eq=...,colorbalance=...,curves=...",                // legacy; only used where no look resolves
+  "look": {                                                     // colour direction — see look.py
+    "base": "inkwash",                                          // library name OR raw ffmpeg chain
+    "sections": {"drop": "solar", "peak": "ice"},               // by spine section tag
+    "sources":  {"<src_id>": "arctic"},                         // everything from one source
+    "segments": {"10": "mono_steel"},                           // one shot
+    "drift": 0.3,                                               // 0..1 per-shot deterministic jitter
+    "tech": ""                                                  // non-colour prefix, always first
+  },
   "catalog": { "<srcid>": ["Nice Label", "hero_goal|goal|skills"] },   // optional
   "hero_overrides": [ {"src":"<srcid>", "in_tc": 96.7, "impact": 0.7}, ... ],  // optional
   "exclude_clips": [ 811, 972, ... ],                          // optional — banned clip ids (review rejects)
@@ -83,7 +91,9 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
 - Encoder auto-detected: `h264_nvenc` (preset p6, cq20) if present, else `libx264` (medium, crf18). Draft uses half-res + p1/veryfast.
 - `-frames:v nf` guarantees exact output length regardless of effect frame changes (freeze adds frames via `tpad=clone`, then trims).
 - Effects reference `DUR=seg.dur` and `F=impact`. `setpts=PTS-STARTPTS` after the grade so `t` starts at 0 for effect expressions.
-- Grade override: set `project.json.grade` to any ffmpeg filter chain (it's appended after the fill/scale). Keep it a comma-joined chain with no leading/trailing comma.
+- Colour: `look.py color_chain(cfg, seg)` resolves it per segment — `seg["grade"]` > `look.segments[i]` > `look.sources[src]` > `look.sections[tag]` > `look.base`, with `look.drift` jitter appended and `look.tech` prefixed. `render.py` composes `FILL + color_chain(...)`, where FILL is the scale/crop. **Framing is structural and is never part of a look** — before this split, a per-segment `grade` replaced the whole chain including the scale/crop, so any shot-level coloring silently broke the fill. Any ffmpeg chain is a valid look value; keep it comma-joined with no leading/trailing comma.
+- `extract_audio.py` seeds a **random** look on a fresh workdir (never a fixed house preset) and preserves an existing `look` on re-run. `--style remaster` additionally sets `look.tech` to the denoise/sharpen/HDR base, which survives any colour swap.
+- `qc.py` `[exposure]`: per-frame `signalstats` YAVG; flags ≥247 (blown) or ≤10 (crushed), exempting the first 0.2s of every segment (beat flashes are deliberate white hits) and the hero freeze windows. Fails past 3 frames — the guard that keeps an aggressive look from clipping a bright shot to paper.
 
 ## colorscan.py knobs (per-domain tuning)
 

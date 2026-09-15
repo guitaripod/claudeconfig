@@ -62,6 +62,31 @@ def main():
             if not any(a <= t <= b for a, b in hw): fz.append(round(t, 2))
     print(f"[freeze] unexpected={len(fz)} {fz[:8]}"); fz and d.append(f"{len(fz)} freeze")
 
+    # Exposure: an aggressive look can clip a bright shot to white (or crush a dark
+    # one) in a way no black/freeze gate catches. Beat flashes are deliberate white
+    # hits, so the first 0.2s of every segment is exempt, as are hero freezes.
+    seg = json.load(open(f"{ROOT}/assign.json"))["segments"]
+    flash = [(x["start"], x["start"] + 0.2) for x in seg]
+    ex = ff(["ffmpeg", "-hide_banner", "-i", FINAL, "-an", "-vf",
+             "signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-",
+             "-f", "null", "-"]).stdout
+    t, blown, crushed = 0.0, [], []
+    for l in ex.splitlines():
+        l = l.strip()
+        if "pts_time:" in l:
+            try: t = float(l.split("pts_time:")[1].split()[0])
+            except Exception: pass
+        elif "YAVG=" in l:
+            try: y = float(l.split("YAVG=")[1])
+            except Exception: continue
+            if any(a <= t <= b for a, b in flash) or any(a <= t <= b for a, b in hw):
+                continue
+            if y >= 247: blown.append(round(t, 2))
+            elif y <= 10: crushed.append(round(t, 2))
+    print(f"[exposure] blown={len(blown)} {blown[:6]} crushed={len(crushed)} {crushed[:6]}")
+    if len(blown) > 3: d.append(f"{len(blown)} blown frames")
+    if len(crushed) > 3: d.append(f"{len(crushed)} crushed frames")
+
     cum, worst = 0, 0
     for s in segs: worst = max(worst, abs(cum - round(s["start"] * FPS))); cum += s["nf"]
     print(f"[beats] worst cut-vs-beat offset = {worst} frames"); worst > 2 and d.append("beat align")

@@ -10,6 +10,9 @@ minterpolate chain, which also remains the per-segment fallback."""
 import sys, json, subprocess, os, shutil, threading
 from concurrent.futures import ThreadPoolExecutor
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from look import color_chain
+
 ROOT = os.path.abspath(sys.argv[1])
 CFG = json.load(open(f"{ROOT}/project.json"))
 DRAFT = "--draft" in sys.argv
@@ -28,11 +31,20 @@ NVENC = "h264_nvenc" in _enc
 STYLE = CFG.get("style", "classic")
 OSW, OSH = int(round(OW * 1.06 / 2)) * 2, int(round(OH * 1.06 / 2)) * 2
 if STYLE == "remaster":
-    GRADE = ((("" if LS else "transpose=1,") +
-             f"scale={OW}:{OH}:force_original_aspect_ratio=increase,"
-             f"crop={OW}:{OH},") + CFG["grade"])
+    FILL = (("" if LS else "transpose=1,") +
+            f"scale={OW}:{OH}:force_original_aspect_ratio=increase,crop={OW}:{OH},")
 else:
-    GRADE = (f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,crop={OW}:{OH}," + CFG["grade"])
+    FILL = f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,crop={OW}:{OH},"
+GRADE = FILL + color_chain(CFG)
+
+
+def seg_grade(s):
+    """Fill/framing is structural and always applies; only the colour varies.
+    (A per-segment grade used to replace GRADE wholesale and silently drop the
+    scale/crop, so any shot-level coloring broke the framing.)"""
+    return FILL + color_chain(CFG, s)
+
+
 MCI = f"minterpolate=fps={FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
 FLASH = float(CFG.get("flash_gain", 1.0))
 RGB = int(CFG.get("rgb_shift", 7))
@@ -125,7 +137,7 @@ def remaster_fx(s):
 def vf(s):
     d, F, eff = s["dur"], s["impact"], s["effects"]; p = []
     if s.get("crop"): p.append(f"crop={s['crop']}")
-    p.append(s.get("grade") or GRADE); p.append("setpts=PTS-STARTPTS")
+    p.append(seg_grade(s)); p.append("setpts=PTS-STARTPTS")
     if STYLE == "remaster":
         p += slowmo(s.get("speed", 1.0))
         p += remaster_fx(s)
@@ -207,7 +219,7 @@ def render_one(s):
     r = subprocess.run(base, capture_output=True, text=True)
     if r.returncode == 0: return s["i"], True, "mci" if RIFE else "ok"
     sm = ",".join(slowmo(s.get("speed", 1.0))) + "," if STYLE == "remaster" else ""
-    vf2 = f"{('crop=' + s['crop'] + ',') if s.get('crop') else ''}{s.get('grade') or GRADE},setpts=PTS-STARTPTS,{sm}setsar=1,fps={FPS},format=yuv420p"
+    vf2 = f"{('crop=' + s['crop'] + ',') if s.get('crop') else ''}{seg_grade(s)},setpts=PTS-STARTPTS,{sm}setsar=1,fps={FPS},format=yuv420p"
     fb = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(s["in_tc"]),
           "-t", str(inp), "-i", src, "-vf", vf2, "-frames:v", str(s["nf"]), "-fps_mode", "cfr",
           "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",

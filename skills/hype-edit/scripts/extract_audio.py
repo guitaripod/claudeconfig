@@ -15,25 +15,21 @@ Downloads/extracts the song, trims trailing silence, frame-aligns the timeline, 
 writes sample-exact analysis (22.05k mono) + master (44.1k stereo) WAVs. Emits
 project.json — the single config every other script reads. Run with the venv python.
 """
-import sys, os, json, subprocess, argparse
+import sys, os, json, subprocess, argparse, random
 import numpy as np
 import soundfile as sf
 import librosa
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from look import LOOKS, CHARACTER
+
 SR_A = 22050
 
-GRADES = {
-    # teal-orange stadium-night montage
-    "classic":
-        "eq=contrast=1.12:saturation=1.14:brightness=-0.02:gamma=0.96,"
-        "colorbalance=rs=-0.06:gs=-0.02:bs=0.08:rm=0.02:bm=-0.02:rh=0.10:gh=0.03:bh=-0.08,"
-        "curves=master='0/0 0.10/0.03 0.5/0.5 0.9/0.97 1/1',vignette=angle=PI/6",
-    # AI-remaster look: clean painterly base, oversharpened detail, HDR-ish pop
-    "remaster":
-        "hqdn3d=1.5:1.0:2.5:2.5,unsharp=5:5:0.9:5:5:0.35,cas=0.55,"
-        "eq=contrast=1.09:saturation=1.30:gamma=0.99,vibrance=intensity=0.22,"
-        "curves=master='0/0 0.12/0.08 0.5/0.53 0.9/0.95 1/1'",
-}
+# The remaster style keeps a signature technical base (denoise/sharpen/HDR-ish pop);
+# its colour still resolves through look.py like every other style.
+REMASTER_BASE = ("hqdn3d=1.5:1.0:2.5:2.5,unsharp=5:5:0.9:5:5:0.35,cas=0.55,"
+                 "eq=contrast=1.09:saturation=1.30:gamma=0.99,vibrance=intensity=0.22,"
+                 "curves=master='0/0 0.12/0.08 0.5/0.53 0.9/0.95 1/1'")
 CANVAS = {"classic": (1920, 1080, 30), "remaster": (1080, 1920, 60)}
 
 
@@ -109,7 +105,14 @@ def main():
     cfg = {}
     if os.path.exists(f"{root}/project.json"):
         cfg = json.load(open(f"{root}/project.json"))
-    grade = cfg.get("grade") if cfg.get("style") == a.style and cfg.get("grade") else GRADES[a.style]
+    # No house grade. A fresh workdir gets a RANDOM starting look so no two edits
+    # open on the same filter; an authored look (look.py set/shuffle) always wins.
+    look = cfg.get("look")
+    if not look:
+        look = {"base": random.choice([k for k in LOOKS if k != "neutral"]),
+                "sections": {}, "sources": {}, "segments": {}, "drift": 0.0}
+    look["tech"] = REMASTER_BASE if a.style == "remaster" else look.get("tech", "")
+    grade = cfg.get("grade", "")
     cfg.update({
         "root": root, "fps": a.fps, "dur": round(float(dur), 4),
         "total_frames": int(round(dur * a.fps)),
@@ -117,12 +120,18 @@ def main():
         "audio_analysis": "song_22k_mono.wav", "audio_master": "master.wav",
         "style": a.style,
         "grade": grade,
+        "look": look,
         "hero_overrides": cfg.get("hero_overrides", []),
         "pitch": a.pitch,
     })
     json.dump(cfg, open(f"{root}/project.json", "w"), indent=1)
     print(f"style={a.style} dur={dur:.3f}s ({cfg['total_frames']} frames @ {a.fps}fps "
           f"{a.w}x{a.h}) analysis={na} master={nm} samples → project.json")
+    b = look.get("base")
+    print(f"look={b} — {CHARACTER.get(b, 'custom chain')}\n"
+          f"  This is a random roll, not a house style. See the options:\n"
+          f"    python3 $S/look.py {root} preview      # every look on one real frame\n"
+          f"    python3 $S/look.py {root} set base=<name> peak=<name> drift=0.3")
 
 
 if __name__ == "__main__":

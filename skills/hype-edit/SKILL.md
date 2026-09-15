@@ -30,7 +30,7 @@ There is nothing to pick, and **one thing above all is fixed: relentless aggress
 - **Output geometry.** Built on a **1920×1080 landscape canvas — the full frame, no cropping** — then delivered as the **immersive vertical**: the finished landscape rotated 90° and scaled to fill a tall phone screen (~**1080×2340**; iPhone Air = 1080×2346) edge-to-edge, running *behind* the notch and TikTok UI (viewer rotates their phone; ref: the 9s Messi edit). No portrait-crop; the tall canvas trims only ~9% off the source's top/bottom.
 
 **Yours to direct (artistic — decide per edit, and it may vary clip-to-clip):**
-- **Coloring / grade.** A default teal-orange preset seeds `project.json "grade"`, but the look is your call — restyle it, push it, or set a per-segment `"grade"` so coloring differs shot to shot (`render.py` honors a per-segment grade, falling back to the global one). Colour consistency is *not* required; a point of view is.
+- **Coloring / look.** There is **no house grade.** `extract_audio.py` rolls a *random* starting look from `look.py`'s library, precisely so no two edits open on the same filter — it is a dice roll, never a default to keep by inertia. Direct it: `look.py <wd> preview` renders one real frame from this edit through all 17 looks into `frames/looks.png` — **read that image and choose with your eyes**, don't nudge numbers blind. Then `look.py <wd> set base=… drop=… peak=… drift=…`. Colour consistency is *not* a goal; a point of view is. Two edits that look alike are a failure of direction, not a house style.
 - **Effects.** `assign_clips.py` bakes a dense, beat-keyed plan by default (punch/flash/shake/RGB on ~every cut, freeze on the biggest beat) and `render.py` carries cranked intensities — a strong aggressive baseline. Flavor and dial it to the piece; the density serves the pacing, so keep it hot.
 
 `extract_audio.py --style classic` selects the pipeline (`project.json "style"` drives every stage); canvas 1920×1080@30 (`--w/--h/--fps` override). The landscape render is the working master on disk; the deliverable is always the rotated tall-fill vertical (Phase 5).
@@ -57,6 +57,7 @@ PY=<workdir>/.venv/bin/python       # use THIS python for build_spine.py, scenes
 - **Key action stays clear of the trim margins.** The build is the full 1920×1080 frame (no per-segment crop); the tall-fill vertical trims only ~9% off the top/bottom at delivery, so don't rely on content living in those edges.
 - **Diversity + zero reuse.** With a deep pool, no clip repeats and consecutive cuts come from different sources.
 - **Keep every cut clean.** Fire effects densely on the hits, but rarely stack more than ~3 at once, and never let them muddy the footage or blow out detail — density should energize the pacing, not smear the frame.
+- **The look is chosen, not inherited.** The edit ships on a look you picked after seeing `frames/looks.png`, and the director note says which and why. A hard look (`solar`, `arctic`, `bleach`) can clip a bright shot to pure white outside any flash — `qc.py`'s `[exposure]` gate counts blown/crushed frames and fails past 3, so soften the look or grade those shots individually rather than shipping them.
 - **Zero A/V drift.** One continuous master audio muxed last; sum of segment frames == `total_frames`.
 
 ## Workflow
@@ -89,6 +90,32 @@ python3 $S/colorscan.py <workdir>              # flag promo cards + synthetic gr
 
 **Audit the sources before trusting them.** Build a per-source frame montage (`contact_sheet.py` logic, or `ffmpeg -ss <t> -i src/<id>.mp4 -frames:v 1`) and eyeball kits/scoreboards. Comps titled "Best of <player> <year>" are often *club* footage, not the event you asked for — drop off-subject sources. This one check saves an entire wasted render.
 
+### Phase 1.5 — Choose the look (do this once, with your eyes)
+
+```bash
+python3 $S/look.py <workdir> preview        # all 17 looks on one real frame → frames/looks.png
+python3 $S/look.py <workdir> set base=inkwash drop=solar peak=ice drift=0.3
+```
+
+`preview` grades a frame from this edit's own footage, so you judge the look on the actual
+material rather than an abstract swatch. **Read `frames/looks.png` as an image before
+choosing.** A look value is a library name *or* any ffmpeg filter chain — write your own when
+nothing in the library fits; the library is a vocabulary, not a menu.
+
+Levers, in resolution order (`look.py show` prints the block):
+
+| key | effect |
+|---|---|
+| `segments` | one shot graded differently — `seg:10=mono_steel` |
+| `sources` | everything from one source — `src:<id>=ice` |
+| `sections` | by spine section — `drop=`, `peak=`, `build=`, `low=` |
+| `base` | the edit's default |
+| `drift` | `0..1` deterministic per-shot jitter, so one look still breathes |
+| `tech` | non-colour prefix (denoise/sharpen) that always runs first |
+
+`shuffle` rolls a fresh combination when you want something to react to. Nothing here has to be
+consistent — a section that changes colour on the drop is a choice, not a defect.
+
 ### Phase 2/3 — Assign + render
 
 ```bash
@@ -117,7 +144,7 @@ python3 $S/contact_sheet.py <workdir> --n 48   # full-res visual pass
 
 ### Phase 4 — Iterate (at least twice; this is what makes it hype)
 
-Between passes, actually inspect. `qc.py` must be green (frames, format, zero A/V drift, no black/unexpected-freeze, 0-frame beat offset, density-in-drops). Then read the seg grid + contact sheet: any bumper/wipe/dupe/weak frame is a defect → `exclude_clips` → re-render. **Verify heroes from their segment files** (`ffmpeg -i seg/seg_<i>.mp4 -frames:v 1` at a few offsets — output-timestamp sampling can miss the hero window): the subject must be THE subject of the brief, in frame, at peak moment. If the auto-pick is a keeper/teammate/empty grass, pin `hero_overrides` and re-run.
+Between passes, actually inspect. `qc.py` must be green (frames, format, zero A/V drift, no black/unexpected-freeze, no blown/crushed exposure, 0-frame beat offset, density-in-drops). Then read the seg grid + contact sheet: any bumper/wipe/dupe/weak frame is a defect → `exclude_clips` → re-render. **Verify heroes from their segment files** (`ffmpeg -i seg/seg_<i>.mp4 -frames:v 1` at a few offsets — output-timestamp sampling can miss the hero window): the subject must be THE subject of the brief, in frame, at peak moment. If the auto-pick is a keeper/teammate/empty grass, pin `hero_overrides` and re-run.
 
 ### Phase 5 — Deliver
 
@@ -150,7 +177,7 @@ When the brief is a *story told by a voice* over the OST ("tell the story of X w
 
 ## Effect catalog (density is the point)
 
-Baked per-segment by `assign_clips.py` (dense plan, automatic) and `render.py` (cranked intensities), locked to the beat: **punch-in zoom** (every cut), **beat-flash** (white hit, most cuts), **drop-flash** (bigger flash on downbeats / drop entries), **camera shake** (section entries + ~⅓ of cuts), **RGB-split** (~⅓ of cuts), **freeze-frame + zoom + flash + shake** (the single biggest beat only). Effects fire on ~every cut by design — that density serves the relentless pacing; the opener detonates (`punch+drop-flash+shake`). This is the aggressive baseline, not a mandate on the *look*: tune strength in `render.py`, when-they-fire in `assign_clips.py`, and set the grade (global or per-segment `seg["grade"]`) however the piece wants — the pacing is the constant, the styling is yours. To hand-pick hero moments, set `project.json` `hero_overrides` (see `reference/pipeline.md`).
+Baked per-segment by `assign_clips.py` (dense plan, automatic) and `render.py` (cranked intensities), locked to the beat: **punch-in zoom** (every cut), **beat-flash** (white hit, most cuts), **drop-flash** (bigger flash on downbeats / drop entries), **camera shake** (section entries + ~⅓ of cuts), **RGB-split** (~⅓ of cuts), **freeze-frame + zoom + flash + shake** (the single biggest beat only). Effects fire on ~every cut by design — that density serves the relentless pacing; the opener detonates (`punch+drop-flash+shake`). This is the aggressive baseline, not a mandate on the *look*: tune strength in `render.py`, when-they-fire in `assign_clips.py`, and set the colour through `look.py` (base, per-section, per-source, per-segment, plus `drift`) however the piece wants — the pacing is the constant, the styling is yours. To hand-pick hero moments, set `project.json` `hero_overrides` (see `reference/pipeline.md`).
 
 ## Batch mode (N edits in one brief)
 
@@ -160,7 +187,7 @@ Baked per-segment by `assign_clips.py` (dense plan, automatic) and `render.py` (
 
 ## Anti-patterns (do not ship)
 
-Metronomic cuts that ignore energy · all effects stacked on one cut (muddy — cap ~3) · a limp/draggy stretch that stops banging · black/frozen frames · audio drift by the end · a clip repeated too soon · the best moment anywhere but a peak · off-subject or wrong-game/wrong-event footage · menus/HUD/typography/wipes/bumpers/score-graphics left in · declaring done without reading the render · hero unverified at segment level · shipping landscape or a cropped/letterboxed vertical instead of the rotated tall-fill · **[gaming]** combo/hit counters, QTE prompts, or controller-glyph overlays left in · a flash-washed opener (dropflash hides a short seg 0) · a hero **freeze on a low-motion, dark, or subtitled cutscene frame** (it black/freeze-flags in qc and reads as a pacing dead-spot — freeze on a clean high-contrast subject).
+Metronomic cuts that ignore energy · shipping the rolled look untouched because it was there (the roll is a prompt, not a decision) · a blown-out or crushed look that fails `[exposure]` · all effects stacked on one cut (muddy — cap ~3) · a limp/draggy stretch that stops banging · black/frozen frames · audio drift by the end · a clip repeated too soon · the best moment anywhere but a peak · off-subject or wrong-game/wrong-event footage · menus/HUD/typography/wipes/bumpers/score-graphics left in · declaring done without reading the render · hero unverified at segment level · shipping landscape or a cropped/letterboxed vertical instead of the rotated tall-fill · **[gaming]** combo/hit counters, QTE prompts, or controller-glyph overlays left in · a flash-washed opener (dropflash hides a short seg 0) · a hero **freeze on a low-motion, dark, or subtitled cutscene frame** (it black/freeze-flags in qc and reads as a pacing dead-spot — freeze on a clean high-contrast subject).
 
 ## The hard parts (hard-won — read `reference/pipeline.md` for detail)
 
@@ -174,4 +201,4 @@ Metronomic cuts that ignore energy · all effects stacked on one cut (muddy — 
 
 ## Files
 
-`scripts/`: `setup.sh` `extract_audio.py` `fetch.sh` `build_spine.py` `scenes.py` `colorscan.py` `assign_clips.py` `render.py` `restore.py` `qc.py` `contact_sheet.py` `ask.py` (surface questions/status to Telegram, send-only) `narrate.py` (opt-in voice-over). `reference/pipeline.md`: data-flow, `project.json` schema, tuning knobs, hero overrides, narration spec, ffmpeg recipe details.
+`scripts/`: `setup.sh` `extract_audio.py` `fetch.sh` `build_spine.py` `scenes.py` `colorscan.py` `look.py` (colour direction: library, preview, per-section/source/segment resolution) `assign_clips.py` `render.py` `restore.py` `qc.py` `contact_sheet.py` `ask.py` (surface questions/status to Telegram, send-only) `narrate.py` (opt-in voice-over). `reference/pipeline.md`: data-flow, `project.json` schema, tuning knobs, hero overrides, narration spec, ffmpeg recipe details.
