@@ -66,7 +66,10 @@ def main():
     # one) in a way no black/freeze gate catches. Beat flashes are deliberate white
     # hits, so the first 0.2s of every segment is exempt, as are hero freezes.
     seg = json.load(open(f"{ROOT}/assign.json"))["segments"]
-    flash = [(x["start"], x["start"] + 0.2) for x in seg]
+    # One-frame tolerance at the head: assign.json stores intended float starts, but
+    # rendered frames land on exact frame indices, so a flash can straddle the
+    # boundary and read as blown a few ms before its segment nominally begins.
+    flash = [(x["start"] - 1.5 / FPS, x["start"] + 0.2) for x in seg]
     ex = ff(["ffmpeg", "-hide_banner", "-i", FINAL, "-an", "-vf",
              "signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-",
              "-f", "null", "-"]).stdout
