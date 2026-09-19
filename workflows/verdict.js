@@ -148,7 +148,7 @@ const kindMeta = kind => {
 
 phase('Evidence')
 
-const meta = kindMeta(scope.kind)
+const kmeta = kindMeta(scope.kind)
 
 const sourceAgents = []
 if (fetchRecipes[scope.kind].critics) {
@@ -204,7 +204,7 @@ for (const res of [criticsRes, usersRes]) {
     const v = Number(s.score100)
     if (!Number.isFinite(v) || v < 0 || v > 100) continue
     if (s.sampleSize === 0) continue
-    if (!meta.weights[s.key]) continue
+    if (!kmeta.weights[s.key]) continue
     byKey[s.key] = { score: v, raw: s.raw ?? null, sampleSize: s.sampleSize ?? null, url: s.url ?? null, note: s.note ?? null }
   }
 }
@@ -214,16 +214,16 @@ if (!keys.length) {
   return `Couldn't reach any score source for **${scope.identity}**.\n\n${criticsRes?.error ? `Critic sources: ${criticsRes.error}` : ''}${usersRes?.error ? `\nAudience sources: ${usersRes.error}` : ''}\n\nTry again later, or check the title is right — \`/verdict ${query}\` (add a year/artist if ambiguous).`
 }
 
-const totalW = keys.reduce((s, k) => s + meta.weights[k], 0)
-const consensus = Math.round(keys.reduce((s, k) => s + byKey[k].score * meta.weights[k], 0) / totalW)
+const totalW = keys.reduce((s, k) => s + kmeta.weights[k], 0)
+const consensus = Math.round(keys.reduce((s, k) => s + byKey[k].score * kmeta.weights[k], 0) / totalW)
 const weightedMean = arr => {
-  const ws = arr.map(k => meta.weights[k])
+  const ws = arr.map(k => kmeta.weights[k])
   const tw = ws.reduce((a, b) => a + b, 0)
   return arr.reduce((s, k, i) => s + byKey[k].score * ws[i], 0) / tw
 }
 
-const criticKeys = keys.filter(k => meta.critics.includes(k))
-const userKeys = keys.filter(k => meta.users.includes(k))
+const criticKeys = keys.filter(k => kmeta.critics.includes(k))
+const userKeys = keys.filter(k => kmeta.users.includes(k))
 const criticAvg = criticKeys.length ? Math.round(weightedMean(criticKeys) * 10) / 10 : null
 const userAvg = userKeys.length ? Math.round(weightedMean(userKeys) * 10) / 10 : null
 let gap = null
@@ -266,7 +266,7 @@ const SRC_NAMES = {
 }
 
 function renderCard() {
-  const meta_ = meta
+  const meta_ = kmeta
   const lines = []
   const titleLine = `${(scope.title || 'Media').toUpperCase()}${scope.year ? ` (${scope.year})` : ''}`
   const sub = [scope.creator, meta_.label, scope.platform].filter(Boolean).join(' · ')
