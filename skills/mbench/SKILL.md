@@ -29,6 +29,29 @@ mbench ls       ·   mbench board --open   ·   mbench profile <id>
 2. Optional: add `[<id>]` to `~/.config/mbench/models.toml` with `hf_id` and `quantization` (both required for `--submit`), `spec = { method, draft, tokens_per_step, window }` and `engine = { repository, commit, version }`.
 3. Run `mbench profile <id>` to see what was resolved and from where, then `mbench run <id> --detach`.
 
+## Phone runs (iPhone Air)
+
+A phone row is two runs: the phone measures speed, thermals and battery, its quality comes from a desktop twin of the
+same `.gguf`. Set `twin = "<twin id>"` in the phone entry and the board links the twin's newest complete full run by
+itself — `--quality-from` is only for naming a specific run.
+
+1. Download the `.gguf` into `/mnt/nvme8tb/Downloads/phone-models/`, then `mbench phone push <path>` (minutes for a GB).
+2. `~/.config/llama-swap/config.yaml`: a `<id>-gguf` twin entry pointing at that same file, added to the `phone-twins`
+   group. llama-swap runs with `--watch-config`, so it reloads on its own.
+3. `~/.config/mbench/models.toml`: `["<id>-air"]` with `twin`, `hf_id`, `quantization` and
+   `phone = { file, n_ctx, parallel = 4, flash_attn = "on", cache_type_k = "q8_0", cache_type_v = "q8_0", extra_args = ["-kvu"] }`.
+4. Port forwards must already be up, and they must outlive the session:
+   `systemd-run --user --unit=mbench-forward-8080 --collect ~/.local/bin/pymobiledevice3 usbmux forward 18080 8080`
+   (and 18081 → 8081). A run never sets them up itself.
+5. `mbench phone launch` then `mbench phone health`; the app must stay foreground with the screen on.
+6. `mbench run <id>-air --detach`, and the twin on the GPU. The two devices are separate, so both can run at once.
+
+- A phone run yields to the desktop's RAM floor like any other run, so a GPU run starting can park it for ten minutes.
+- `mbench phone logs` pulls both `mbenchd.log` and `llama-server.log`; the llama-server one is appended across runs and
+  its timestamps are elapsed, not wall clock.
+- The app restarting mid-run is reported as "iOS killed the app", but that is inferred from uptime going backwards.
+  Confirm it with `pymobiledevice3 crash ls`: a real kill leaves a `JetsamEvent-*.ips`, a real crash an `mbenchd-*.ips`.
+
 ## Comparability
 
 - Datasets are pinned by sha256; subsets and needle prompts use seed 0.
