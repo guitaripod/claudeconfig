@@ -23,19 +23,42 @@ function promptText(parts) {
     .join("\n")
 }
 
-export const BrevityPlugin = async () => {
-  return {
+/// Records whether the prompt asked for depth, and returns the mode it chose.
+function remember(sessionID, text) {
+  const next = ELABORATION_RE.test(text) ? "soft" : "hard"
+  if (sessionID) mode.set(sessionID, next)
+  return next
+}
+
+/// The contract text for the session's last recorded prompt.
+function contract(sessionID) {
+  const current = sessionID ? (mode.get(sessionID) ?? "hard") : "hard"
+  return { current, text: current === "soft" ? SOFT : HARD }
+}
+
+export default {
+  id: "brevity",
+  server: async () => ({
     "chat.message": async (input, output) => {
-      const text = promptText(output?.parts)
-      const next = ELABORATION_RE.test(text) ? "soft" : "hard"
-      if (input?.sessionID) mode.set(input.sessionID, next)
+      const next = remember(input?.sessionID, promptText(output?.parts))
       debug(`chat.message session=${input?.sessionID} mode=${next}`)
     },
 
     "experimental.chat.system.transform": async (input, output) => {
-      const current = input?.sessionID ? (mode.get(input.sessionID) ?? "hard") : "hard"
-      output.system.push(current === "soft" ? SOFT : HARD)
+      const { current, text } = contract(input?.sessionID)
+      output.system.push(text)
       debug(`system.transform session=${input?.sessionID} mode=${current}`)
     },
-  }
+  }),
+  setup: async (ctx) => {
+    await ctx.session.hook("prompt", (event) => {
+      const next = remember(event.sessionID, event.prompt?.text ?? "")
+      debug(`prompt session=${event.sessionID} mode=${next}`)
+    })
+    await ctx.session.hook("context", (event) => {
+      const { current, text } = contract(event.sessionID)
+      event.system.push({ type: "text", text })
+      debug(`context session=${event.sessionID} mode=${current}`)
+    })
+  },
 }

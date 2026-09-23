@@ -5,7 +5,7 @@ import path from "node:path"
 
 type Mode = "normal" | "conserve" | "rush"
 
-interface DelegateArgs {
+export interface DelegateArgs {
   op: "run" | "new" | "log" | "stats" | "show" | "tiers"
   packet?: string
   class?: string
@@ -182,9 +182,58 @@ export function renderRunSummary(lines: string[]): string {
   return parts.join("\n")
 }
 
+export const DELEGATE_DESCRIPTION =
+  "Dispatch a bounded task packet through the delegate tier ladder (t1 local, t2 cheap cloud) or inspect delegate runs. Only use when the user explicitly asks to delegate a task, write or run a packet, or check delegate log/stats/show/tiers — never to offload work opportunistically, and never choosing tier/ceiling unless the user says to."
+
+/** Runs one delegate subcommand for `args` in `cwd`, as the title and text a tool call reports. */
+export async function runDelegate(args: DelegateArgs, cwd: string): Promise<{ title: string; output: string }> {
+  const bin = resolveDelegateBin()
+
+  if (args.op === "new") {
+    const { path: packetPath, yaml } = await createPacket(bin, cwd, args)
+    return { title: `delegate new: ${args.class ?? "?"}`, output: `${packetPath}\n\n${yaml}` }
+  }
+
+  if (args.op === "run") {
+    let packetPath = args.packet
+    if (!packetPath) {
+      const created = await createPacket(bin, cwd, args)
+      packetPath = created.path
+    }
+    const runArgs = ["run", packetPath, "--json", "-y"]
+    if (args.tier) runArgs.push("--tier", args.tier)
+    if (args.ceiling) runArgs.push("--ceiling", args.ceiling)
+    if (args.mode) runArgs.push("--mode", args.mode)
+
+    const { stdout, stderr } = await runCli(bin, cwd, runArgs)
+    const summary = renderRunSummary(stdout.split("\n"))
+    const output = stderr.trim() ? `${summary}\n\nstderr:\n${stderr.trim()}` : summary
+    return { title: `delegate run: ${packetPath}`, output }
+  }
+
+  if (args.op === "show") {
+    if (!args.packet) throw new Error("op=show needs `packet` set to a run id")
+    const { stdout, stderr, exitCode } = await runCli(bin, cwd, ["show", args.packet])
+    if (exitCode !== 0) throw new Error(`delegate show failed (exit ${exitCode}): ${stderr.trim() || stdout.trim()}`)
+    return { title: `delegate show: ${args.packet}`, output: stdout.trim() || stderr.trim() }
+  }
+
+  if (args.op === "log" || args.op === "tiers") {
+    const { stdout, stderr, exitCode } = await runCli(bin, cwd, [args.op])
+    if (exitCode !== 0) throw new Error(`delegate ${args.op} failed (exit ${exitCode}): ${stderr.trim() || stdout.trim()}`)
+    return { title: `delegate ${args.op}`, output: stdout.trim() || stderr.trim() }
+  }
+
+  // op === "stats"
+  const statsArgs = ["stats"]
+  if (args.class) statsArgs.push("--class", args.class)
+  const { stdout, stderr, exitCode } = await runCli(bin, cwd, statsArgs)
+  if (exitCode !== 0) throw new Error(`delegate stats failed (exit ${exitCode}): ${stderr.trim() || stdout.trim()}`)
+  return { title: "delegate stats", output: stdout.trim() || stderr.trim() }
+}
+
 export default tool({
-  description:
-    "Dispatch a bounded task packet through the delegate tier ladder (t1 local, t2 cheap cloud) or inspect delegate runs. Only use when the user explicitly asks to delegate a task, write or run a packet, or check delegate log/stats/show/tiers — never to offload work opportunistically, and never choosing tier/ceiling unless the user says to.",
+  description: DELEGATE_DESCRIPTION,
   args: {
     op: tool.schema.enum(["run", "new", "log", "stats", "show", "tiers"]).describe("Delegate subcommand to perform."),
     packet: tool.schema.string().optional().describe("Packet YAML path for op=run; run id for op=show."),
@@ -199,49 +248,6 @@ export default tool({
     mode: tool.schema.enum(["normal", "conserve", "rush"]).optional().describe("Dispatch mode override."),
   },
   async execute(args, context) {
-    const bin = resolveDelegateBin()
-    const cwd = context.directory
-
-    if (args.op === "new") {
-      const { path: packetPath, yaml } = await createPacket(bin, cwd, args as DelegateArgs)
-      return { title: `delegate new: ${args.class ?? "?"}`, output: `${packetPath}\n\n${yaml}` }
-    }
-
-    if (args.op === "run") {
-      let packetPath = args.packet
-      if (!packetPath) {
-        const created = await createPacket(bin, cwd, args as DelegateArgs)
-        packetPath = created.path
-      }
-      const runArgs = ["run", packetPath, "--json", "-y"]
-      if (args.tier) runArgs.push("--tier", args.tier)
-      if (args.ceiling) runArgs.push("--ceiling", args.ceiling)
-      if (args.mode) runArgs.push("--mode", args.mode)
-
-      const { stdout, stderr } = await runCli(bin, cwd, runArgs)
-      const summary = renderRunSummary(stdout.split("\n"))
-      const output = stderr.trim() ? `${summary}\n\nstderr:\n${stderr.trim()}` : summary
-      return { title: `delegate run: ${packetPath}`, output }
-    }
-
-    if (args.op === "show") {
-      if (!args.packet) throw new Error("op=show needs `packet` set to a run id")
-      const { stdout, stderr, exitCode } = await runCli(bin, cwd, ["show", args.packet])
-      if (exitCode !== 0) throw new Error(`delegate show failed (exit ${exitCode}): ${stderr.trim() || stdout.trim()}`)
-      return { title: `delegate show: ${args.packet}`, output: stdout.trim() || stderr.trim() }
-    }
-
-    if (args.op === "log" || args.op === "tiers") {
-      const { stdout, stderr, exitCode } = await runCli(bin, cwd, [args.op])
-      if (exitCode !== 0) throw new Error(`delegate ${args.op} failed (exit ${exitCode}): ${stderr.trim() || stdout.trim()}`)
-      return { title: `delegate ${args.op}`, output: stdout.trim() || stderr.trim() }
-    }
-
-    // op === "stats"
-    const statsArgs = ["stats"]
-    if (args.class) statsArgs.push("--class", args.class)
-    const { stdout, stderr, exitCode } = await runCli(bin, cwd, statsArgs)
-    if (exitCode !== 0) throw new Error(`delegate stats failed (exit ${exitCode}): ${stderr.trim() || stdout.trim()}`)
-    return { title: "delegate stats", output: stdout.trim() || stderr.trim() }
+    return runDelegate(args as DelegateArgs, context.directory)
   },
 })

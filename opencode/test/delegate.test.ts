@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { renderRunSummary } from "./delegate.ts"
+import { renderRunSummary } from "../tools/delegate.ts"
 
 const SYNTHETIC_LINES = [
   JSON.stringify({
