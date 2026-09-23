@@ -17,7 +17,7 @@ myyty sync --last 90d --force   # refetch a window, e.g. after Apple restates it
 myyty coverage                  # which periods are stored, per report
 ```
 
-Apple publishes yesterday's daily report, keeps dailies for ~365 days and restates the last few days, so `sync` always re-pulls the newest two days. Nothing is refetched twice otherwise; `myyty rebuild` replays the raw files with no network.
+Apple publishes yesterday's daily report around 5 am CET and keeps dailies for ~365 days. `sync` fetches only periods not stored yet, so a day Apple had not published is retried on the next run; `--force` refetches and never discards a stored report Apple no longer serves (a forced refetch of 35 days in 2026-09 came back unchanged, so restatements are rare). `myyty rebuild` replays the raw files with no network.
 
 ## Reading the data
 
