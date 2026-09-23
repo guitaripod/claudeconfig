@@ -18,13 +18,6 @@ function refusingCommand(message) {
 
 export default {
   id: "guard",
-  server: async () => ({
-    "tool.execute.before": async (input, output) => {
-      if (input?.tool !== "bash") return
-      const reason = refusal(String(output?.args?.command ?? ""))
-      if (reason) throw new Error(reason)
-    },
-  }),
   setup: async (ctx) => {
     await ctx.tool.hook("execute.before", (event) => {
       if (event.tool !== "shell" || typeof event.input?.command !== "string") return

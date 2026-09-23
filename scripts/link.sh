@@ -79,9 +79,9 @@ if [ -d "$OPENCODE_DIR" ]; then
     [ "$REPO_DIR" = "$HOME/claudeconfig" ] || rel="$REPO_DIR"
     ln -sfn "$rel/CLAUDE.md" "$OPENCODE_DIR/AGENTS.md"
     ln -sfn "$rel/opencode/plugin" "$OPENCODE_DIR/plugin"
-    ln -sfn "$rel/opencode/tools" "$OPENCODE_DIR/tools"
+    [ -L "$OPENCODE_DIR/tools" ] && rm "$OPENCODE_DIR/tools"
     ln -sfn "$rel/opencode/command" "$OPENCODE_DIR/command"
-    echo "  link $OPENCODE_DIR/{AGENTS.md,plugin,tools,command}"
+    echo "  link $OPENCODE_DIR/{AGENTS.md,plugin,command}"
 fi
 
 echo "=== Linking delegate config ==="

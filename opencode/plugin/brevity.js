@@ -16,13 +16,6 @@ function debug(line) {
   } catch {}
 }
 
-function promptText(parts) {
-  return (parts ?? [])
-    .filter((p) => p?.type === "text" && typeof p.text === "string")
-    .map((p) => p.text)
-    .join("\n")
-}
-
 /// Records whether the prompt asked for depth, and returns the mode it chose.
 function remember(sessionID, text) {
   const next = ELABORATION_RE.test(text) ? "soft" : "hard"
@@ -38,18 +31,6 @@ function contract(sessionID) {
 
 export default {
   id: "brevity",
-  server: async () => ({
-    "chat.message": async (input, output) => {
-      const next = remember(input?.sessionID, promptText(output?.parts))
-      debug(`chat.message session=${input?.sessionID} mode=${next}`)
-    },
-
-    "experimental.chat.system.transform": async (input, output) => {
-      const { current, text } = contract(input?.sessionID)
-      output.system.push(text)
-      debug(`system.transform session=${input?.sessionID} mode=${current}`)
-    },
-  }),
   setup: async (ctx) => {
     await ctx.session.hook("prompt", (event) => {
       const next = remember(event.sessionID, event.prompt?.text ?? "")
