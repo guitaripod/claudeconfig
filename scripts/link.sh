@@ -73,6 +73,9 @@ link hooks
 link skills
 link workflows
 
+echo "=== Linking enabled Claude plugin skills ==="
+bash "$REPO_DIR/scripts/link-plugin-skills.sh"
+
 OPENCODE_DIR="$HOME/.config/opencode"
 if [ -d "$OPENCODE_DIR" ]; then
     rel="../../claudeconfig"
