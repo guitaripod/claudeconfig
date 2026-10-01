@@ -63,7 +63,7 @@ Extract unique session directory paths from lines matching "sessions/wwdcYEAR/ID
 ${isRecentQuery ? 'Prefer sessions/wwdc2026 paths.' : ''}
 
 Return up to 5 most relevant sessions. Derive each title from its slug (e.g. "274-what-s-new-in-swiftdata" → "What's New in SwiftData").`,
-  { label: 'search', phase: 'Search', model: 'claude-haiku-4-5-20251001', schema: SESSION_SCHEMA }
+  { label: 'search', phase: 'Search', model: 'haiku', effort: 'low', schema: SESSION_SCHEMA }
 )
 
 if (!found.sessions.length) return `No WWDC sessions found for: ${query}`
@@ -80,7 +80,7 @@ ${readmeUrl}
 
 Return the full content in the "content" field.
 Set "needsTranscript" to true if${isDetailQuery ? ' true (the user wants code examples or implementation detail)' : ' the README is very thin (under ~200 words) and a deeper transcript would help answer a how-to or code question'}.`,
-      { label: `read:${i}`, phase: 'Read', model: 'claude-haiku-4-5-20251001', schema: READ_SCHEMA }
+      { label: `read:${i}`, phase: 'Read', model: 'haiku', effort: 'low', schema: READ_SCHEMA }
     )
     if (!result) return null
 
@@ -89,7 +89,7 @@ Set "needsTranscript" to true if${isDetailQuery ? ' true (the user wants code ex
       const transcriptUrl = `https://raw.githubusercontent.com/guitaripod/wwdc-sessions/master/${s.path}/transcript.md`
       const transcript = await agent(
         `Fetch this URL and return its full content verbatim:\n${transcriptUrl}`,
-        { label: `transcript:${i}`, phase: 'Read', model: 'claude-haiku-4-5-20251001' }
+        { label: `transcript:${i}`, phase: 'Read', model: 'haiku', effort: 'low' }
       )
       if (transcript) content = content + '\n\n### Full Transcript\n\n' + transcript
     }
@@ -111,5 +111,5 @@ Here are the relevant WWDC session contents:
 ${valid.map(c => `## ${c.title}\n\n${c.content}`).join('\n\n---\n\n')}
 
 Write a clear, well-organized answer. Include concrete API changes, new features, and code examples where present. Use markdown.`,
-  { label: 'synthesize', phase: 'Synthesize', model: 'claude-haiku-4-5-20251001' }
+  { label: 'synthesize', phase: 'Synthesize', model: 'haiku', effort: 'medium' }
 )

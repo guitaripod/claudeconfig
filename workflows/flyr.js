@@ -4,7 +4,7 @@ export const meta = {
   whenToUse: 'When you want the cheapest fare for a trip and date flexibility matters — e.g. "/flyr cheap one-way HEL to ICN in September" or "/flyr return HEL→BKK around 2026-09-10 for ~2 weeks, business".',
   phases: [
     { title: 'Plan', detail: 'parse the request into an explicit date grid + airport set' },
-    { title: 'Search', detail: 'one flyr search per date / date-pair, in parallel', model: 'claude-haiku-4-5-20251001' },
+    { title: 'Search', detail: 'one flyr search per date / date-pair, in parallel', model: 'haiku' },
     { title: 'Rank', detail: 'collate fares, surface the cheapest options' },
   ],
 }
@@ -81,7 +81,7 @@ Rules:
 - Every search entry must be { "date": "YYYY-MM-DD", "returnDate": "YYYY-MM-DD" or null }. For one-way, returnDate is null on every entry.
 
 Set "interpretation" to one plain-English sentence: origin → destinations, window, trip type, cabin, pax, currency.`,
-  { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA }
+  { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA, effort: 'low' }
 )
 
 const searches = (plan.searches || []).filter(s => s && s.date).slice(0, 24)
@@ -170,7 +170,8 @@ If the command errors, times out, or returns zero flights, return an empty "fare
         label: `search:${plan.from}→${toArg}@${s.date}${s.returnDate ? '/' + s.returnDate : ''}`,
         phase: 'Search',
         schema: FARE_SCHEMA,
-        model: 'claude-haiku-4-5-20251001',
+        model: 'haiku',
+        effort: 'low',
       }
     )
   )
@@ -228,5 +229,5 @@ Write a concise markdown answer for the user using ONLY these fares:
 4. Final line, verbatim: To open it in Google Flights: \`${openCmd}\`
 
 Be factual and tight. Currency is ${plan.currency}. Do not add fares that aren't in the JSON.`,
-  { label: 'rank', phase: 'Rank' }
+  { label: 'rank', phase: 'Rank', effort: 'low' }
 )

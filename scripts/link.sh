@@ -72,6 +72,7 @@ link statusline-command.sh
 link hooks
 link skills
 link workflows
+link agents
 
 echo "=== Linking enabled Claude plugin skills ==="
 bash "$REPO_DIR/scripts/link-plugin-skills.sh"

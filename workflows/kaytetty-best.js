@@ -6,7 +6,7 @@ export const meta = {
     'When you want a "what should I buy second-hand" answer checked against live Finnish used listings. Three modes, auto-detected: a SPECIFIC thing you have decided to buy used ("/kaytetty-best iphone 13 128gb", "/kaytetty-best rtx 3080") finds the best-value live listing plus the fair band; an OPEN category ("/kaytetty-best good used road bike under 800") shortlists models then checks what is for sale used; a BUILD ("/kaytetty-best gaming pc around a 1080 ti", "/kaytetty-best home office setup under 600") scopes a compatible parts/kit list around any anchor and sources every part used, then totals a coherent in-budget build with the used-vs-new saving.',
   phases: [
     { title: 'Scope', detail: 'classify the request and build the used-market search plan' },
-    { title: 'Hunt', detail: 'pull live listings from Tori.fi + Huuto.net (+ new-price reference)', model: 'claude-haiku-4-5-20251001' },
+    { title: 'Hunt', detail: 'pull live listings from Tori.fi + Huuto.net (+ new-price reference)', model: 'haiku' },
     { title: 'Appraise', detail: 'compute the fair band, flag scams, pick the best-value listing / assemble the build' },
   ],
 }
@@ -140,7 +140,7 @@ Decide the MODE:
   * Leave the product/category fields ('searchQuery','coreQuery','mustMatch','accessoryTerms','newPriceQuery','candidates') null/empty at the TOP level — the per-part queries live inside 'components'.
 
 For all modes: respect hard constraints. Set 'budgetEur' to the user's max total (else null) and 'regionHint' to a preferred Finnish city/region for pickup if named (else null). 'category' = normalized name of the thing/build, 'interpretation' = one sentence (for a build, state the platform + anchor + whether the anchor is being bought or is owned). In product/category modes leave 'platform'/'buildRationale' null and 'components' empty.`,
-  { label: 'scope', phase: 'Scope', schema: SCOPE_SCHEMA }
+  { label: 'scope', phase: 'Scope', schema: SCOPE_SCHEMA, effort: 'medium' }
 )
 
 log(`${scope.mode === 'product' ? 'Product' : scope.mode === 'build' ? 'Build' : 'Category'}: ${scope.interpretation}`)
@@ -189,7 +189,7 @@ Pass WebFetch this extraction prompt: "This is a Finnish used-goods marketplace 
 Then from what WebFetch returns, keep ONLY genuine listings of the target item "${scope.category}"${mustMatch.length ? ` (the title must be consistent with all of: ${mustMatch.join(', ')})` : ''}. DROP accessories, parts, spares, cases and lookalikes${accessoryTerms.length ? ` (titles containing any of: ${accessoryTerms.join(', ')})` : ''}, and drop clearly-different variants/capacities than asked.
 
 For each kept listing return: title, priceEur (the asking price), auction=false, buyNowEur=null, currentBidEur=null, location, url, closingTime=null, bidderCount=null, condition (from the title if stated, else null), warrantyMonths (e.g. a title saying "TAKUU 12kk" -> 12, else null), sellerType ("dealer" if the title looks like a reseller e.g. repeated "ALE …/ TAKUU 12kk" branding, else "private" for a normal seller). Max 25, cheapest first. NEVER invent a listing, price or url. If WebFetch fails or nothing matches, return empty listings and a one-line error.`,
-    { label, phase: 'Hunt', schema: LISTING_SCHEMA, model: 'claude-haiku-4-5-20251001' }
+    { label, phase: 'Hunt', schema: LISTING_SCHEMA, model: 'haiku', effort: 'low' }
   )
 }
 
@@ -215,7 +215,7 @@ For each kept item:
 - location, url=links.alternative, closingTime, bidderCount. condition/warrantyMonths from the title if stated (else null). sellerType usually "private" on Huuto.
 
 Max 25, cheapest first. NEVER invent data. If curl errors or nothing matches, return empty listings and a one-line error.`,
-    { label, phase: 'Hunt', schema: LISTING_SCHEMA, model: 'claude-haiku-4-5-20251001' }
+    { label, phase: 'Hunt', schema: LISTING_SCHEMA, model: 'haiku', effort: 'low' }
   )
 }
 
@@ -283,7 +283,7 @@ hinta compare "${String(newPriceQuery).replace(/"/g, '\\"')}" --enrich --devices
 \`\`\`
 
 It returns a "groups" array; each group has "attributes" (brand, capacity_gb…) and "offers" [{ source, price_euro, in_stock, url }] cheapest first. Pick the ONE group that best matches "${newPriceQuery}" (right capacity/variant, plain not bundle). Report the cheapest in-stock offer as the NEW reference price: foundInFinland, cheapestNewEur, retailer, url. If the command errors or nothing matches, foundInFinland=false and the rest null. NEVER invent a price.`,
-    { label, phase: 'Hunt', schema: NEW_SCHEMA, model: 'claude-haiku-4-5-20251001' }
+    { label, phase: 'Hunt', schema: NEW_SCHEMA, model: 'haiku', effort: 'low' }
   )
 }
 
@@ -369,7 +369,7 @@ Assemble the build and pick the better of two routes:
 6. **Buyer advice** — 1-2 lines specific to used PC parts: stress-test the GPU for artifacts and check for mining wear/repaste, inspect the CPU socket/pins, confirm PSU age (avoid 7+ yr units), and test-boot before paying; meet in person.
 
 Rules: prices are EUR and live. Never invent a listing, price, seller, or URL not in the JSON. Never pick a suspicious-low listing. Keep every pick compatible. Coverage is Tori.fi + Huuto.net only (Facebook Marketplace is not searchable). Be factual and tight — the buyer should know exactly which listings to open and what it totals.`,
-    { label: 'assemble-build', phase: 'Appraise' }
+    { label: 'assemble-build', phase: 'Appraise', effort: 'medium' }
   )
 }
 
@@ -444,5 +444,5 @@ Write a concise markdown recommendation using ONLY these facts:
 5. One line of buyer advice fit to THIS item (e.g. for a phone: check IMEI / iCloud lock / battery health and meet in person; for a bike: check frame/serial; for furniture: inspect wear) — grounded and short, no boilerplate lecture.
 ${scope.budgetEur ? `6. Flag anything recommended that sits over the ${scope.budgetEur} EUR budget.\n` : ''}
 Rules: prices are EUR and live. Never invent a listing, price, seller, or URL not in the JSON. Never recommend a suspicious-low listing as a buy. Note that coverage is Tori.fi + Huuto.net only (Facebook Marketplace is not searchable). Be factual and tight — the buyer should know exactly which listing to open.`,
-  { label: 'appraise', phase: 'Appraise' }
+  { label: 'appraise', phase: 'Appraise', effort: 'medium' }
 )

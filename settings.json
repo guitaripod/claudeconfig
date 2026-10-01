@@ -11,12 +11,10 @@
     "defaultMode": "default"
   },
   "availableModels": [
-    "claude-opus-5[1m]",
     "opus",
     "sonnet",
     "haiku",
-    "fable",
-    "claude-fable-5"
+    "fable"
   ],
   "hooks": {
     "PostToolBatch": [

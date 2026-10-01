@@ -10,6 +10,7 @@ Single source of truth for global Claude Code (and shared opencode) configuratio
 - `hooks/` — `brevity.sh` + `brevity-midrun.sh` (answer length), `guard-bash.sh` (blocks Co-Authored-By trailers and opencode-serve restarts)
 - `skills/` — custom user skills (procedures that load on demand: `ios-dev`, `app-store`, `kontu`, …)
 - `workflows/` — Claude Code workflow scripts
+- `agents/`: subagent definitions that pin model and effort (`Explore` and `general-purpose` override the built-ins, `bulk` for mechanical work), since subagents otherwise inherit the session's effort
 - `opencode/plugin/`, `opencode/command/` — opencode 2 equivalents of the hooks, workflows and skills (plugins default-export `{ id, setup }`), linked into `~/.config/opencode/`
 - `delegate/config.yml` — shared `delegate` CLI config (tiers, classes), linked to `~/.config/delegate/config.yml`; `~/.config/delegate/host.yml` stays a real per-machine file
 - `scripts/` — `link.sh` (symlinks), `sync.sh` (cross-machine pull), `brevity-report.py`
