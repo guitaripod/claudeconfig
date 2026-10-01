@@ -55,11 +55,13 @@ done
 
 case "$MODE" in peak|loud) ;; *) echo "error: --mode must be peak or loud" >&2; exit 2 ;; esac
 
-# Output path: <stem> - loud<ext>, auto-suffix on collision
+# Output path: <stem> - loud<ext>, auto-suffix on collision. ext always follows the
+# input: ffmpeg picks the muxer from the temp file's suffix, so a --out run must not
+# leave ext unset or the AVI sources come out as MP4 wearing an .avi name.
+stem="${INPUT%.*}"
+if [ "$stem" != "$INPUT" ]; then ext=".${INPUT##*.}"; else ext=""; fi
+
 if [ -z "$OUT" ]; then
-  stem="${INPUT%.*}"
-  ext=".${INPUT##*.}"
-  [ "$stem" = "$INPUT" ] && ext=""
   OUT="${stem} - loud${ext}"
   n=2
   while [ -e "$OUT" ]; do
@@ -86,21 +88,24 @@ echo "audio : ${ABIT} AAC @ ${SR} Hz, video stream copied"
 # loudnorm prints its JSON report to stderr mixed with ffmpeg logs; grab the block only.
 measure() {
   local f="$1"
-  ffmpeg -hide_banner -nostdin -i "$f" -map 0:a:0 \
-    -af "loudnorm=I=-20:TP=-1:LRA=11:print_format=json" -f null - 2>"$f.log"
+  local log
+  log=$(mktemp)
+  ffmpeg -hide_banner -nostdin -err_detect ignore_err -i "$f" -map 0:a:0 \
+    -af "loudnorm=I=-20:TP=-1:LRA=11:print_format=json" -f null - 2>"$log" || true
   local json
-  json=$(sed -n '/^{/,/^}/p' "$f.log")
-  rm -f "$f.log"
+  json=$(sed -n '/^{/,/^}/p' "$log")
+  rm -f "$log"
   [ -n "$json" ] || { echo "error: loudnorm reported no JSON for $f" >&2; exit 1; }
   printf '%s' "$json"
 }
 
-# Print the dB of attenuation needed so a file's true peak lands at ceiling; empty if OK.
-correction_gain() {
+# Print how many dB a file's true peak sits over the ceiling; empty when at or under it.
+# An unmeasurable file exits non-zero so the loop stops and the final check errors out.
+overshoot() {
   local tp
-  tp=$(measure "$1" | jq -r '.input_tp // "N/A"')
+  tp=$(measure "$1" | jq -r '.input_tp // "N/A"') || return 1
   awk -v tp="$tp" -v c="$2" \
-    'BEGIN{if (tp ~ /inf/ || tp == "N/A") exit; v=c-tp; if (v < -0.05) printf "%.3f", v}'
+    'BEGIN{if (tp == "N/A" || tp ~ /inf/) exit 1; v=tp-c; if (v > 0.01) printf "%.3f", v}'
 }
 
 meas=$(mktemp)
@@ -111,51 +116,93 @@ LRA0=$(jq -r '.input_lra // "N/A"' "$meas")
 TH0=$(jq -r '.input_thresh // "N/A"' "$meas")
 echo "before: I=${I0} LUFS  true-peak=${TP0} dBTP  LRA=${LRA0} LU"
 
-TMP=$(mktemp --suffix="${ext:-.mp4}")
+# The muxer follows the final output name, whatever the input was called.
+out_tail="${OUT##*/}"
+case "$out_tail" in
+  *.*) tmp_ext=".${out_tail##*.}" ;;
+  *)   tmp_ext="${ext:-.mp4}" ;;
+esac
+TMP=$(mktemp --suffix="$tmp_ext")
 trap 'rm -f "$meas" "$TMP"' EXIT
 
 CEILING=0
+LTP=$TP
 if [ "$MODE" = peak ]; then
   # Transparent gain to the ceiling. AAC re-encoding can add inter-sample peak
-  # overshoot, so a single correction re-encode (still from the original) covers it.
+  # overshoot, so correction re-encodes (still from the original) cover it.
   GAIN=$(awk -v tp="$TP0" 'BEGIN{if (tp ~ /inf/ || tp == "N/A") print 0; else printf "%.3f", -tp}')
-  AF="volume=${GAIN}dB,alimiter=level=false:limit=1.0"
   echo "mode  : peak (gain ${GAIN} dB, ceiling ${CEILING} dBTP)"
 else
-  # Two-pass dynamic loudnorm: pass 1 measures, pass 2 applies time-varying gain
-  # to hit the I/TP targets. loudnorm runs at 192 kHz internally, so resample
-  # back to the source rate. AAC can still overshoot the TP ceiling (inter-sample
-  # peaks), covered by the same correction re-encode.
-  AF="loudnorm=I=${TARGET}:TP=${TP}:LRA=11:measured_I=${I0}:measured_TP=${TP0}:measured_LRA=${LRA0}:measured_thresh=${TH0}:linear=false,alimiter=level=false:limit=1.0,aresample=${SR}"
   CEILING=$TP
   echo "mode  : loud (two-pass EBU R128 → I=${TARGET} LUFS, TP=${TP} dBTP)"
 fi
 
+# Two-pass dynamic loudnorm (pass 1 measures, pass 2 applies time-varying gain to hit
+# the I/TP targets; loudnorm runs at 192 kHz internally, so resample back to the source
+# rate). Rebuilt per correction pass: loud mode re-targets loudnorm's TP instead of
+# appending volume, so re-holding I costs nothing; peak mode's gain never changes.
+build_af() {
+  if [ "$MODE" = peak ]; then
+    AF="volume=${GAIN}dB,alimiter=level=false:limit=1.0"
+  else
+    AF="loudnorm=I=${TARGET}:TP=${1}:LRA=11:measured_I=${I0}:measured_TP=${TP0}:measured_LRA=${LRA0}:measured_thresh=${TH0}:linear=false,alimiter=level=false:limit=1.0,aresample=${SR}"
+  fi
+}
+build_af "$LTP"
+
 encode() { # $1 = gain suffix applied after loudnorm/limiter (must not be re-normalized)
-  ffmpeg -hide_banner -nostdin -y -i "$INPUT" \
+  local rc=0
+  ffmpeg -hide_banner -nostdin -err_detect ignore_err -y -i "$INPUT" \
     -map 0:v:0 -map 0:a:0 -c:v copy \
     -af "${AF}${1}" -c:a aac -b:a "$ABIT" \
-    -movflags +faststart "$TMP"
+    -movflags +faststart "$TMP" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    # Concat'd mkvs can trip a spurious EOF "Conversion failed!" (exit 69) after all
+    # frames are written. Tolerate it only when the output is actually complete.
+    local in_dur out_dur
+    in_dur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$INPUT" 2>/dev/null)
+    out_dur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$TMP" 2>/dev/null)
+    awk -v a="$in_dur" -v b="$out_dur" 'BEGIN{exit !((a+0)>0 && (b+0)>0 && (a-b)<3 && (b-a)<3)}' \
+      || { echo "error: ffmpeg encode failed (rc=$rc, in=${in_dur}s out=${out_dur}s)" >&2; exit 1; }
+  fi
 }
 encode ""
 
-# AAC re-encoding adds variable inter-sample overshoot, so iterate: measure the
-# encoded file and subtract whatever it landed over by, until under the ceiling.
-for pass in 1 2 3; do
-  CORR=$(correction_gain "$TMP" "$CEILING") || break
-  [ -z "$CORR" ] && break
-  echo "correcting: pass $pass landed ${CORR} dB over the ceiling, re-encoding"
-  encode ",volume=${CORR}dB"
+# AAC re-encoding adds variable inter-sample overshoot, so iterate until the encode
+# lands under the ceiling. Loud mode re-targets loudnorm's TP (it re-holds I on
+# target; a trailing volume would drag I down with it) and everything falls back to
+# accumulating trailing volume. The temp file only becomes $OUT if it verifies.
+VOL=0
+for pass in 1 2 3 4 5; do
+  OVER=$(overshoot "$TMP" "$CEILING") || break
+  [ -z "$OVER" ] && break
+  if [ "$MODE" = loud ] && [ "$pass" -le 3 ]; then
+    LTP=$(awk -v t="$LTP" -v o="$OVER" 'BEGIN{printf "%.2f", t-o}')
+    echo "correcting: pass $pass landed ${OVER} dB over the ceiling, re-encoding (TP=${LTP})"
+    build_af "$LTP"
+    encode ""
+  else
+    VOL=$(awk -v v="$VOL" -v o="$OVER" 'BEGIN{printf "%.3f", v-o}')
+    echo "correcting: pass $pass landed ${OVER} dB over the ceiling, re-encoding (volume=${VOL} dB)"
+    encode ",volume=${VOL}dB"
+  fi
 done
 
-mv "$TMP" "$OUT"
-trap - EXIT
+final=$(measure "$TMP")
+TP1=$(jq -r '.input_tp // "N/A"' <<<"$final")
+I1=$(jq -r '.input_i // "N/A"' <<<"$final")
+case "$TP1" in
+  ''|N/A|*[Ii]nf*)
+    echo "error: cannot verify true peak of the output (measured ${TP1})" >&2
+    exit 1 ;;
+esac
+awk -v tp="$TP1" -v c="$CEILING" 'BEGIN{exit !(tp <= c + 0.01)}' || {
+  echo "error: output landed at ${TP1} dBTP, over the ${CEILING} dBTP ceiling" >&2
+  exit 1
+}
 
-# Verify on the actual output
-meas2=$(mktemp)
-measure "$OUT" >"$meas2"
-I1=$(jq -r '.input_i // "N/A"' "$meas2")
-TP1=$(jq -r '.input_tp // "N/A"' "$meas2")
-rm -f "$meas2"
+mv "$TMP" "$OUT"
+rm -f "$meas"
+trap - EXIT
 echo "after : I=${I1} LUFS  true-peak=${TP1} dBTP"
 echo "done  : $OUT"
