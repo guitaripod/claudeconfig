@@ -93,5 +93,6 @@
   "autoCompactEnabled": true,
   "switchModelsOnFlag": false,
   "fileCheckpointingEnabled": false,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "model": "sonnet"
 }
