@@ -104,7 +104,7 @@ done
 LIGHTPANDA_VERSION="1.0.0"
 
 ensure_lightpanda() {
-    if command -v lightpanda >/dev/null 2>&1 && [ "$(lightpanda version 2>/dev/null)" = "$LIGHTPANDA_VERSION" ]; then
+    if [ "$("$HOME/.cargo/bin/lightpanda" version 2>/dev/null)" = "$LIGHTPANDA_VERSION" ]; then
         echo "  ok   lightpanda $LIGHTPANDA_VERSION"
         return
     fi
