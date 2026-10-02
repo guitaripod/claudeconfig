@@ -108,7 +108,7 @@ ensure_lightpanda() {
         echo "  ok   lightpanda $LIGHTPANDA_VERSION"
         return
     fi
-    curl -fsSL https://pkg.lightpanda.io/install.sh | bash -s "$LIGHTPANDA_VERSION" >/dev/null \
+    curl -fsSL https://pkg.lightpanda.io/install.sh | LIGHTPANDA_DIR="$HOME/.cargo/bin" bash -s "$LIGHTPANDA_VERSION" >/dev/null \
         && echo "  inst lightpanda $LIGHTPANDA_VERSION" \
         || echo "  WARN: lightpanda install failed"
 }
