@@ -101,6 +101,21 @@ for shim in flyr hinta-best kaytetty-best; do
     link_abs "$REPO_DIR/opencode/command/$shim.md" "$HOME/.omp/agent/commands/$shim.md"
 done
 
+LIGHTPANDA_VERSION="1.0.0"
+
+ensure_lightpanda() {
+    if command -v lightpanda >/dev/null 2>&1 && [ "$(lightpanda version 2>/dev/null)" = "$LIGHTPANDA_VERSION" ]; then
+        echo "  ok   lightpanda $LIGHTPANDA_VERSION"
+        return
+    fi
+    curl -fsSL https://pkg.lightpanda.io/install.sh | bash -s "$LIGHTPANDA_VERSION" >/dev/null \
+        && echo "  inst lightpanda $LIGHTPANDA_VERSION" \
+        || echo "  WARN: lightpanda install failed"
+}
+
+echo "=== Ensuring lightpanda (headless browser MCP) ==="
+ensure_lightpanda
+
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
 ln -sfn "$REPO_DIR/scripts/brevity-report.py" "$BIN_DIR/brevity-report"

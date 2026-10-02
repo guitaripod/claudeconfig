@@ -44,6 +44,10 @@ The `delegate` CLI (tiered task dispatcher, `~/Dev/rust/delegate`) is wired into
 
 All four links are created by `scripts/link.sh`. `~/.config/delegate/host.yml` (per-machine tier overrides) is never linked from here.
 
+## lightpanda
+
+Headless browser (no rendering: no screenshots or PDFs) exposed as the `lightpanda` MCP in all harnesses: opencode (`opencode.json`), omp (`omp/mcp.json`), Claude Code (`claude mcp add -s user lightpanda -- lightpanda mcp`, machine-local in `~/.claude.json`). `link.sh` installs the pinned `LIGHTPANDA_VERSION` into `~/.local/bin`.
+
 ## Machines
 
 - **macbook** — macOS

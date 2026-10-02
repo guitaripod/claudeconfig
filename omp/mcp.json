@@ -4,6 +4,11 @@
       "type": "stdio",
       "command": "flyr",
       "args": ["mcp"]
+    },
+    "lightpanda": {
+      "type": "stdio",
+      "command": "lightpanda",
+      "args": ["mcp"]
     }
   }
 }
