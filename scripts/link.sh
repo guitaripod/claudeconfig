@@ -121,8 +121,18 @@ ensure_lightpanda() {
         || echo "  WARN: lightpanda install failed"
 }
 
+register_lightpanda_mcp() {
+    command -v claude >/dev/null || { echo "  skip lightpanda MCP (claude not installed)"; return; }
+    if claude mcp get lightpanda >/dev/null 2>&1; then
+        echo "  ok   lightpanda MCP (Claude Code)"
+    else
+        claude mcp add -s user lightpanda -- "$HOME/.cargo/bin/lightpanda" mcp >/dev/null && echo "  add  lightpanda MCP (Claude Code)"
+    fi
+}
+
 echo "=== Ensuring lightpanda (headless browser MCP) ==="
 ensure_lightpanda
+register_lightpanda_mcp
 
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
