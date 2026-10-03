@@ -29,6 +29,11 @@ Everything here applies to every session on every machine. Machine-specific rule
 - Run on my iPhone Air (devicectl name "iPhone Air", id `0A19DF7B-F393-5AA6-AD32-F997CC562974`), never a simulator or the iPhone XS unless I say so.
 - Every mobile app carries a file-based logger (`AppLogger` + `LogFileWriter`); add it to any app that lacks one. Logger pattern, signing, xtool-on-Linux and Sign in with Apple debugging: `ios-dev` skill. App Store Connect, releases and revenue: `app-store` skill.
 
+## Web
+- WebSearch to discover URLs (US-only summaries; it can't open walled or JS pages). Read a known URL with WebFetch first; on consent walls, JS-rendered pages or redirects it fails, so switch to Lightpanda (`mcp__lightpanda__*`, load via ToolSearch; runs from my IP): `markdown {url}`, then `tree`/`links`/`extract`. Never run two Lightpanda calls in parallel (one shared page), and never `evaluate` big payloads on huge pages: it hangs with ExecutionTerminated and wedges the session.
+- YouTube: consent wall falls to `evaluate` `document.cookie = "SOCS=CAI; domain=.youtube.com; path=/; max-age=31536000"` then reload. For search results and playlists use curl with `-H 'Cookie: SOCS=CAI; CONSENT=YES+'` and a browser UA, parsing `ytInitialData` in Python, or `yt-dlp --flat-playlist`; ad-hoc yt-dlp takes `--cookies-from-browser vivaldi` (Premium), never my `ytd` aliases' `--exec` hook.
+- Never claim a store has something from search snippets; verify on the page, and report a geo-block (JP stores 403 my IP) as unverified. No DRM circumvention.
+
 ## Config
 - Claude Code config (this file, `settings.json`, `hooks/`, `skills/`, `workflows/`, `agents/`, opencode plugins and commands) lives in `~/claudeconfig` (guitaripod/claudeconfig), symlinked into `~/.claude/` and `~/.config/opencode/` by `scripts/link.sh`; `scripts/sync.sh mac` pulls it on the other machine.
 - Machine dotfiles: Arch `~/dotfiles` (guitaripod/archconfig), macOS `~/macconfig` (guitaripod/macconfig; run `scripts/update-from-system.sh` after editing a tracked dotfile). Each links its `home/.claude/rules/*.md` into `~/.claude/rules/`. Neovim: `~/.config/nvim` (guitaripod/rawdog.ml.nvim), edit there only.
