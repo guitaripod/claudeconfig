@@ -2,6 +2,10 @@
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
   },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "permissions": {
     "allow": [
       "Bash(echo $PATH)",
@@ -61,8 +65,8 @@
     "vtsls@claude-code-lsps": true,
     "rust-analyzer@claude-code-lsps": true,
     "swift-lsp@claude-plugins-official": true,
-    "pyright-lsp@claude-plugins-official": true,
-    "cloudflare@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": false,
+    "cloudflare@claude-plugins-official": false,
     "revenuecat@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
     "asc@rorkai": true
