@@ -89,11 +89,12 @@ if [ -d "$OPENCODE_DIR" ]; then
 fi
 
 echo "=== Linking memory stores (private repo ~/claudememory) ==="
-if [ -x "$HOME/claudememory/scripts/link.sh" ]; then
-    "$HOME/claudememory/scripts/link.sh"
-else
-    echo "  skip (clone guitaripod/claudememory into ~/claudememory, then rerun)"
+if [ ! -d "$HOME/claudememory/.git" ]; then
+    memory_url="$(git -C "$REPO_DIR" remote get-url origin | sed 's/claudeconfig/claudememory/')"
+    git clone -q "$memory_url" "$HOME/claudememory" && echo "  clone $memory_url" \
+        || echo "  skip (cannot clone $memory_url; needs GitHub access to the private repo)"
 fi
+[ -x "$HOME/claudememory/scripts/link.sh" ] && "$HOME/claudememory/scripts/link.sh"
 
 echo "=== Linking delegate config ==="
 link_abs "$REPO_DIR/delegate/config.yml" "$HOME/.config/delegate/config.yml"

@@ -37,7 +37,7 @@ git clone https://github.com/guitaripod/claudeconfig.git ~/claudeconfig
 ~/claudeconfig/scripts/link.sh
 ```
 
-`link.sh` symlinks each tracked path from `~/claudeconfig/` into `~/.claude/` (and the opencode plugin/command dirs into `~/.config/opencode/`). Existing files are backed up to `<file>.bak.<epoch>` before being replaced. The dotfiles repos' `link.sh` call it for you.
+`link.sh` symlinks each tracked path from `~/claudeconfig/` into `~/.claude/` (and the opencode plugin/command dirs into `~/.config/opencode/`), clones the private `claudememory` repo next to it if it is missing (same remote host and protocol as this clone) and wires memory plus its sync job. Existing files are backed up to `<file>.bak.<epoch>` before being replaced. The dotfiles repos' `link.sh` call it for you.
 
 ## Workflow
 
