@@ -88,6 +88,13 @@ if [ -d "$OPENCODE_DIR" ]; then
     echo "  link $OPENCODE_DIR/{AGENTS.md,plugin,command}"
 fi
 
+echo "=== Linking memory stores (private repo ~/claudememory) ==="
+if [ -x "$HOME/claudememory/scripts/link.sh" ]; then
+    "$HOME/claudememory/scripts/link.sh"
+else
+    echo "  skip (clone guitaripod/claudememory into ~/claudememory, then rerun)"
+fi
+
 echo "=== Linking delegate config ==="
 link_abs "$REPO_DIR/delegate/config.yml" "$HOME/.config/delegate/config.yml"
 
@@ -120,4 +127,6 @@ BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
 ln -sfn "$REPO_DIR/scripts/brevity-report.py" "$BIN_DIR/brevity-report"
 echo "  link $BIN_DIR/brevity-report"
+ln -sfn "$REPO_DIR/scripts/memory-lint.py" "$BIN_DIR/memory-lint"
+echo "  link $BIN_DIR/memory-lint"
 echo "=== Done ==="

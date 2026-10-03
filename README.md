@@ -13,11 +13,22 @@ Single source of truth for global Claude Code (and shared opencode) configuratio
 - `agents/`: subagent definitions that pin model and effort (`Explore` and `general-purpose` override the built-ins, `bulk` for mechanical work), since subagents otherwise inherit the session's effort
 - `opencode/plugin/`, `opencode/command/` — opencode 2 equivalents of the hooks, workflows and skills (plugins default-export `{ id, setup }`), linked into `~/.config/opencode/`
 - `delegate/config.yml` — shared `delegate` CLI config (tiers, classes), linked to `~/.config/delegate/config.yml`; `~/.config/delegate/host.yml` stays a real per-machine file
-- `scripts/` — `link.sh` (symlinks), `sync.sh` (cross-machine pull), `brevity-report.py`
+- `scripts/` — `link.sh` (symlinks), `sync.sh` (cross-machine pull), `brevity-report.py`, `memory-lint.py` (checks auto-memory folders; linked as `~/.local/bin/memory-lint`)
 
 Machine-specific rules are **not** here: each machine's dotfiles repo (`guitaripod/archconfig` → `~/dotfiles`, `guitaripod/macconfig` → `~/macconfig`) keeps them in `home/.claude/rules/*.md` and links them into `~/.claude/rules/`, which Claude Code loads alongside `CLAUDE.md`. opencode picks them up through `instructions` in that machine's `~/.config/opencode/opencode.local.json`.
 
 `settings.local.json`, runtime caches, sessions, projects, plans, tasks, history, and plugin install state stay machine-local in `~/.claude/` and are not tracked here.
+
+The Cloudflare skills live in `skills/` (newer than the plugin's bundled copies), so the `cloudflare` plugin stays disabled; enabling it would list every Cloudflare skill twice and add four MCP servers that need OAuth. `attribution` is blanked in `settings.json` so Claude Code never asks for Co-Authored-By lines; `hooks/guard-bash.sh` remains the backstop.
+
+## Memory
+
+Claude Code's auto-memory is personal, so it is **not** in this public repo. It lives in the private repo `guitaripod/claudememory`, cloned at `~/claudememory`:
+
+- `global/` is the shared store for sessions started in `~` or `~/agentapi-workdir`; `tailscode/` serves the Tailscode checkout on either machine. `map.tsv` lists which working directories use which store.
+- `scripts/link.sh` (run by this repo's `link.sh`) sets `autoMemoryDirectory` in each mapped directory's `.claude/settings.local.json`, symlinks `~/.claude/projects/<dir>/memory` to the same store as a read fallback, and installs a 15-minute sync job (systemd user timer on Linux, launchd agent on macOS). A folder it replaces is kept as `memory.pre-claudememory.<epoch>` and any file not already in the store is reported as `MERGE NEEDED`.
+- `scripts/sync.sh` commits what agents wrote, rebases onto the other machine and pushes; `MEMORY.md` merges as a union. `sync.sh` here runs it too.
+- Every other project's memory folder stays machine-local. `memory-lint` checks all of them (broken index links, unindexed files, missing frontmatter, cut-off text, oversized indexes).
 
 ## Setup on a new machine
 

@@ -25,6 +25,10 @@ sync_local() {
         prune_junk "$r"
     done
     if [ "$dirty" -eq 1 ]; then echo "NOTE: dirty repos above — check before pushing"; fi
+    if [ -x ~/claudememory/scripts/sync.sh ]; then
+        echo "== ~/claudememory"
+        ~/claudememory/scripts/sync.sh || echo "   WARN: memory sync failed"
+    fi
 }
 
 main() {
@@ -53,6 +57,10 @@ for r in ~/claudeconfig ~/.config/opencode; do
 done
 find ~/claudeconfig -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
 find ~/claudeconfig -name .DS_Store -delete 2>/dev/null || true
+if [ -x ~/claudememory/scripts/sync.sh ]; then
+    echo "== ~/claudememory"
+    ~/claudememory/scripts/sync.sh || echo "   WARN: memory sync failed"
+fi
 EOF
     done
 }
