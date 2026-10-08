@@ -29,7 +29,7 @@ Copy this checklist and work down it. Do not skip a gate.
 - [ ] 7. Optimise: answer the questions in references/states.md per screen, then implement
 - [ ] 8. Tier 5 only for what the system cannot do ("Does the system already do it?")
 - [ ] 9. Full audit exits 0, builds against 27.1, matrix re-run: 0 failed, every cell reviewed
-- [ ] 10. Ship: four slots, every locale, build host verified ("Shipping")
+- [ ] 10. Ship: every placement App Store Connect lists (read it, then enforce it with `capture.py --spec`), every locale, build host verified ("Shipping")
 ```
 
 ### SDK first
@@ -116,7 +116,7 @@ Done means the SDK checks pass, the full audit exits 0, the matrix has 0 failed,
 
 ## Shipping
 
-App Store Connect has **four Duo screenshot slots**, each up to ten images per localization: outer 1398 × 2034 and 2034 × 1398, inner 2007 × 2853 and 2853 × 2007. Optional now; required for submissions built with the 27.1 SDK from April 2027; optimised apps can be submitted today. The slots are by display and orientation, not by pose, so tell the pose story inside them: flat, book and laptop shots in the inner slots, the bar-side layout in the outer ones. Resizing existing shots does not meet the spec. Run the matrix per locale (`--arg -AppleLanguages`, `--appearance`) and upload from the manifest. Details and the upload-path caveat are in `references/capture.md`.
+App Store Connect has **four Duo screenshot slots**, each up to ten images per localization: outer 1398 × 2034 and 2034 × 1398, inner 2007 × 2853 and 2853 × 2007. Optional now; required for submissions built with the 27.1 SDK from April 2027; optimised apps can be submitted today. The slots are by display and orientation, not by pose, so tell the pose story inside them: flat, book and laptop shots in the inner slots, the bar-side layout in the outer ones. Resizing existing shots does not meet the spec. The UI can list more placements than these four sizes (product page Header, Search Results, each with outer and inner variants): Apple's public pages do not, so read the real list from App Store Connect, write it as a coverage spec and run `capture.py --spec` so no permutation is missed. Run the matrix per locale (`--arg -AppleLanguages`, `--appearance`) and upload from the manifest. Details and the upload-path caveat are in `references/capture.md`.
 
 **Build host.** The Duo adaptation exists only in a binary linked against the iOS 27.1 SDK, so the build host must run Xcode 27.1 (needs macOS 26.6 or later) **and** be a stable macOS: a beta host stamps `BuildMachineOSBuild` and the upload is rejected (ITMS-90111). A host or VM still on Xcode 26.x produces a binary that never adapts. Tart guests cannot update their own macOS (`softwareupdate` fails with "Failed to find SFR recovery volume"), so a new guest has to be created from an IPSW. Check all three before starting the release: `xcodebuild -version`, `sw_vers -buildVersion`, `xcrun vtool -show-build <archive binary>` reads `sdk 27.1`.
 

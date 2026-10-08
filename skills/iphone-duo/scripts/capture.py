@@ -21,6 +21,15 @@ Writes DIR/raw/, DIR/framed/ and DIR/manifest.json, and exits 1 if any capture f
 the app refuses (an orientation it does not support on the outer display) is recorded as
 skipped, never as a pass.
 
+Coverage spec: `--spec FILE` takes the list of cells App Store Connect actually asks for, so
+"every permutation" is enforced rather than remembered. Each cell names a placement, a pixel
+size, a minimum count and, optionally, the states that may satisfy it:
+
+    {"cells": [{"name": "header inner landscape", "size": [2853, 2007], "min": 3,
+                "states": ["inner-landscape", "book-landscape"]}]}
+
+The run prints each cell as met or short and exits 1 while any cell is short.
+
 Not covered, because no scriptable route exists: Split View halves, Picture in Picture,
 multiple windows, software keyboard, camera. Use `duoctl tap` and `duoctl swipe` for the
 parts of those that can be driven, and capture the rest by hand.
@@ -219,6 +228,25 @@ def frame_all(raw_paths, framed_dir):
     return {entry["source"]: (entry.get("device"), entry.get("output")) for entry in entries}
 
 
+def coverage(records, spec_path):
+    """Compares successful captures against a coverage spec and returns the unmet cell names."""
+    with open(spec_path) as handle:
+        cells = json.load(handle)["cells"]
+    good = [record for record in records if record["status"] == "ok"]
+    unmet = []
+    for cell in cells:
+        size = tuple(cell["size"])
+        states = cell.get("states")
+        have = len([record for record in good if tuple(record["size"]) == size
+                    and (not states or record["state"] in states)])
+        need = cell.get("min", 1)
+        met = have >= need
+        print("%-5s %-40s %dx%d  %d of %d" % ("MET" if met else "SHORT", cell["name"], size[0], size[1], have, need))
+        if not met:
+            unmet.append(cell["name"])
+    return unmet
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Capture an app on every iPhone Duo state.")
     parser.add_argument("--udid", help="Duo simulator UDID (default: the only booted iPhone Duo)")
@@ -231,6 +259,7 @@ def parse_arguments():
     parser.add_argument("--states", default="", help="comma list of states (default: all)")
     parser.add_argument("--appearance", default="light", help="comma list of light,dark (default: light)")
     parser.add_argument("--settle", type=float, default=4.0, help="seconds to wait after each launch")
+    parser.add_argument("--spec", help="JSON coverage spec of the cells App Store Connect requires")
     parser.add_argument("--list-states", action="store_true")
     return parser.parse_args()
 
@@ -317,7 +346,8 @@ def main():
     print("capture.py: %s; manifest %s" % (
         ", ".join("%d %s" % (count, status) for status, count in sorted(counts.items())),
         os.path.join(args.out, "manifest.json")))
-    return 1 if counts.get("failed") else 0
+    unmet = coverage(records, args.spec) if args.spec else []
+    return 1 if counts.get("failed") or unmet else 0
 
 
 if __name__ == "__main__":
