@@ -80,6 +80,7 @@ Vertical bars mean one horizontal edge carries the whole inset and the opposite 
 | Hardcoded bar heights as constraint constants: `20`, `44`, `64`, `88`, `34`, `49`, `83` | cannot follow an inset that appears at runtime |
 | `UIKeyboardWillShowNotification` + `UIKeyboardFrameEndUserInfoKey` driving a constraint | screen coordinates, stale on the next resize |
 | `ignoresSafeArea()` with no `edges:` argument | extends content under the vertical bar |
+| `x.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20)` (same for `trailingAnchor`) on foreground content | Pins to the full view, so it runs under the 84 pt status column. Found in a real app as clipped trailing text, a hidden **Done** button and a hidden paywall **close** button. A zero constant on a background or scroll view is fine; the audit flags only non-zero constants. Replace `view` with `view.safeAreaLayoutGuide`. |
 | `layoutMargins.left` applied to leading and trailing | same asymmetry defect |
 | `viewRespectsSystemMinimumLayoutMargins = false` | report, do not silently change |
 | Subviews relying on **inherited** layout margins | **iOS 27.1 changed a `UIView`'s default layout margins to zero** |
@@ -145,7 +146,7 @@ Read-only checks. Report, never change silently.
 
 | Check | Fail action |
 |---|---|
-| `UILaunchScreen` / `UILaunchScreens` / `UILaunchStoryboardName` / `UILaunchStoryboards` / `INFOPLIST_KEY_UILaunchScreen_Generation` present | iOS 27 rejects the upload with `ITMS-90870`. See TN3208. One key is enough. |
+| **None** of `UILaunchScreen` / `UILaunchScreens` / `UILaunchStoryboardName` / `UILaunchStoryboards` / `INFOPLIST_KEY_UILaunchScreen_Generation` anywhere | A build linked against the iOS 27 SDK is rejected at upload with `ITMS-90870` (TN3208). At least one key must be present; one is enough. The audit reports the absence as a defect. |
 | `UISupportedInterfaceOrientations~ipad` lists all four | Name what is missing. A controller-level `supportedInterfaceOrientations` override can still lock the scene. |
 | `UIRequiresFullScreen` | Report it. **Never delete it** — deletion makes the app resizable immediately and the layouts may not be ready. **Never add `UIRequiresFullScreenIgnoredStartingWithVersion`** — its value decides which releases keep the old behaviour, which is the developer's call. See TN3192. |
 | `UIApplicationDelegate` instead of scene lifecycle | Migrate; apps built with the latest SDK must adopt the scene-based life cycle. |

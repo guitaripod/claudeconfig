@@ -102,7 +102,11 @@ Only the iPhone Duo simulator (`com.apple.CoreSimulator.SimDeviceType.iPhone-Duo
 | Keyboard | Up in every pose (230–350 pt tall); bottom-pinned controls break first |
 | Previews | Canvas overrides **Display** group; Resizable Canvas for arbitrary sizes |
 
-Screenshots: `xcrun simctl io booted screenshot --display=1` (outer), `--display=3` (inner). They can be **black for a few minutes after boot**, and first launch takes several minutes; wait and check the file before judging. `simctl` has no pose command, so poses are driven from Device Hub (which needs Accessibility permission, so it cannot be scripted over SSH). Most app extensions cannot run, and VoiceOver and the Accessibility Inspector do not work inside Device Hub.
+**Closed pose needs no Device Hub.** Build, `simctl install`, `simctl launch`, then `simctl io <udid> screenshot --display=1`: the outer display is the default view. That alone catches most defects, so run it on every screen before touching poses. Look for controls hidden under the camera (a Done or close button at the top trailing corner), text clipped by the status column, and content running under the vertical bar. If the app has a launch-argument demo mode, use it to reach each screen; pass its variables as `SIMCTL_CHILD_<NAME>=…`. Use `--terminate-running-process` when relaunching.
+
+Screenshots: `xcrun simctl io booted screenshot --display=1` (outer), `--display=3` (inner). The inner display is black while the device is closed. They can be **black for a few minutes after boot**, and first launch takes several minutes; wait and check the file before judging. `simctl` has no pose command, so poses are driven from Device Hub (which needs Accessibility permission, so it cannot be scripted over SSH). Most app extensions cannot run, and VoiceOver and the Accessibility Inspector do not work inside Device Hub.
+
+**Frame every shot with `frames`** (the `frames-cli` skill), both the ones you inspect and the ones you ship: `frames -o <dir> <shots>`. It auto-detects the four Duo sizes and applies the real bezel and camera, so a control under the camera is obvious, and the output is the deliverable. Run `frames doctor` first; it needs Pillow (`pip3 install --user Pillow`) and, for video only, ffmpeg.
 
 **Not verifiable in the simulator**: camera switching between displays and cameras, haptics, thermals. Say so rather than claiming a pass. Camera work needs a physical Duo.
 
@@ -116,6 +120,8 @@ Done means the SDK checks pass, the full audit exits 0, and each cell above has 
 |---|---|---|
 | Outer | 1398 × 2034 | 2034 × 1398 |
 | Inner | 2007 × 2853 | 2853 × 2007 |
+
+**Build host.** The Duo adaptation exists only in a binary linked against the iOS 27.1 SDK, so the build host must run Xcode 27.1 (needs macOS 26.6 or later) **and** be a stable macOS: a beta host stamps `BuildMachineOSBuild` and the upload is rejected (ITMS-90111). A host or VM still on Xcode 26.x produces a binary that never adapts. Tart guests cannot update their own macOS (`softwareupdate` fails with "Failed to find SFR recovery volume"), so a new guest has to be created from an IPSW. Check all three before starting the release: `xcodebuild -version`, `sw_vers -buildVersion`, `xcrun vtool -show-build <archive binary>` reads `sdk 27.1`.
 
 As of 2026-10-09, `asc` 5.4.0 lists no Duo screenshot display type and a third-party guide reports App Store Connect upload support as "later this year". Confirm your upload path before planning around the deadline. A featuring nomination can flag an app as optimised for all poses.
 

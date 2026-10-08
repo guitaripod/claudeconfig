@@ -113,7 +113,8 @@ add_pattern 2 DEFECT "scroll view refuses inset adjustment" 'contentInsetAdjustm
 add_pattern 2 DEFECT "hand-rolled keyboard avoidance" 'UIKeyboardWillShow|UIKeyboardWillChangeFrame|UIKeyboardFrameEndUserInfoKey|keyboardWillShowNotification|keyboardWillChangeFrameNotification'
 add_pattern 2 DEFECT "system minimum margins disabled" 'viewRespectsSystemMinimumLayoutMargins[[:space:]]*=[[:space:]]*(false|NO)'
 add_pattern 2 REVIEW  "unscoped ignoresSafeArea" 'ignoresSafeArea\([[:space:]]*\)|edgesIgnoringSafeArea'
-add_pattern 2 REVIEW  "bar height as a constraint constant" 'constant:[[:space:]]*-?(20|34|44|49|64|83|88)\b'
+add_pattern 2 DEFECT "foreground pinned to view edge, not safe area" '(leading|trailing)Anchor\.constraint\(equalTo:[[:space:]]*(self\.)?view\.(leading|trailing)Anchor,[[:space:]]*constant:[[:space:]]*[^0 )]'
+add_pattern 2 REVIEW  "bar height as a top or bottom constraint constant" '(top|bottom)Anchor\.constraint\([^)]*constant:[[:space:]]*-?(20|34|44|49|64|83|88)\b'
 add_pattern 2 REVIEW  "inset written into system insets" 'additionalSafeAreaInsets'
 add_pattern 2 REVIEW  "layout margins in play" 'layoutMargins|preservesSuperviewLayoutMargins|systemMinimumLayoutMargins'
 
@@ -123,7 +124,6 @@ add_pattern 3 REVIEW  "vertical bar API already adopted" 'toolbarVerticalBehavio
 add_pattern 3 REVIEW  "axis and overflow configured" 'axisBehavior|visibilityPriority|additionalOverflowItems|ToolbarOverflowMenu'
 
 add_pattern 4 REVIEW  "UIRequiresFullScreen (report, never delete)" 'UIRequiresFullScreen'
-add_pattern 4 REVIEW  "launch screen declaration (ITMS-90870 on iOS 27)" 'UILaunchScreen|UILaunchScreens|UILaunchStoryboardName|UILaunchStoryboards|INFOPLIST_KEY_UILaunchScreen_Generation'
 add_pattern 4 REVIEW  "supported interface orientations" 'UISupportedInterfaceOrientations'
 add_pattern 4 REVIEW  "app delegate lifecycle" 'UIApplicationDelegate|didFinishLaunchingWithOptions'
 
@@ -133,12 +133,28 @@ add_pattern 5 REVIEW  "hinge angle read" 'onHingeChange|UIHingeInteraction|Devic
 add_pattern 5 REVIEW  "capture device position as direction" 'AVCaptureDevice[[:space:]]*\.[[:space:]]*Position|\.position[[:space:]]*==|AVCaptureDevice\.default\('
 add_pattern 5 REVIEW  "full-bleed fill media" 'scaledToFill|aspectRatio\([^)]*\.fill|scaleAspectFill'
 
+LAUNCH_SCREEN_REGEX='UILaunchScreen|UILaunchScreens|UILaunchStoryboardName|UILaunchStoryboards|INFOPLIST_KEY_UILaunchScreen_Generation'
+UIKIT_APP_REGEX='UIApplicationSceneManifest|UIApplicationDelegate|UIViewController|UIHostingController'
+
 scan() {
   if command -v rg >/dev/null 2>&1; then
     rg --line-number --no-heading --smart-case "${RG_ARGS[@]}" -e "$1" "$ROOT" 2>/dev/null || true
   else
     grep -rnE "${GREP_ARGS[@]}" -e "$1" "$ROOT" 2>/dev/null || true
   fi
+}
+
+filter_hits() {
+  local label="$1" hits="$2" line file
+  if [ "$label" != "custom bar construction" ]; then
+    printf '%s' "$hits"
+    return
+  fi
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    file="${line%%:*}"
+    grep -q 'inputAccessoryView' "$file" 2>/dev/null || printf '%s\n' "$line"
+  done <<<"$hits"
 }
 
 json_escape() {
@@ -188,7 +204,7 @@ for tier in 1 2 3 4 5; do
       continue
     fi
 
-    hits="$(scan "${PATTERN_REGEX[$i]}")"
+    hits="$(filter_hits "${PATTERN_LABEL[$i]}" "$(scan "${PATTERN_REGEX[$i]}")")"
     if [ -z "$hits" ]; then
       continue
     fi
@@ -210,6 +226,15 @@ for tier in 1 2 3 4 5; do
       review_detail+="-- ${PATTERN_LABEL[$i]}"$'\n'"$hits"$'\n'
     fi
   done
+
+  if [ "$tier" = "4" ] && [ -z "$(scan "$LAUNCH_SCREEN_REGEX")" ] && [ -n "$(scan "$UIKIT_APP_REGEX")" ]; then
+    tier_defects=$((tier_defects + 1))
+    defect_report+="$(printf '%-52s %5s' "no launch screen declaration (ITMS-90870)" 1)"$'\n'
+    defect_detail+="-- no launch screen declaration (ITMS-90870)"$'\n'"none of UILaunchScreen, UILaunchScreens, UILaunchStoryboardName, UILaunchStoryboards or INFOPLIST_KEY_UILaunchScreen_Generation found; iOS 27 SDK uploads are rejected without one"$'\n'
+    if [ "$JSON_OUT" -eq 1 ]; then
+      printf '{"tier":4,"kind":"DEFECT","pattern":"no launch screen declaration (ITMS-90870)","file":"","line":0,"text":""}\n'
+    fi
+  fi
 
   defect_total=$((defect_total + tier_defects))
   review_total=$((review_total + tier_reviews))
