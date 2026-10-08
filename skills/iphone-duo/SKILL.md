@@ -1,6 +1,6 @@
 ---
 name: iphone-duo
-description: Make an iOS app work well on iPhone Duo, Apple's folding iPhone (iOS 27.1). Runs a grep audit, fixes layout in a fixed tier order, decides when system components already adapt versus when to use the new reserved-region, arrangement, vertical-bar and hinge APIs, and verifies every pose. Use for "prepare for iPhone Duo", foldable iPhone, resizable windows, iPhone Split View, content colliding with the fold or cameras, or bars moving to a side edge.
+description: Take an iOS app from "works" to excellent on every iPhone Duo state (iOS 27.1, Apple's folding iPhone). Audits the code, fixes layout in a fixed tier order, scripts the simulator through every display, orientation and fold pose to capture and inspect each, optimises the app for each state instead of just surviving it, and produces the framed App Store screenshots for all four Duo slots. Use for "prepare for iPhone Duo", foldable iPhone, Duo screenshots, resizable windows, iPhone Split View, content colliding with the fold or cameras, or bars moving to a side edge.
 ---
 
 # iPhone Duo
@@ -12,7 +12,7 @@ iPhone Duo (iOS 27.1) changes four things about layout:
 3. **The fold and the cameras reserve regions** that content must avoid.
 4. **Split View and multiple windows arrive on iPhone**, so the app can be half the screen with its bar on either edge.
 
-This is the adaptive-layout discipline iPad already demanded, with every escape hatch removed. Most apps need tiers 1–4 and nothing from the new APIs.
+This is the adaptive-layout discipline iPad already demanded, with every escape hatch removed. The target is not "does not break" but excellent in every state: the inner display is an iPad-class canvas, the fold and laptop poses reward a deliberate layout, and App Store Connect wants screenshots for all four display slots. Most apps need tiers 1–4 for correctness and then a per-state optimisation pass.
 
 ## Workflow
 
@@ -25,9 +25,11 @@ Copy this checklist and work down it. Do not skip a gate.
 - [ ] 3. Tier 2 fixed, then: scripts/audit.sh --tier 2 reports 0 defects
 - [ ] 4. Tier 3 fixed, then: scripts/audit.sh --tier 3 reports 0 defects
 - [ ] 5. Tier 4 reported to the owner (read-only)
-- [ ] 6. Tier 5 only for what the system cannot do ("Does the system already do it?")
-- [ ] 7. Full audit exits 0 and the app builds against the 27.1 SDK
-- [ ] 8. Pose matrix passed ("Verify every pose")
+- [ ] 6. Baseline matrix: scripts/capture.py over every screen and state, every cell looked at
+- [ ] 7. Optimise: answer the questions in references/states.md per screen, then implement
+- [ ] 8. Tier 5 only for what the system cannot do ("Does the system already do it?")
+- [ ] 9. Full audit exits 0, builds against 27.1, matrix re-run: 0 failed, every cell reviewed
+- [ ] 10. Ship: four slots, every locale, build host verified ("Shipping")
 ```
 
 ### SDK first
@@ -58,7 +60,7 @@ Detection patterns and the replacement for each are in `references/audit-rules.m
 
 ## Does the system already do it?
 
-**Inherited with standard components, no code:** `NavigationSplitView`/`UISplitViewController` collapse on the outer display and adjust around the fold. `TabView`/`UITabBarController` go vertical and can become a sidebar on the inner display. Sheets, alerts, menus and popovers move away from the fold (a plain `.sheet` takes the leading panel in book pose, the lower panel in tabletop). `.split` arrangements divide across the fold.
+**Inherited with standard components, no code:** `NavigationSplitView`/`UISplitViewController` collapse on the outer display and adjust around the fold. `TabView`/`UITabBarController` go vertical and can become a sidebar on the inner display. Sheets, alerts, menus and popovers move away from the fold (a plain `.sheet` takes the leading panel in book pose, the lower panel in the laptop pose). `.split` arrangements divide across the fold.
 
 **Yours to handle:**
 
@@ -71,7 +73,7 @@ Detection patterns and the replacement for each are in `references/audit-rules.m
 | Effect that tracks how far it is folded | `onHingeChange`, **never for layout** |
 | Camera UI that must follow the user between displays | `AVCaptureDeviceDirectionCoordinator` (`references/camera.md`) |
 
-Move elements by purpose, not geometry: alerts toward the trailing side in book pose, media to the top region and controls to the stable bottom region in tabletop. Scrolling content does not displace; it already scrolls. Audit centred layouts first, since the centre is where the fold lands. Never drop a control in one pose that exists in another.
+Move elements by purpose, not geometry: alerts toward the trailing side in book pose, media to the top region and controls to the stable bottom region in the laptop pose (Apple's name for a portrait inner display with a horizontal fold). Scrolling content does not displace; it already scrolls. Audit centred layouts first, since the centre is where the fold lands. Never drop a control in one pose that exists in another.
 
 ## Traps that are not in Apple's docs
 
@@ -89,41 +91,36 @@ Measured on the 27.1 simulator unless marked.
 - **New windows cannot be created on the outer display**; handle the activation error.
 - **Fill-cropped 16:9 media on the inner display wastes about 134 pt**, a fifth of the screen. Pick fill or fit from the current aspect ratio.
 
-## Verify every pose
+## Cover every state
 
-Only the iPhone Duo simulator (`com.apple.CoreSimulator.SimDeviceType.iPhone-Duo`, created for the 27.1 runtime) shows vertical bars and reserved regions. A resizable simulator or iPhone Mirroring covers general resizing only.
+Only the iPhone Duo simulator shows vertical bars, reserved regions and the fold. The state space is large: two displays, both orientations, flat, book and laptop poses, any angle between, Split View halves, Picture in Picture, windows, keyboard, camera, dark mode, Dynamic Type, locales. `references/states.md` lists every state with Apple's wording, what the system does, and what excellent means; `references/capture.md` has the tools.
 
-| Axis | Cases |
-|---|---|
-| Pose | Closed, Book, Open, each also Rotate Right |
-| Between poses | Hold **Option** over the pose buttons for the 0–180° hinge slider; look for content under the fold at partial angles |
-| Mid-session | Launch closed, navigate deep, open it; fold while a sheet, alert or keyboard is up; selection and scroll state survive |
-| Split View | Drag the app to **each** half of the inner display; the bar sits on the app's outer edge, so test both sides |
-| Keyboard | Up in every pose (230–350 pt tall); bottom-pinned controls break first |
-| Previews | Canvas overrides **Display** group; Resizable Canvas for arbitrary sizes |
+**Script the matrix, then look at it.** Install `duoctl` (`references/capture.md`; no GUI permission needed), then:
 
-**Closed pose needs no Device Hub.** Build, `simctl install`, `simctl launch`, then `simctl io <udid> screenshot --display=1`: the outer display is the default view. That alone catches most defects, so run it on every screen before touching poses. Look for controls hidden under the camera (a Done or close button at the top trailing corner), text clipped by the status column, and content running under the vertical bar. If the app has a launch-argument demo mode, use it to reach each screen; pass its variables as `SIMCTL_CHILD_<NAME>=…`. Use `--terminate-running-process` when relaunching.
+```bash
+scripts/capture.py --udid <udid> --bundle-id <id> --out <dir> --env <K=V> \
+  --screen items:<K=V> --screen detail:<K=V> --screen settings:<K=V>
+```
 
-Screenshots: `xcrun simctl io booted screenshot --display=1` (outer), `--display=3` (inner). The inner display is black while the device is closed. They can be **black for a few minutes after boot**, and first launch takes several minutes; wait and check the file before judging. `simctl` has no pose command, so poses are driven from Device Hub (which needs Accessibility permission, so it cannot be scripted over SSH). Most app extensions cannot run, and VoiceOver and the Accessibility Inspector do not work inside Device Hub.
+It folds, unfolds, sets 127° and rotates through six states (outer portrait and landscape, inner landscape and portrait, book, laptop), launches each screen, rejects black, mis-sized or dead-app captures, frames the rest with `frames`, and writes a manifest. Skipped is not passed: a state the app refuses (landscape on the outer display of a portrait-only app) is a decision to make, not a gap to hide. If the app has a launch-argument demo mode, each screen is one flag; otherwise add one in DEBUG, with its seeding made safe to relaunch.
 
-**Frame every shot with `frames`** (the `frames-cli` skill), both the ones you inspect and the ones you ship: `frames -o <dir> <shots>`. It auto-detects the four Duo sizes and applies the real bezel and camera, so a control under the camera is obvious, and the output is the deliverable. Run `frames doctor` first; it needs Pillow (`pip3 install --user Pillow`) and, for video only, ffmpeg.
+**Then inspect every cell** (a contact sheet per screen shows all states at once). Look for controls under the camera or status column (a Done or close button at the top trailing corner), clipped text, content under the vertical bar, a grid column on the fold, a phone layout stretched across the inner display, and a launcher screen where the app should be.
 
-**Not verifiable in the simulator**: camera switching between displays and cameras, haptics, thermals. Say so rather than claiming a pass. Camera work needs a physical Duo.
+**Optimise, do not just repair.** For each screen answer the questions in `references/states.md` and implement the answers: the inner display wants an iPad-class layout (split view, sidebar, columns), book pose wants an even column count, the laptop pose can split content above controls below without removing anything, Apple asks for landscape on the outer display. Re-run the matrix after.
 
-Done means the SDK checks pass, the full audit exits 0, and each cell above has been looked at, not assumed.
+**Not scriptable:** Split View halves, Picture in Picture, windows, the inner camera and the outer-display accessory. Drive what `duoctl tap`/`swipe` can reach, do the rest by hand, and say which cells were manual. Camera, haptics and thermals need a physical Duo; never claim them from the simulator.
+
+**Frame every shot with `frames`** (the `frames-cli` skill); the script does it and the framed output is the deliverable. Run `frames doctor` first; it needs Pillow (`pip3 install --user Pillow`).
+
+Done means the SDK checks pass, the full audit exits 0, the matrix has 0 failed, and each cell has been looked at, not assumed.
 
 ## Shipping
 
-**From April 2027 every App Store submission must include iPhone Duo screenshots.** Capture from the simulator at the exact sizes below; resizing existing portrait screenshots does not meet the spec.
-
-| Display | Portrait | Landscape |
-|---|---|---|
-| Outer | 1398 × 2034 | 2034 × 1398 |
-| Inner | 2007 × 2853 | 2853 × 2007 |
+App Store Connect has **four Duo screenshot slots**, each up to ten images per localization: outer 1398 × 2034 and 2034 × 1398, inner 2007 × 2853 and 2853 × 2007. Optional now; required for submissions built with the 27.1 SDK from April 2027; optimised apps can be submitted today. The slots are by display and orientation, not by pose, so tell the pose story inside them: flat, book and laptop shots in the inner slots, the bar-side layout in the outer ones. Resizing existing shots does not meet the spec. Run the matrix per locale (`--arg -AppleLanguages`, `--appearance`) and upload from the manifest. Details and the upload-path caveat are in `references/capture.md`.
 
 **Build host.** The Duo adaptation exists only in a binary linked against the iOS 27.1 SDK, so the build host must run Xcode 27.1 (needs macOS 26.6 or later) **and** be a stable macOS: a beta host stamps `BuildMachineOSBuild` and the upload is rejected (ITMS-90111). A host or VM still on Xcode 26.x produces a binary that never adapts. Tart guests cannot update their own macOS (`softwareupdate` fails with "Failed to find SFR recovery volume"), so a new guest has to be created from an IPSW. Check all three before starting the release: `xcodebuild -version`, `sw_vers -buildVersion`, `xcrun vtool -show-build <archive binary>` reads `sdk 27.1`.
 
-As of 2026-10-09, `asc` 5.4.0 lists no Duo screenshot display type and a third-party guide reports App Store Connect upload support as "later this year". Confirm your upload path before planning around the deadline. A featuring nomination can flag an app as optimised for all poses.
+Upload support is unverified (`references/capture.md`): confirm the path before promising a date. A featuring nomination's free-text Helpful Details can state support for all poses.
 
 ## References
 
@@ -131,6 +128,8 @@ As of 2026-10-09, `asc` 5.4.0 lists no Duo screenshot display type and a third-p
 |---|---|
 | `references/audit-rules.md` | Triaging audit findings: patterns and replacements per tier, SwiftUI and UIKit |
 | `references/api-surface.md` | Writing Duo code: every symbol, version-tagged, with gating recipes |
+| `references/states.md` | Planning the optimisation: every state, Apple's rules, use-case patterns, per-screen questions |
+| `references/capture.md` | Capturing: duoctl install, the matrix script, the four App Store slots, what cannot be scripted |
 | `references/measured.md` | Needing a number: displays, insets, fold geometry, keyboards, device identity |
 | `references/camera.md` | The app uses AVFoundation, the one area with no system fallback |
 
