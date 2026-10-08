@@ -140,7 +140,7 @@ Decide the MODE:
   * Leave the product/category fields ('searchQuery','coreQuery','mustMatch','accessoryTerms','newPriceQuery','candidates') null/empty at the TOP level — the per-part queries live inside 'components'.
 
 For all modes: respect hard constraints. Set 'budgetEur' to the user's max total (else null) and 'regionHint' to a preferred Finnish city/region for pickup if named (else null). 'category' = normalized name of the thing/build, 'interpretation' = one sentence (for a build, state the platform + anchor + whether the anchor is being bought or is owned). In product/category modes leave 'platform'/'buildRationale' null and 'components' empty.`,
-  { label: 'scope', phase: 'Scope', schema: SCOPE_SCHEMA, effort: 'medium' }
+  { label: 'scope', phase: 'Scope', schema: SCOPE_SCHEMA, model: 'haiku', effort: 'medium' }
 )
 
 log(`${scope.mode === 'product' ? 'Product' : scope.mode === 'build' ? 'Build' : 'Category'}: ${scope.interpretation}`)
@@ -369,7 +369,7 @@ Assemble the build and pick the better of two routes:
 6. **Buyer advice** — 1-2 lines specific to used PC parts: stress-test the GPU for artifacts and check for mining wear/repaste, inspect the CPU socket/pins, confirm PSU age (avoid 7+ yr units), and test-boot before paying; meet in person.
 
 Rules: prices are EUR and live. Never invent a listing, price, seller, or URL not in the JSON. Never pick a suspicious-low listing. Keep every pick compatible. Coverage is Tori.fi + Huuto.net only (Facebook Marketplace is not searchable). Be factual and tight — the buyer should know exactly which listings to open and what it totals.`,
-    { label: 'assemble-build', phase: 'Appraise', effort: 'medium' }
+    { label: 'assemble-build', phase: 'Appraise', model: 'haiku', effort: 'medium' }
   )
 }
 
@@ -444,5 +444,5 @@ Write a concise markdown recommendation using ONLY these facts:
 5. One line of buyer advice fit to THIS item (e.g. for a phone: check IMEI / iCloud lock / battery health and meet in person; for a bike: check frame/serial; for furniture: inspect wear) — grounded and short, no boilerplate lecture.
 ${scope.budgetEur ? `6. Flag anything recommended that sits over the ${scope.budgetEur} EUR budget.\n` : ''}
 Rules: prices are EUR and live. Never invent a listing, price, seller, or URL not in the JSON. Never recommend a suspicious-low listing as a buy. Note that coverage is Tori.fi + Huuto.net only (Facebook Marketplace is not searchable). Be factual and tight — the buyer should know exactly which listing to open.`,
-  { label: 'appraise', phase: 'Appraise', effort: 'medium' }
+  { label: 'appraise', phase: 'Appraise', model: 'haiku', effort: 'medium' }
 )

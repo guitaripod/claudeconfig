@@ -60,7 +60,7 @@ Request: "${query}"
 First run \`date +%F\` (Bash) for today's date; media with similar titles (remakes, sequels, re-releases) need the right year to disambiguate.
 
 Return the kind (game/movie/show/album/book), the canonical title, the creator (studio for games, director for films, artist for albums, author for books — best-known name, e.g. "FromSoftware", "Villeneuve", "Tyler, the Creator"), the release year (string, null if truly unknown), the platform for games only (the main platform, e.g. "PC", "PS5"; null otherwise), and a one-line identity statement that pins down the exact entry ("Elden Ring (2022), base game not the DLC", "Dune: Part Two (2024), the Villeneuve film"). Prefer the most-searched/canonical entry when ambiguous — e.g. a film named the same as a book is the film unless the request clearly means the book.`,
-  { label: 'scope', phase: 'Scope', schema: SCOPE_SCHEMA, effort: 'low' }
+  { label: 'scope', phase: 'Scope', schema: SCOPE_SCHEMA, model: 'haiku', effort: 'low' }
 )
 
 log(`Verdict on ${scope.identity}`)
@@ -342,5 +342,5 @@ After the card, no headers, at most 5 short lines:
 5. Who it's for / who should skip it — one line each if you can infer it from the split and buzz (e.g. "for genre die-hards; skip if you want a short game").
 
 Rules: never invent or round differently a score that is in the card; never add sources that are not in the card; keep the whole reply tight — the card does the showing, the text only explains.`,
-  { label: 'verdict', phase: 'Verdict', effort: 'low' }
+  { label: 'verdict', phase: 'Verdict', model: 'haiku', effort: 'low' }
 )
