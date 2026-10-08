@@ -107,34 +107,40 @@ def is_black(path):
         return ImageStat.Stat(small).mean[0] < 2.0
 
 
-def average_hash(path):
-    """A 256-bit perceptual hash of the image, or None when Pillow is unavailable."""
+DUPLICATE_DIFFERENCE = 2.0
+
+
+def thumbnail(path):
+    """A 64x64 RGB thumbnail as a flat list of channel values, or None when Pillow is unavailable."""
     try:
         from PIL import Image
     except ImportError:
         return None
     with Image.open(path) as image:
-        small = image.convert("L").resize((16, 16))
-        pixels = list(small.getdata())
-    mean = sum(pixels) / len(pixels)
-    return [1 if pixel > mean else 0 for pixel in pixels]
+        return list(image.convert("RGB").resize((64, 64)).tobytes())
+
+
+def mean_difference(first, second):
+    """Mean absolute difference per channel value between two thumbnails, from 0 to 255."""
+    return sum(abs(a - b) for a, b in zip(first, second)) / len(first)
 
 
 def flag_duplicates(records):
-    """Fails a capture that looks identical to a different screen in the same state.
+    """Fails a capture that is practically identical to a different screen in the same state.
 
     Two screens that render the same pixels almost always mean routing failed and both shots show
-    the launch screen. Near-identical status-bar differences are tolerated by the distance bound.
+    the launch screen. Colour is compared, not just layout, because different records share a
+    layout; the bound tolerates a changing status-bar counter and nothing more.
     """
     seen = {}
     for record in records:
         if record["status"] != "ok":
             continue
-        digest = average_hash(record["raw"])
+        digest = thumbnail(record["raw"])
         if digest is None:
             return
         for other, other_digest in seen.get(record["state"], []):
-            if other["screen"] != record["screen"] and sum(a != b for a, b in zip(digest, other_digest)) <= 3:
+            if other["screen"] != record["screen"] and mean_difference(digest, other_digest) < DUPLICATE_DIFFERENCE:
                 record["status"] = "failed"
                 record["note"] = "looks identical to %s: routing probably failed" % other["screen"]
                 break
