@@ -9,12 +9,28 @@ Everything here is measured or derived, not published as an Apple spec sheet. So
 | Outer | **466 × 678 pt** | 678 × 466 | @3x | 0° |
 | Inner | **669 × 951 pt** | 951 × 669 pt | @3x | **270° (landscape-native)** |
 
-Scale is @3x and this is arithmetically forced, not guessed: 1398/3 = 466, 2034/3 = 678, 2007/3 = 669, 2853/3 = 951 are all integers; at @2x the inner display would be 1003.5 × 1426.5 pt, which is impossible. Pixel sizes are Apple's own App Store Connect screenshot specifications.
+Scale is @3x and this is arithmetically forced, not guessed: 1398/3 = 466, 2034/3 = 678, 2007/3 = 669, 2853/3 = 951 are all integers; at @2x the inner display would be 1003.5 × 1426.5 pt, which is impossible.
+
+Pixel sizes are Apple's App Store Connect screenshot specifications, and were **re-measured on a live iPhone Duo simulator** on the 27.1 runtime — outer captured at 1398 × 2034, inner at 2007 × 2853, matching the point math exactly.
 
 | Display | Portrait px | Landscape px |
 |---|---|---|
 | Outer | 1398 × 2034 | 2034 × 1398 |
 | Inner | 2007 × 2853 | 2853 × 2007 |
+
+**Closed pose, measured on the live Duo simulator with a 27.1-linked app:**
+
+| Reported | Value |
+|---|---|
+| Scene (window) size | 466 × 678 |
+| `GeometryReader` size | **382 × 644** — already inset: 466 − 84 (vertical bar) by 678 − 34 (home indicator) |
+| `horizontalSizeClass` / `verticalSizeClass` | compact / regular |
+| `toolbarVerticalEdge` | `trailing` |
+| `displayScale` | 3.0 |
+| Hinge | `status == .closed`, `angle == 0°` |
+| Reserved regions | **none at all** — the outer display reports no division and no occlusion region, not even inactive ones |
+
+The 84/34 inset arithmetic is why `GeometryProxy.size` is already inset — subtracting insets from it again double-counts. The `GeometryReader` size matching the community probe's closed-pose window is the confirmation that the probe was measuring the same thing.
 
 Simulator device profile, single source — treat as reliable but not Apple-published: model `iPhone19,4`, product class `V68`, `A3447`, `minRuntimeVersion 27.1`, corner radius 59 outer / 55 inner, both displays P3, 460 ppi / 60 Hz (probe flags the last two as simulator placeholders), compatible-device fallback `iPhone18,3`. The inner framebuffer is a plain rounded rectangle with **no camera cutout** — the camera's occlusion comes from the reserved-region API at runtime.
 
@@ -120,10 +136,11 @@ Relevant `supportedFeatures`: `com.apple.display.integrated`, `com.apple.display
 
 ## Simulator
 
+Creating and booting the Duo works once the package install has completed — `xcrun simctl create "iPhone Duo" com.apple.CoreSimulator.SimDeviceType.iPhone-Duo com.apple.CoreSimulator.SimRuntime.iOS-27-1` then `xcrun simctl boot <udid>`, confirmed on the RC.
+
 - Exactly three pose buttons — **Closed, Book, Open** — plus Rotate Right. Hold **Option** over them for a hidden 0–180° hinge slider.
-- **No `simctl` pose command.** The community `hinge` CLI drives the private HID protocol the slider uses (usage page `0xFF61`, usage `0x5B`, serialized dict with `provider = "com.apple.Virtualization"`), read back with `xcrun devicectl device motion hinge-angle`.
-- Capture: `xcrun simctl io booted screenshot --display=1` (outer), `--display=3` (inner).
-- **Creating the Duo device needs admin authorization.** The device type ships inside `XcodeSystemResources.pkg`, which Xcode installs during its first-launch component step. Copying `iPhone Duo.simdevicetype` into `~/Library/Developer/CoreSimulator/Profiles/DeviceTypes/` is enough to make `xcrun simctl list devicetypes` show it, but `xcrun simctl create` then fails with `Authorization is required to install the packages`. Run the first-launch install, or `sudo xcodebuild -license accept` plus the package install, before expecting a working Duo device.
-- `DeviceSupportsEnhancedMultitasking` is false — no Stage Manager.
+- **No `simctl` pose command, confirmed:** `xcrun simctl ui` only sets appearance (dark mode, increase contrast, content size). Poses come from Device Hub. Driving its buttons additionally needs macOS Accessibility permission, so it cannot be automated from an SSH session.
+- Capture: `xcrun simctl io <udid> screenshot --display=1` (outer), `--display=3` (inner). Both sizes verified on a live device.
+- **Creating the Duo device needs admin authorization.** The device type ships inside `XcodeSystemResources.pkg`. Copying `iPhone Duo.simdevicetype` into `~/Library/Developer/CoreSimulator/Profiles/DeviceTypes/` makes `simctl list devicetypes` show it, but `simctl create` then fails with `Authorization is required to install the packages` — the authorization is for the *package*, not the file. Fix: `sudo installer -pkg <Xcode>/Contents/Resources/Packages/XcodeSystemResources.pkg -target /`.
 
 **Known issues that affect testing:** first launch takes several minutes; StandBy unavailable; most app extensions cannot be run or debugged; screenshots and recordings may be **black for a few minutes after boot**; VoiceOver and the Accessibility Inspector cannot convey content inside Device Hub; Device Hub resize mode with a pre-iOS-27-linked app is unsupported and may show a black screen; exiting resize mode other than through the toolbar leaves content mis-sized until reboot.

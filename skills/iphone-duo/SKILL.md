@@ -21,7 +21,7 @@ Every Duo API is **iOS 27.1+**. Behaviour is stamped by the linked SDK, not the 
 | Check | How | Why it matters |
 |---|---|---|
 | Links the iOS 27.1 SDK | `xcodebuild -showsdks`, or inspect `SDKROOT` / the scheme's base SDK | Builds linked against iOS 27.0 or earlier **do not adapt at all** — see the ladder below |
-| `SDKROOT` set, not just `-sdk` | Inspect the build invocation | A `-sdk` link without `SDKROOT` silently stamps the binary 27.0 and none of the behaviour activates |
+| `SDKROOT` set, not just `-sdk` | `xcrun vtool -show-build <binary>` — the `sdk` field must read 27.1 | **Reproduced live.** `swiftc -sdk iPhoneSimulator27.1.sdk -target arm64-apple-ios27.1-simulator` produced a binary stamped `sdk 27.0` (with only a warning, "using sysroot for 'macOS 27.0'"), and the app silently got no vertical bar and a `nil` `toolbarVerticalEdge`. Setting `SDKROOT` alongside `-sdk` fixed both. A wrong stamp is invisible: the app runs, it just never adapts. |
 | Duo simulator runtime present | `xcodebuild -downloadPlatform iOS` — the runtime is a separate multi-GB download, not bundled with Xcode | Without it you cannot measure anything |
 
 **The SDK ladder** — what linking against 27.0 versus 27.1 actually gets you:
