@@ -1,6 +1,6 @@
 # iPhone Duo — measured values
 
-Everything here is measured or derived, not published as an Apple spec sheet. Sources are named per row. **Simulator values until hardware ships October 23, 2026.**
+Nothing here is published as an Apple spec sheet. Provenance is mixed and marked inline: rows verified on a live iPhone Duo simulator running the 27.1 runtime are labelled as such; rows still sourced from community probes are named. **Simulator values until hardware ships October 23, 2026.**
 
 ## Displays
 
