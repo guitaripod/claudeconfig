@@ -1,8 +1,8 @@
 ---
 name: Explore
-description: Read-only search agent for locating code. Use it to find files by pattern, grep for symbols or strings, or answer where something is defined and which files reference it. Not for code review, audits or open-ended analysis, since it reads excerpts and reports locations. State the breadth in the prompt, "quick", "medium" or "very thorough". Runs Haiku at low effort.
+description: Read-only search agent for locating code. Use it to find files by pattern, grep for symbols or strings, or answer where something is defined and which files reference it. Not for code review, audits or open-ended analysis, since it reads excerpts and reports locations. State the breadth in the prompt, "quick", "medium" or "very thorough". Runs Haiku at medium effort.
 model: haiku
-effort: low
+effort: medium
 omitClaudeMd: true
 disallowedTools: Agent, Edit, Write, NotebookEdit, ExitPlanMode, Artifact, ArtifactComments, ArtifactData
 ---

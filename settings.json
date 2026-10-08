@@ -28,6 +28,11 @@
             "type": "command",
             "command": "bash \"$HOME/claudeconfig/hooks/brevity-midrun.sh\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$HOME/claudeconfig/hooks/delegate-midrun.sh\"",
+            "timeout": 5
           }
         ]
       }

@@ -81,7 +81,7 @@ Rules:
 - Every search entry must be { "date": "YYYY-MM-DD", "returnDate": "YYYY-MM-DD" or null }. For one-way, returnDate is null on every entry.
 
 Set "interpretation" to one plain-English sentence: origin → destinations, window, trip type, cabin, pax, currency.`,
-  { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA, model: 'haiku', effort: 'low' }
+  { label: 'plan', phase: 'Plan', schema: PLAN_SCHEMA, model: 'haiku', effort: 'medium' }
 )
 
 const searches = (plan.searches || []).filter(s => s && s.date).slice(0, 24)
@@ -171,7 +171,7 @@ If the command errors, times out, or returns zero flights, return an empty "fare
         phase: 'Search',
         schema: FARE_SCHEMA,
         model: 'haiku',
-        effort: 'low',
+        effort: 'medium',
       }
     )
   )
@@ -229,5 +229,5 @@ Write a concise markdown answer for the user using ONLY these fares:
 4. Final line, verbatim: To open it in Google Flights: \`${openCmd}\`
 
 Be factual and tight. Currency is ${plan.currency}. Do not add fares that aren't in the JSON.`,
-  { label: 'rank', phase: 'Rank', model: 'haiku', effort: 'low' }
+  { label: 'rank', phase: 'Rank', model: 'haiku', effort: 'medium' }
 )

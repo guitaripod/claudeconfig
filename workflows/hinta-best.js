@@ -82,7 +82,7 @@ Decide the MODE:
 - 'category' — an open "what's best" question (e.g. "best 4TB SSD", "a good OLED under 2000", "wireless gaming mouse"). Use WebSearch to find the CURRENT best-in-class picks as of today (RTINGS, Tom's Hardware, TechPowerUp, Wirecutter, etc.), then set 'candidates' to 5-8 concrete, currently-buyable models spanning tiers (>=1 flagship, 1-2 value, 1 budget). Each 'model' must be an EXACT searchable name including the defining size/capacity ("WD Black SN850X 4TB", "LG OLED65C4"), never vague. Leave 'searchQuery' null.
 
 For both: respect hard constraints (budget, screen size, form factor, must-haves) and set budgetEur / minInches / maxInches (inches only for screens, else null). 'category' = normalized name, 'interpretation' = one sentence.`,
-  { label: 'scope', phase: 'Scope', schema: SCOPE_SCHEMA, model: 'haiku', effort: 'medium' }
+  { label: 'scope', phase: 'Scope', schema: SCOPE_SCHEMA, model: 'haiku', effort: 'high' }
 )
 
 const inchArgs =
@@ -139,7 +139,7 @@ Keep ONLY groups that are genuinely the product "${scope.category}" (right brand
 - name, cheapestPriceEur, inStock, retailer (offer source), url (offer url), retailerCount (offers in the group).
 
 If the command errors or nothing matches, return an empty "variants" and a one-line "error". NEVER invent a price or URL.`,
-    { label: `price:${q}`, phase: 'Price', schema: PRODUCT_SCHEMA, model: 'haiku', effort: 'low' }
+    { label: `price:${q}`, phase: 'Price', schema: PRODUCT_SCHEMA, model: 'haiku', effort: 'medium' }
   )
 
   options = (res?.variants || [])
@@ -194,7 +194,7 @@ Pick the ONE group that best matches "${c.model}" (brand "${c.brand}") — match
 - foundInFinland (false if nothing matches, then null/0/false elsewhere), cheapestPriceEur, inStock, retailer, url, retailerCount, note (one short line only if something's off, else null).
 
 If the command errors or nothing matches, foundInFinland=false with the reason in note. NEVER invent a price or URL.`,
-        { label: `price:${c.model}`, phase: 'Price', schema: CAND_SCHEMA, model: 'haiku', effort: 'low' }
+        { label: `price:${c.model}`, phase: 'Price', schema: CAND_SCHEMA, model: 'haiku', effort: 'medium' }
       )
     )
   )
@@ -240,5 +240,5 @@ Write a concise markdown recommendation using ONLY these facts:
 ${scope.mode === 'category' ? '3. If a genuinely best-in-class model was NOT found in Finland (foundInFinland=false), note it in one line so the user knows it exists but is not stocked here — do NOT recommend buying it.\n' : ''}${scope.budgetEur ? `4. Flag any pick over the ${scope.budgetEur} EUR budget.\n` : ''}5. Prefer in-stock; if the best option is out of stock, say so and point at the best in-stock alternative. If prices cluster, say the market is tight so any reputable in-stock one is fine.
 
 Rules: prices are EUR and live. Never invent a price, retailer, or URL not in the JSON. Never recommend an item with foundInFinland=false as a buy. Be factual and tight — the buyer should know exactly what to click.`,
-  { label: 'recommend', phase: 'Recommend', model: 'haiku', effort: 'medium' }
+  { label: 'recommend', phase: 'Recommend', model: 'haiku', effort: 'high' }
 )
