@@ -95,6 +95,8 @@ Measured on the 27.1 simulator unless marked.
 
 Only the iPhone Duo simulator shows vertical bars, reserved regions and the fold. The state space is large: two displays, both orientations, flat, book and laptop poses, any angle between, Split View halves, Picture in Picture, windows, keyboard, camera, dark mode, Dynamic Type, locales. `references/states.md` lists every state with Apple's wording, what the system does, and what excellent means; `references/capture.md` has the tools.
 
+**Fill every view with diverse, realistic data first.** A shot of an empty or uniform view is a failed shot. Seed enough content to fill the largest display (inner landscape is 951 × 669 pt: a dozen or more rows, several grid rows), with varied names including one long enough to truncate, a spread of magnitudes, every badge and state the UI can show (fine, expiring, expired, unread, error), varied imagery rather than one tile style, and believable documents (an itemised receipt, not a placeholder). Route different shots to different records through launch variables so no two screens show the same item, keep currency and dates in the device locale, use fictional people and no third-party platform names, and make the seeding deterministic, offline and safe to relaunch. `references/capture.md` has the checklist.
+
 **Script the matrix, then look at it.** Install `duoctl` (`references/capture.md`; no GUI permission needed), then:
 
 ```bash

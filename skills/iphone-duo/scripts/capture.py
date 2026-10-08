@@ -107,6 +107,41 @@ def is_black(path):
         return ImageStat.Stat(small).mean[0] < 2.0
 
 
+def average_hash(path):
+    """A 256-bit perceptual hash of the image, or None when Pillow is unavailable."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    with Image.open(path) as image:
+        small = image.convert("L").resize((16, 16))
+        pixels = list(small.getdata())
+    mean = sum(pixels) / len(pixels)
+    return [1 if pixel > mean else 0 for pixel in pixels]
+
+
+def flag_duplicates(records):
+    """Fails a capture that looks identical to a different screen in the same state.
+
+    Two screens that render the same pixels almost always mean routing failed and both shots show
+    the launch screen. Near-identical status-bar differences are tolerated by the distance bound.
+    """
+    seen = {}
+    for record in records:
+        if record["status"] != "ok":
+            continue
+        digest = average_hash(record["raw"])
+        if digest is None:
+            return
+        for other, other_digest in seen.get(record["state"], []):
+            if other["screen"] != record["screen"] and sum(a != b for a, b in zip(digest, other_digest)) <= 3:
+                record["status"] = "failed"
+                record["note"] = "looks identical to %s: routing probably failed" % other["screen"]
+                break
+        else:
+            seen.setdefault(record["state"], []).append((record, digest))
+
+
 class Duo:
     """One booted iPhone Duo simulator, driven through duoctl and simctl."""
 
@@ -332,6 +367,7 @@ def main():
     duo.duoctl("rotate", initial.get("orientation") or "portrait")
     duo.set_appearance("light")
 
+    flag_duplicates(records)
     framed = frame_all([r["raw"] for r in records if r["status"] == "ok"], os.path.join(args.out, "framed"))
     for record in records:
         if record["raw"] in framed:

@@ -30,8 +30,19 @@ scripts/capture.py --udid <udid> --bundle-id <id> --out <dir> \
 - `--screen NAME[:K=V,K=V]` is one screen and the launch variables that route to it (passed as `SIMCTL_CHILD_*`). An app with a launch-argument demo mode makes every screen one flag. Without one, use `--arg` and `duoctl tap`.
 - States: `outer-portrait`, `outer-landscape`, `inner-landscape`, `inner-portrait`, `book-landscape` (127°), `laptop-portrait` (127°). `--states a,b` selects, `--list-states` prints them.
 - `--appearance light,dark` multiplies the matrix; `--arg` passes launch arguments such as `-AppleLanguages (fi)` for locales.
-- Per capture it waits, checks the app is still running (relaunching a dead one), screenshots, and rejects black or wrongly sized images (retrying with a longer wait). A state the app refuses, such as a landscape the app does not support on the outer display, is recorded as **skipped**, never as a pass.
+- Per capture it waits, checks the app is still running (relaunching a dead one), screenshots, and rejects black or wrongly sized images (retrying with a longer wait), and fails a capture identical to another screen in the same state. A state the app refuses, such as a landscape the app does not support on the outer display, is recorded as **skipped**, never as a pass.
 - Writes `raw/`, `framed/` and `manifest.json`; exits 1 on any failure. It restores light mode and the display and orientation the simulator started on. `outer-landscape` tries the opposite landscape when the first is refused.
+
+## Mock data for the shots
+
+Seed it in a DEBUG-only mode switched by launch variables (`SIMCTL_CHILD_*`), never in release code. Checklist:
+
+- **Volume:** enough rows and cards that every display, including inner landscape (951 × 669 pt), is full, not half empty. Keep under any free-tier cap or paywall threshold so the shot does not show an upsell.
+- **Diversity:** several categories or groups; names of mixed length with at least one that truncates; prices or counts from small to large; every status the UI can show, in proportion; imagery that varies (different symbols, palettes or real artwork), not one repeated tile.
+- **Realism:** documents and details that read as real (store, date, itemised lines, tax, order number), in the device locale's currency and date format; no lorem ipsum, no "Test 1".
+- **Distinct shots:** route each screen to a different record with variables (`DEMO_CATEGORY`, `DEMO_ITEM` by name), so a gallery of detail screens shows a camera, a long-name appliance, an expiring item and an expired one, not the first row five times. `capture.py` fails a capture that is perceptually identical to another screen in the same state, which is the usual sign that routing failed.
+- **Forms:** pre-fill the add or edit flow with plausible values instead of showing it empty.
+- **Safe:** deterministic, no network, no real personal data, and wiping and reseeding inside `performAndWait` so relaunching cannot crash.
 
 ## Reading the result
 
