@@ -36,6 +36,7 @@ DISCARDED_REDIRECT = re.compile(r"[0-9]?>&[0-9]|[0-9]?>\s*/dev/null")
 SEGMENT_SPLIT = re.compile(r"\s*(?:;|&&|\|\||\||\n)\s*")
 GIT_OPTIONS = re.compile(r"^git\s+(?:(?:-C|-c)\s+\S+\s+|--no-pager\s+)*")
 WORKFLOW_ROLE = "workflow-subagent"
+CHECK_LOG = "~/.local/share/claude-delegation/subagents.jsonl"
 TRANSCRIPT_PATTERNS = ("*/*/subagents/agent-*.jsonl", "*/*/subagents/workflows/*/agent-*.jsonl")
 COMPARISON_ROWS = (
     ("spend", lambda s: s["spend_usd"], "money"),
@@ -46,6 +47,7 @@ COMPARISON_ROWS = (
     ("escalation %", lambda s: s["delegation"]["escalation_pct"], "pct"),
     ("zero-tool %", lambda s: s["zero_tool"]["rate_pct"], "pct"),
     ("read-only %", lambda s: s["main_tools"]["read_only_pct"], "pct"),
+    ("sent back %", lambda s: s["checks"]["sent_back_pct"], "pct"),
 )
 
 Rate = namedtuple("Rate", "input write_5m write_1h read output")
@@ -436,6 +438,66 @@ def collect(root, windows):
     return accs
 
 
+def new_check_row():
+    """Empty per-agent-type totals for the SubagentStop check log."""
+    return {"delegates": 0, "sent_back": 0, "zero_tool": 0, "unchecked": 0, "retries": 0, "fixed": 0}
+
+
+def read_check_log(path, windows):
+    """Fold hooks/delegate-check.sh log lines into per-window, per-agent-type totals.
+
+    A first stop counts as a delegate; a sent-back one is split into zero-tool and unchecked-edit causes.
+    A retry stop is fixed when it now used tools and, if it edited, ran a command after the last edit.
+    """
+    totals = {window.label: defaultdict(new_check_row) for window in windows}
+    try:
+        fh = open(os.path.expanduser(path), "r", errors="replace")
+    except OSError:
+        return totals
+    with fh:
+        for line in fh:
+            row = parse_line(line)
+            when = parse_timestamp((row or {}).get("ts"))
+            if row is None or when is None:
+                continue
+            for window in windows:
+                if window.contains(when):
+                    fold_check_row(totals[window.label][row.get("agent_type") or UNKNOWN_SUBAGENT_ROLE], row)
+    return totals
+
+
+def fold_check_row(stats, row):
+    """Add one logged subagent stop to its agent type's totals."""
+    if row.get("retry"):
+        stats["retries"] += 1
+        if row.get("tool_uses") and row.get("checked") is not False:
+            stats["fixed"] += 1
+        return
+    stats["delegates"] += 1
+    if not row.get("sent_back"):
+        return
+    stats["sent_back"] += 1
+    if not row.get("tool_uses"):
+        stats["zero_tool"] += 1
+    else:
+        stats["unchecked"] += 1
+
+
+def check_summary(totals):
+    """Overall and per-agent-type sent-back rates from the check log."""
+    delegates = sum(row["delegates"] for row in totals.values())
+    sent_back = sum(row["sent_back"] for row in totals.values())
+    return {
+        "delegates": delegates,
+        "sent_back": sent_back,
+        "sent_back_pct": pct(sent_back, delegates),
+        "by_agent_type": {
+            name: dict(row, sent_back_pct=pct(row["sent_back"], row["delegates"]))
+            for name, row in sorted(totals.items(), key=lambda item: -item[1]["delegates"])
+        },
+    }
+
+
 def pct(part, whole):
     """Percentage rounded to two places, or 0.0 when the whole is zero."""
     return round(100 * part / whole, 2) if whole else 0.0
@@ -489,7 +551,7 @@ def scope_summary(stats, spend_total, output_total):
     }
 
 
-def summarize(window, acc):
+def summarize(window, acc, checks):
     """Turn one window's accumulator into the plain dict that both the text and JSON output use."""
     days = window.days()
     spend = acc["spend"]
@@ -533,6 +595,7 @@ def summarize(window, acc):
             "rate_pct": pct(len(zero), subagents),
             "examples": sorted(zero, key=lambda row: row["path"])[:EXAMPLE_LIMIT],
         },
+        "checks": check_summary(checks),
         "main_tools": {
             "calls": acc["tool_calls"],
             "read_only": acc["read_only"],
@@ -653,6 +716,22 @@ def print_main_tools(summary):
     print(f"tool calls {t['calls']}  read-only {t['read_only']} ({t['read_only_pct']:.1f}%)")
 
 
+def print_checks(summary):
+    """Print how often hooks/delegate-check.sh sent a delegate back, and how often the retry fixed it."""
+    c = summary["checks"]
+    print("\nsubagent checks (hooks/delegate-check.sh)")
+    if not c["delegates"]:
+        print("no logged subagent stops in this window")
+        return
+    print(f"{c['sent_back']} of {c['delegates']} delegates sent back ({c['sent_back_pct']:.1f}%)")
+    print(f"{'agent type':<22}{'delegates':>10}{'sent back':>11}{'zero-tool':>11}{'unchecked':>11}{'fixed':>8}")
+    for name, row in c["by_agent_type"].items():
+        print(
+            f"{name:<22}{row['delegates']:>10}{row['sent_back']:>11}{row['zero_tool']:>11}"
+            f"{row['unchecked']:>11}{row['fixed']:>4}/{row['retries']:<3}"
+        )
+
+
 def print_window(summary):
     """Print one window's full report."""
     print(f"{summary['label']}: {summary['start'][:10]} .. {summary['end'][:10]} ({summary['days']:.1f} days)")
@@ -666,6 +745,7 @@ def print_window(summary):
     print_delegation(summary)
     print_zero_tool(summary)
     print_main_tools(summary)
+    print_checks(summary)
 
 
 def build_windows(args, now):
@@ -690,6 +770,7 @@ def build_parser():
     ap.add_argument("--before-after", type=day_arg, metavar="YYYY-MM-DD", help="compare [DATE-N, DATE) with [DATE, DATE+N)")
     ap.add_argument("--days", type=int, default=14, help="window length for --before-after, or lookback without dates (default 14)")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--check-log", default=CHECK_LOG, help="SubagentStop log written by hooks/delegate-check.sh")
     ap.add_argument(
         "--root",
         default=os.path.expanduser("~/.claude/projects"),
@@ -711,7 +792,8 @@ def main():
         if not args.before_after and window.start >= window.end:
             ap.error(f"the {window.label} window is empty (check the dates)")
     accs = collect(Path(os.path.expanduser(args.root)), windows)
-    summaries = [summarize(window, accs[window.label]) for window in windows]
+    checks = read_check_log(args.check_log, windows)
+    summaries = [summarize(window, accs[window.label], checks[window.label]) for window in windows]
     if not any(summary["calls"] for summary in summaries):
         print("no API calls found", file=sys.stderr)
         return 1

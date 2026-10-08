@@ -59,6 +59,17 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/claudeconfig/hooks/delegate-check.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "statusLine": {

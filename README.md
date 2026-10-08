@@ -7,7 +7,7 @@ Single source of truth for global Claude Code (and shared opencode) configuratio
 - `CLAUDE.md` — global instructions, kept short: only what applies to every session on every machine
 - `settings.json` — preferences, hooks, enabled plugins, marketplaces, statusline
 - `statusline-command.sh` — statusline renderer
-- `hooks/` — `brevity.sh` + `brevity-midrun.sh` (answer length), `delegate-midrun.sh` (nudges the main session to hand read-only streaks to Haiku), `guard-bash.sh` (blocks Co-Authored-By trailers and opencode-serve restarts)
+- `hooks/` — `brevity.sh` + `brevity-midrun.sh` (answer length), `delegate-midrun.sh` (nudges the main session to hand read streaks and multi-file edits to Haiku), `delegate-check.sh` (SubagentStop: sends back delegates that used no tools or never checked their edits, logs every stop for `delegation-report`), `guard-bash.sh` (blocks Co-Authored-By trailers and opencode-serve restarts)
 - `skills/` — custom user skills (procedures that load on demand: `ios-dev`, `app-store`, `kontu`, …)
 - `workflows/` — Claude Code workflow scripts
 - `agents/`: subagent definitions that pin Haiku and effort (`Explore` and `general-purpose` override the built-ins, `bulk` for mechanical work), since subagents otherwise inherit the session's effort
