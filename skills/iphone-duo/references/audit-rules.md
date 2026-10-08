@@ -2,6 +2,10 @@
 
 Detection patterns and replacements, in fix order. Each tier assumes the previous one is clean. `scripts/audit.sh` automates detection and reports file:line; this file is the replacement guidance.
 
+[Tier 1](#tier-1--screen-orientation-idiom) · [Tier 2](#tier-2--safe-areas-and-layout-margins) · [Tier 3](#tier-3--bars) · [Tier 4](#tier-4--plumbing) · [Tier 5](#tier-5--custom-layout-last) · [SwiftUI](#swiftui-specific) · [Objective-C](#objective-c)
+
+In the script, DEFECT patterns gate the exit code; REVIEW patterns (including `ignoresSafeArea()` with no edges, which is correct for a background, and every Tier 4 check) never do. Tier 5 is review-only.
+
 ---
 
 ## Tier 1 — screen, orientation, idiom
@@ -20,6 +24,8 @@ The question this tier answers is wrong on Duo: *what device am I on, and which 
 | `userInterfaceIdiom`, `UI_USER_INTERACE_IDIOM()`, `UI_USER_INTERFACE_IDIOM()` | Swift, ObjC |
 | `horizontalSizeClass == .regular` / `.compact` treated as iPad or iPhone | Swift, ObjC |
 | `bounds.height == <literal>` or a list of known iPhone heights | Swift, ObjC |
+| `UIApplication.shared.keyWindow` / `.windows` (one-window assumption, wrong with multiple windows and Split View) | Swift, ObjC |
+| `UIApplication.shared.statusBarFrame` | Swift, ObjC |
 
 **Replacements**
 
@@ -32,6 +38,8 @@ The question this tier answers is wrong on Duo: *what device am I on, and which 
 | `UIDevice.current.orientation` / `statusBarOrientation` in layout | compare `view.bounds.width` to `view.bounds.height`, or read size classes |
 | `userInterfaceIdiom == .phone` / `== .pad` | size classes, or available space |
 | `bounds.height == 844` | nothing — derive from the container |
+| `UIApplication.shared.keyWindow` / `.windows.first` | `view.window` or `view.window?.windowScene`; for the active scene's window, iterate `UIApplication.shared.connectedScenes` |
+| `statusBarFrame` | the safe area, or `windowScene.statusBarManager` where the frame is genuinely needed |
 
 Two habits matter more than the individual substitutions:
 

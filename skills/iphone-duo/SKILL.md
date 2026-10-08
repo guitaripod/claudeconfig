@@ -1,130 +1,131 @@
 ---
 name: iphone-duo
-description: Get an iOS app working well on iPhone Duo — Apple's folding iPhone. Covers what the device changes about layout, how to audit an app for patterns that break, how to fix them in the right order, when the system handles adaptation for you versus when to reach for the new iOS 27.1 APIs (reserved regions, arrangements, vertical bars, hinge), and how to test every pose. Use when asked to prepare an app for iPhone Duo or the foldable iPhone, make an app resizable or adapt to a resizing window, fix layout breaking on resize or in iPhone Split View, place content around the fold or hinge, or handle bars moving to a vertical edge.
+description: Make an iOS app work well on iPhone Duo, Apple's folding iPhone (iOS 27.1). Runs a grep audit, fixes layout in a fixed tier order, decides when system components already adapt versus when to use the new reserved-region, arrangement, vertical-bar and hinge APIs, and verifies every pose. Use for "prepare for iPhone Duo", foldable iPhone, resizable windows, iPhone Split View, content colliding with the fold or cameras, or bars moving to a side edge.
 ---
 
 # iPhone Duo
 
-iPhone Duo is Apple's first folding iPhone (iOS 27.1). Four things change about how your app lays itself out:
+iPhone Duo (iOS 27.1) changes four things about layout:
 
-1. **The scene moves between two displays while the app runs** — 466 × 678 pt outer (closed) and 669 × 951 pt inner (open). The window is not always the size of the screen, and the size changes mid-session.
-2. **Status, navigation, toolbars and tab bars sit vertically along one edge** on the outer display and on the inner display in landscape. Horizontal bars survive only in the inner display's tall layout.
-3. **The fold and two front cameras reserve regions** of the display that content must avoid.
-4. **Split View multitasking and multiple app windows** arrive on iPhone, so your app can be half a screen, with its bar on either edge.
+1. **The scene changes displays mid-session**: 466 × 678 pt outer, 669 × 951 pt inner. The window is not the screen, and its size changes while the app runs.
+2. **Bars go vertical**: status, navigation, toolbars and tab bars sit on one side edge on the outer display and on the inner display in landscape. Only the inner display in its tall layout keeps horizontal bars.
+3. **The fold and the cameras reserve regions** that content must avoid.
+4. **Split View and multiple windows arrive on iPhone**, so the app can be half the screen with its bar on either edge.
 
-Nothing here is special-casing a device. It is the same adaptive-layout discipline that iPad and iPhone Mirroring already demanded — Duo just removes every remaining escape hatch.
+This is the adaptive-layout discipline iPad already demanded, with every escape hatch removed. Most apps need tiers 1–4 and nothing from the new APIs.
 
-## 0. Confirm the build SDK
+## Workflow
 
-Every Duo API is **iOS 27.1+**. Behaviour is stamped by the linked SDK, not the deployment target.
+Copy this checklist and work down it. Do not skip a gate.
 
-| Check | How | Why it matters |
-|---|---|---|
-| Links the iOS 27.1 SDK | `xcodebuild -showsdks`, or inspect `SDKROOT` / the scheme's base SDK | Builds linked against iOS 27.0 or earlier **do not adapt at all** — see the ladder below |
-| `SDKROOT` set, not just `-sdk` | `xcrun vtool -show-build <binary>` — the `sdk` field must read 27.1 | **Reproduced live.** `swiftc -sdk iPhoneSimulator27.1.sdk -target arm64-apple-ios27.1-simulator` produced a binary stamped `sdk 27.0` (with only a warning, "using sysroot for 'macOS 27.0'"), and the app silently got no vertical bar and a `nil` `toolbarVerticalEdge`. Setting `SDKROOT` alongside `-sdk` fixed both. A wrong stamp is invisible: the app runs, it just never adapts. |
-| Duo simulator runtime present | `xcodebuild -downloadPlatform iOS` — the runtime is a separate multi-GB download, not bundled with Xcode | Without it you cannot measure anything |
-
-**The SDK ladder** — what linking against 27.0 versus 27.1 actually gets you:
-
-| | Linked 27.0 or earlier | Linked 27.1 |
-|---|---|---|
-| Closed | Window is 386 × 678 beside an 80 pt black rail; **horizontal** bars; **no reserved regions** | Full 466 × 678; **vertical** bars; camera occlusion regions reported |
-| Open | Window is 871 × 669 with a rail on the right; no regions | Full 951 × 669; vertical bars; the fold and inner camera reported as reserved regions |
-
-So the first step is always: build against the iOS 27.1 SDK, then look at the app. The audit and source fixes below are valid regardless of the SDK; only compile verification and pose screenshots need the Duo runtime.
-
-## 1. Prefer Apple's own skill for the generic half
-
-Apple ships an **`app-resizability`** skill inside Xcode 27.1 (it replaced `uikit-app-modernization`). Export it with:
-
-```bash
-xcrun agent skills export --output-dir ~/duo-skills
+```
+- [ ] 0. SDK: links iOS 27.1, stamped correctly ("SDK first")
+- [ ] 1. Baseline: scripts/audit.sh <repo>   (record the counts)
+- [ ] 2. Tier 1 fixed, then: scripts/audit.sh --tier 1 reports 0 defects
+- [ ] 3. Tier 2 fixed, then: scripts/audit.sh --tier 2 reports 0 defects
+- [ ] 4. Tier 3 fixed, then: scripts/audit.sh --tier 3 reports 0 defects
+- [ ] 5. Tier 4 reported to the owner (read-only)
+- [ ] 6. Tier 5 only for what the system cannot do ("Does the system already do it?")
+- [ ] 7. Full audit exits 0 and the app builds against the 27.1 SDK
+- [ ] 8. Pose matrix passed ("Verify every pose")
 ```
 
-It requires a running Xcode. It covers the generic modernization — `UIScreen.main`, orientation, idiom, scene lifecycle, safe-area asymmetry — with 13 core principles and five task references, and it is the standard Agent Skills format so it works in any agent. **This skill is the Duo layer on top**, not a replacement. Run Apple's skill for tiers 1, 2 and 4; come here for the rest.
+### SDK first
 
-## 2. The procedure
+Behaviour is stamped by the linked SDK, not the deployment target. An app linked against 27.0 or earlier **never adapts**: it gets a 386 × 678 window beside an 80 pt black rail, horizontal bars and no reserved regions. Nothing errors, so check it:
 
-Run `scripts/audit.sh <repo>` from the repo root. Grep-based, no SDK needed, reports file:line, exits non-zero on defects. Patterns are tagged **DEFECT** (wrong on Duo) or **REVIEW** (needs judgement, not necessarily wrong) — the distinction is what lets the exit code gate without false alarms.
+- `xcodebuild -showsdks` lists an iOS Simulator 27.1 SDK.
+- `xcrun vtool -show-build <binary>` reads `sdk 27.1`. A command-line build with `-sdk` but no `SDKROOT` was stamped 27.0 and silently lost the vertical bar and `toolbarVerticalEdge`.
+- The Duo simulator runtime is a separate multi-GB download (`xcodebuild -downloadPlatform iOS`).
 
-**Fix in this order. Do not reorder — each tier assumes the previous one is clean.**
+The audit and every source fix work without the SDK. Only compiling Duo symbols and pose screenshots need it. For Apple's generic half (scene lifecycle, orientation, idiom), also run its `app-resizability` skill: `xcrun agent skills export --output-dir ~/duo-skills` (needs a running Xcode). This skill is the Duo layer on top.
 
-1. **Tier 1 — screen, orientation, idiom.** Any code asking *what device am I on* or *which way am I rotated*. On a device that changes displays and folds mid-session, neither is knowable.
-2. **Tier 2 — safe areas and layout margins.** A vertical bar means one horizontal edge carries the whole inset while the opposite edge carries zero, so symmetric-inset code is wrong by default. Includes the iOS 27.1 change where a `UIView`'s default layout margins became zero.
-3. **Tier 3 — bars.** Custom `UIToolbar`, `UINavigationBar`, `UITabBar` and hand-rolled `HStack` toolbars **never go vertical**. Only bars owned by `UINavigationController`, `UITabBarController`, `NavigationStack` or `NavigationSplitView` do.
-4. **Tier 4 — plumbing.** Launch screen key, `UIRequiresFullScreen`, scene lifecycle, iPad orientations. Read-only: report, never change silently.
-5. **Tier 5 — custom layout, last.** Arrangements for two-view relationships, reserved regions for custom edge-to-edge chrome. **Reaching for these before tiers 1–4 is the most common mistake** — the system already handles most of it.
+### Audit and fix, in tier order
 
-Replacement rules for every tier are in `references/audit-rules.md`.
+`scripts/audit.sh <repo>` is grep-based, prints file:line, and exits 1 only on **DEFECT** (wrong on Duo). **REVIEW** hits need judgement and never gate. `--review` lists them, `--json` emits one object per hit, `--exclude '*Tests*'` skips paths. A DEFECT that is genuinely fine (a deliberate `UIScreen.main` in a non-UI utility) gets excluded or rewritten, not ignored.
 
-## 3. The judgement call: when does the system already do it?
+**Do not reorder.** Each tier assumes the previous one is clean:
 
-This is the part that decides whether an app feels great or merely works.
+| Tier | Fixes | Why it comes here |
+|---|---|---|
+| 1 | Screen, orientation, idiom, key window | Neither device nor rotation is knowable when the display changes |
+| 2 | Safe areas, layout margins, keyboard | A vertical bar puts the whole inset on one edge and zero on the other; iOS 27.1 also zeroed a `UIView`'s default layout margins |
+| 3 | Bars | Custom `UIToolbar`/`UINavigationBar`/`UITabBar` and hand-rolled `HStack` toolbars never go vertical; only bars owned by `UINavigationController`, `UITabBarController`, `NavigationStack` or `NavigationSplitView` do |
+| 4 | Plumbing | Launch screen, `UIRequiresFullScreen`, scene lifecycle, orientations. **Report, never change silently** |
+| 5 | Arrangements, reserved regions | Last. Reaching here early is the most common mistake |
 
-**Handled for you by standard components** — use them and you inherit Duo behaviour with no new code:
+Detection patterns and the replacement for each are in `references/audit-rules.md`. After each tier, re-run that tier's audit and the build before moving on.
 
-- `NavigationSplitView` / `UISplitViewController` collapse to one column on the outer display, expand on the inner, and adjust column widths around the fold.
-- `TabView` / `UITabBarController` lay out tabs vertically when appropriate, and can present as a sidebar on the inner display.
-- Sheets, alerts, context menus and popovers reposition themselves away from the fold. A plain `.sheet` already takes the leading panel in book pose and the lower panel in tabletop pose, with zero pose-specific code.
-- `.split` arrangements divide evenly across the fold; split views settle into a 50/50 split.
+## Does the system already do it?
+
+**Inherited with standard components, no code:** `NavigationSplitView`/`UISplitViewController` collapse on the outer display and adjust around the fold. `TabView`/`UITabBarController` go vertical and can become a sidebar on the inner display. Sheets, alerts, menus and popovers move away from the fold (a plain `.sheet` takes the leading panel in book pose, the lower panel in tabletop). `.split` arrangements divide across the fold.
 
 **Yours to handle:**
 
 | Situation | Tool |
 |---|---|
-| Two views with a main–detail relationship | `ArrangementView` with `.split` |
-| Two views with a foreground/background relationship | `ArrangementView` with `.overlay` |
-| A grid that should divide cleanly across the fold | Reserved regions — prefer an even column count from the inactive division region |
-| Custom edge-to-edge chrome, or content a system container does not move | `reservedRegions(kind:)` |
-| An effect driven by how far the device is folded | `onHingeChange` — **never for layout** |
-| Camera UI that must follow the user between displays | `AVCaptureDeviceDirectionCoordinator` |
+| Two views, main–detail | `ArrangementView` with `.split` |
+| Two views, foreground over background | `ArrangementView` with `.overlay` |
+| Grid that should divide across the fold | Even column count, decided from the *inactive* division region |
+| Custom edge-to-edge chrome a container does not move | `reservedRegions(kind:)` |
+| Effect that tracks how far it is folded | `onHingeChange`, **never for layout** |
+| Camera UI that must follow the user between displays | `AVCaptureDeviceDirectionCoordinator` (`references/camera.md`) |
 
-Displacement — moving an element by its purpose rather than its geometry — is the pattern to internalise: alerts move to the trailing side in book pose (closer to where they land when the device closes), media to the top region and controls to the stable bottom region in tabletop pose. Continuous scrolling content does **not** displace; it already adapts by scrolling.
+Move elements by purpose, not geometry: alerts toward the trailing side in book pose, media to the top region and controls to the stable bottom region in tabletop. Scrolling content does not displace; it already scrolls. Audit centred layouts first, since the centre is where the fold lands. Never drop a control in one pose that exists in another.
 
-## 4. Traps that are not in Apple's docs
+## Traps that are not in Apple's docs
 
-Measured on the 27.1 simulator; these are the reason the audit exists.
+Measured on the 27.1 simulator unless marked.
 
-- **Reserved regions arrive *after* the first layout pass.** Read them inside the `GeometryReader` body or `layoutSubviews`. Never cache them.
-- **The outer display reports no reserved regions at all** — not even inactive ones. An empty result does not mean "no camera cutout to worry about."
-- **Never derive posture from the hinge angle.** While dragging, status flips to `partiallyOpen` at 20° and back to `closed` at 27° or 46°; after a click it settles by band (closed at 36.6/71.2/108.6/123.3°, partially open at 143.1°). Fully open is reported only at 180°. Same angle, different pose, depending on how it was reached. React to `status`, the scene's geometry and reserved regions; keep the angle for effects.
-- **`UIScreen.main` still reports the outer display's 466 × 678 while your app is on the inner display**, and its size classes are not the scene's size classes.
-- **In `.overlay` arrangements the *primary* view floats** in the top leading corner while the secondary fills behind it. `overlayArrangementZIndex` reads 0 at the root — read it from a subview.
-- **`.split` can drop the secondary view entirely** when both do not fit along an allowed axis.
-- **The fold overrides your ratio.** In book pose a split arrangement puts its divider on the fold even if `splitArrangementLayoutRatio` says otherwise.
-- **The inner display is landscape-native (270°)** and does not honour `supportedInterfaceOrientations`.
-- **New windows cannot be created on the outer display.** Availability is dynamic — handle the activation error.
-- **In Split View your bar can be on *either* edge** depending on which half you are in. Converting the window to screen coordinates returns `{0,0}` for both halves. The reliable signal is that a reserved-region frame is clipped to your view, so a narrow sliver at the shared edge tells you the side — see `references/audit-rules.md`.
-- **The vertical bar follows the camera.** Rotate a closed device and the column moves between trailing and leading. A control placed "on the right" must read the edge.
+- **Never derive posture from the hinge angle.** `status` flips to `partiallyOpen` at ~20° and back to `closed` at 27° or 46° while dragging, but settles by band after a click. Same angle, different pose. Branch on `status`, scene geometry and reserved regions; use the angle only for effects. Apple's framework engineers confirm there is **no guaranteed update frequency**, so smooth with a spring and treat the angle as a target, not a per-frame input.
+- **Reserved regions arrive after the first layout pass, and an empty result is not proof.** Read them inside the `GeometryReader` body or `layoutSubviews` on every pass; never cache, never decide once at launch. Even `.includeInactive` has returned `[]` on a Duo in `viewDidAppear` (Apple Developer Forums thread 847902, unanswered). Do not build a "detect Duo at startup" branch; lay out from what you are told.
+- **The outer display reported no regions at all** in a live 27.1 probe, not even inactive ones. Empty does not mean "no camera to avoid".
+- **`GeometryProxy.size` is already inset.** Subtracting the safe area again counts it twice.
+- **`UIScreen.main` stays 466 × 678 on the inner display**, with its own size classes.
+- **The vertical bar follows the camera.** A closed device rotated flips the 84 pt column between trailing and leading. A control "on the right" must read the edge. `toolbarVerticalEdge` is `HorizontalEdge?` in SwiftUI (nil = none or unresolved) and `UIVerticalBarEdge` in UIKit (`unspecified`); it resolves leading/trailing while `safeAreaInsets` is physical.
+- **In Split View the bar can be on either edge**, and window-to-screen conversion returns `{0,0}` for both halves. A reserved-region frame is clipped to your view, so a narrow sliver at the shared edge tells you the side (`references/audit-rules.md`, tier 2).
+- **`.overlay`: the *primary* view floats** top-leading over the secondary; `overlayArrangementZIndex` reads 0 at the root, so read it from a subview. **`.split` can drop the secondary view** when both do not fit along an allowed axis, with no error. **The fold overrides `splitArrangementLayoutRatio`** in book pose.
+- **The inner display is landscape-native (270°) and ignores `supportedInterfaceOrientations`.**
+- **New windows cannot be created on the outer display**; handle the activation error.
+- **Fill-cropped 16:9 media on the inner display wastes about 134 pt**, a fifth of the screen. Pick fill or fit from the current aspect ratio.
 
-## 5. Test every pose
+## Verify every pose
 
-Only the iPhone Duo simulator shows vertical bars and reserved regions. A resizable simulator, iPhone Mirroring or a resizable iPad window are useful substitutes for general resize behaviour but will not surface these.
+Only the iPhone Duo simulator (`com.apple.CoreSimulator.SimDeviceType.iPhone-Duo`, created for the 27.1 runtime) shows vertical bars and reserved regions. A resizable simulator or iPhone Mirroring covers general resizing only.
 
-- **Poses: Closed, Book, Open, plus Rotate Right** — in every combination. Hold **Option** over the pose buttons in Device Hub for a hidden 0–180° hinge slider, which is the only way to exercise the between-poses behaviour.
-- **Split View:** drag the app to each half of the inner display. The bar moves to the app's outer edge, so the same screen must be correct on both sides.
-- **Keyboard up in every pose.** Sizes differ enough to break bottom-pinned controls.
-- **Previews:** the canvas overrides picker has a **Display** group for previewing the alternative display, and a Resizable Canvas mode for arbitrary sizes.
-- **Known simulator issues:** first launch takes several minutes; StandBy is unavailable; most app extensions cannot be run or debugged; screenshots and recordings may be **black for a few minutes after boot**, so wait and verify before capturing; VoiceOver and the Accessibility Inspector cannot convey content inside Device Hub, so accessibility needs a different route.
+| Axis | Cases |
+|---|---|
+| Pose | Closed, Book, Open, each also Rotate Right |
+| Between poses | Hold **Option** over the pose buttons for the 0–180° hinge slider; look for content under the fold at partial angles |
+| Mid-session | Launch closed, navigate deep, open it; fold while a sheet, alert or keyboard is up; selection and scroll state survive |
+| Split View | Drag the app to **each** half of the inner display; the bar sits on the app's outer edge, so test both sides |
+| Keyboard | Up in every pose (230–350 pt tall); bottom-pinned controls break first |
+| Previews | Canvas overrides **Display** group; Resizable Canvas for arbitrary sizes |
 
-Capture with `xcrun simctl io booted screenshot --display=1` (outer) and `--display=3` (inner).
+Screenshots: `xcrun simctl io booted screenshot --display=1` (outer), `--display=3` (inner). They can be **black for a few minutes after boot**, and first launch takes several minutes; wait and check the file before judging. `simctl` has no pose command, so poses are driven from Device Hub (which needs Accessibility permission, so it cannot be scripted over SSH). Most app extensions cannot run, and VoiceOver and the Accessibility Inspector do not work inside Device Hub.
 
-The simulator device type is `com.apple.CoreSimulator.SimDeviceType.iPhone-Duo` (alias `V68`, `iPhone19,4`), auto-created for the 27.1 runtime. Booting it requires Xcode's first-launch package install to have completed — see `references/measured.md`.
+**Not verifiable in the simulator**: camera switching between displays and cameras, haptics, thermals. Say so rather than claiming a pass. Camera work needs a physical Duo.
 
-## 6. Shipping
+Done means the SDK checks pass, the full audit exits 0, and each cell above has been looked at, not assumed.
 
-**From April 2027 every App Store submission must include iPhone Duo screenshots.** That is the deadline driving all of this.
+## Shipping
 
-Capture four sizes from the Duo simulator: 1398 × 2034 and 2034 × 1398 (outer), 2007 × 2853 and 2853 × 2007 (inner). Frame them with your device-frame tool of choice, then submit through App Store Connect, where a preview tool shows how assets look on Duo. A featuring nomination can flag the app as optimised for all poses.
+**From April 2027 every App Store submission must include iPhone Duo screenshots.** Capture from the simulator at the exact sizes below; resizing existing portrait screenshots does not meet the spec.
 
-## 7. References
+| Display | Portrait | Landscape |
+|---|---|---|
+| Outer | 1398 × 2034 | 2034 × 1398 |
+| Inner | 2007 × 2853 | 2853 × 2007 |
+
+As of 2026-10-09, `asc` 5.4.0 lists no Duo screenshot display type and a third-party guide reports App Store Connect upload support as "later this year". Confirm your upload path before planning around the deadline. A featuring nomination can flag an app as optimised for all poses.
+
+## References
 
 | File | Load when |
 |---|---|
-| `references/api-surface.md` | Writing or reviewing Duo code — every symbol, version-tagged, with doc links |
-| `references/measured.md` | Needed a number — display sizes, insets, fold geometry, the 27.0-vs-27.1 ladder, keyboard sizes |
-| `references/audit-rules.md` | Running the audit or triaging findings — detection patterns and replacements, SwiftUI and UIKit |
-| `references/camera.md` | The app uses AVFoundation — the one area with no system fallback |
-| `scripts/audit.sh` | Any audit pass |
+| `references/audit-rules.md` | Triaging audit findings: patterns and replacements per tier, SwiftUI and UIKit |
+| `references/api-surface.md` | Writing Duo code: every symbol, version-tagged, with gating recipes |
+| `references/measured.md` | Needing a number: displays, insets, fold geometry, keyboards, device identity |
+| `references/camera.md` | The app uses AVFoundation, the one area with no system fallback |
 
-Apple's canonical pages, in reading order: [/iphone-duo/prepare/](https://developer.apple.com/iphone-duo/prepare/) → [Preparing your app for iPhone Duo](https://developer.apple.com/documentation/technologyoverviews/preparing-your-app-for-iphone-duo) → [Designing for iPhone Duo](https://developer.apple.com/design/human-interface-guidelines/designing-for-iphone-duo). The six Tech Talks that the API detail here comes from: 111461 (prepare), 111462 (bars), 111463 (adaptive layouts), 111464 (displays and scenes), 111465 (camera), 111466 (design).
+Apple, in reading order: [Prepare](https://developer.apple.com/iphone-duo/prepare/) → [Preparing your app for iPhone Duo](https://developer.apple.com/documentation/technologyoverviews/preparing-your-app-for-iphone-duo) → [Designing for iPhone Duo](https://developer.apple.com/design/human-interface-guidelines/designing-for-iphone-duo). Tech Talks 111461 (prepare), 111462 (bars), 111463 (adaptive layouts), 111464 (displays and scenes), 111465 (camera), 111466 (design). Apple's doc pages need JavaScript; swap `developer.apple.com` for `sosumi.ai` to fetch them as Markdown.

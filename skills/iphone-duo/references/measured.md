@@ -2,6 +2,8 @@
 
 Nothing here is published as an Apple spec sheet. Provenance is mixed and marked inline: rows verified on a live iPhone Duo simulator running the 27.1 runtime are labelled as such; rows still sourced from community probes are named. **Simulator values until hardware ships October 23, 2026.**
 
+[Displays](#displays) · [Scene sizes](#scene-sizes-and-size-classes) · [Safe areas and the bar](#safe-area-insets-and-the-vertical-bar) · [The fold](#the-fold) · [Hinge status](#hinge-status-vs-angle) · [Keyboard](#keyboard) · [27.0 vs 27.1](#what-linking-against-ios-270-vs-271-actually-gets-you) · [Cameras](#cameras) · [Device identity](#device-identity--verified-from-the-xcode-271-rc-simulator-profile) · [Simulator](#simulator)
+
 ## Displays
 
 | | Portrait | Landscape | Scale | Native orientation |
@@ -68,7 +70,7 @@ Single-source probe measurement; not an Apple spec. Treat as a sanity check, nev
 
 The `isActive` flag does **not** switch as a function of angle in a predictable way — across four continuous sweeps it turned on at 98, 132.5, 132.5 and 172.6°. Query on every layout pass and lay out from what you are told.
 
-Inner camera occlusion region while active: ~58 × 37 pt. Status-column occlusion region: 84 × 120 pt.
+Inner camera occlusion region while active: ~58 × 37 pt. Status-column occlusion region: 84 × 120 pt. Both are community-probe values, not live-verified.
 
 ## Hinge status vs angle
 
@@ -94,7 +96,7 @@ Measured by building the same source twice. This is the whole argument for the S
 
 | | Linked 27.0 | Linked 27.1 |
 |---|---|---|
-| Closed | window 386 × 678 with an 80 pt black rail; **horizontal** bars; `toolbarVerticalEdge` nil; **no reserved regions** | full 466 × 678; **vertical** bars on trailing; `toolbarVerticalEdge` = trailing; two active occlusions |
+| Closed | window 386 × 678 with an 80 pt black rail; **horizontal** bars; `toolbarVerticalEdge` nil; **no reserved regions** | full 466 × 678; **vertical** bars on trailing; `toolbarVerticalEdge` = trailing; reserved regions: none in the later live probe (see Closed pose above); an earlier community probe reported two active occlusions, so treat closed-pose regions as unreconciled and query at runtime |
 | Open | window 871 × 669, rail on the right, 34 pt insets each side, no regions | 951 × 669, regular × regular, vertical bars, one inactive division (40 pt, full height, x 455–495, 20 pt margins) + inactive inner-camera occlusion + active status-column occlusion |
 | Open, rotated right | 80 pt band across the top | 669 × 951, **horizontal** bars, same three regions rotated |
 

@@ -2,9 +2,15 @@
 
 Version tags are the SDK the symbol appears in, not the deployment target. Every Duo symbol needs `#available(iOS 27.1, *)` unless the app's deployment target is already 27.1.
 
-**Availability, verified against the Xcode 27.1 SDK headers:** every Duo symbol is `@available(anyAppleOS 27.1, *)` in SwiftUI/SwiftUICore and `API_AVAILABLE(ios(27.1), tvos(27.1), visionos(27.1)) API_UNAVAILABLE(watchos)` in UIKit. So tvOS and visionOS carry these symbols at 27.1 even though Apple's docs pages list only iOS/iPadOS — **watchOS does not**. Gate on iOS/iPadOS and let the compiler report the rest.
+**Availability, verified against the Xcode 27.1 SDK headers:** every Duo symbol is `@available(anyAppleOS 27.1, *)` in SwiftUI/SwiftUICore and `API_AVAILABLE(ios(27.1), tvos(27.1), visionos(27.1)) API_UNAVAILABLE(watchos)` in UIKit. So UIKit's Duo symbols exist on iOS, tvOS and visionOS only (UIKit has no watchOS), while Apple's SwiftUI doc pages list the SwiftUI symbols (`ArrangementView`, `toolbarVerticalEdge`, …) on every platform including watchOS and macOS at 27.1. Gate on iOS/iPadOS and let the compiler report the rest.
 
 **Compile-time gating:** Xcode 27.0 and 27.1 ship the same Swift 6.4, so `compiler(>=6.4)` cannot distinguish them. Use `canImport(SwiftUI, _version: 8.0.85)` (27.1 ships `8.0.85.29`, 27.0 ships `8.0.84.1.104`) or `canImport(UIKit, _version: 9127.0.85)` (27.1 `9127.0.85.32`, 27.0 `9127.0.84`). The SwiftUI Duo symbols live in **SwiftUICore**, not SwiftUI — they are re-exported by `import SwiftUI`. Runtime gating is `#available(iOS 27.1, *)`.
+
+---
+
+## Contents
+
+[Reserved regions](#reserved-regions) · [Arrangements](#arrangements) · [Vertical bars](#vertical-bars) · [Hinge](#hinge) · [Scenes and multiple displays](#scenes-and-multiple-displays) · [Container margins](#container-margins) · [Camera](#camera) · [Concentricity and corners](#concentricity-and-corners) · [Adjacent APIs](#adjacent-apis-the-duo-work-depends-on) · [Not available](#not-available)
 
 ---
 
@@ -71,7 +77,7 @@ Bars move to a side edge on the outer display and on the inner display in landsc
 
 | SwiftUI | UIKit | Version |
 |---|---|---|
-| `EnvironmentValues.toolbarVerticalEdge` | `UITraitCollection.verticalBarEdge` → `UIVerticalBarEdge` (`.leading`/`.trailing`/`unspecified`) | 27.1 |
+| `EnvironmentValues.toolbarVerticalEdge` → `HorizontalEdge?` (nil = no vertical bar, or unresolved) | `UITraitCollection.verticalBarEdge` → `UIVerticalBarEdge` (`.leading`/`.trailing`/`unspecified`) | 27.1 |
 | `View.toolbarVerticalBehavior(_:)` | `UIViewController.preferredVerticalBarBehavior` | 27.1 |
 | `View.toolbarVerticalCompressionBehavior(_:)` | `UINavigationItem.verticalBarCompressionBehavior` | 27.1 |
 | `ToolbarVerticalCompressionBehavior` (`.automatic`, `.prefersTabBar`, `.prefersToolbarItems`) | `UIVerticalBarCompressionBehavior` (`.automatic`, `.prefersTabBar`, `.prefersBarItems`) | 27.1 |
@@ -96,7 +102,7 @@ Only bars owned by a navigation container go vertical. A bare `UIToolbar`, `UINa
 | `DeviceHinge.angle` (`Angle`, 180° flat) | same | 27.1 |
 | `DeviceHinge.status` (`.closed`, `.partiallyOpen`, `.fullyOpen`) | same | 27.1 |
 
-`hinge` is `nil` on devices without one — check rather than assume. Effects and interaction only; layout comes from reserved regions and arrangements.
+`hinge` is `nil` on devices without one — check rather than assume. Effects and interaction only; layout comes from reserved regions and arrangements. Updates have **no guaranteed frequency or angle increment** (Apple framework engineer, Developer Forums thread 847866): use them directly where that is fine, otherwise smooth with a spring animation and feed the latest value to an existing animation or render loop as a target.
 
 ## Scenes and multiple displays
 
