@@ -109,6 +109,8 @@ Only the iPhone Duo simulator shows vertical bars and reserved regions. A resiza
 
 Capture with `xcrun simctl io booted screenshot --display=1` (outer) and `--display=3` (inner).
 
+The simulator device type is `com.apple.CoreSimulator.SimDeviceType.iPhone-Duo` (alias `V68`, `iPhone19,4`), auto-created for the 27.1 runtime. Booting it requires Xcode's first-launch package install to have completed — see `references/measured.md`.
+
 ## 6. Shipping
 
 **From April 2027 every App Store submission must include iPhone Duo screenshots.** That is the deadline driving all of this.

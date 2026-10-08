@@ -98,11 +98,32 @@ Both front cameras are square ultrawide sensors.
 
 Depth is only available when addressing an individual camera, not the virtual one. See `camera.md`.
 
+## Device identity — verified from the Xcode 27.1 RC simulator profile
+
+Extracted from `iPhone Duo.simdevicetype` in Xcode 27.1's `XcodeSystemResources.pkg`. These are Apple's own values, not a probe.
+
+| Field | Value |
+|---|---|
+| Simulator device type | `com.apple.CoreSimulator.SimDeviceType.iPhone-Duo` |
+| Alias | `com.apple.CoreSimulator.SimDeviceType.V68` |
+| `modelIdentifier` / `representedModelIdentifiers` | `iPhone19,4` |
+| `productClass` | `V68` |
+| `minRuntimeVersion` | 27.1 |
+| `createByDefaultForRuntimeVersions` | 27.1 and later — so it is created automatically once the 27.1 runtime is present |
+| `supportedProductFamilyIDs` | 1 (iPhone) |
+| `supportedArchs` | arm64, x86_64 |
+| `springBoardConfigName` | `iPhone4Simulator` |
+
+Relevant `supportedFeatures`: `com.apple.display.integrated`, `com.apple.display.supports-external`, `com.apple.display.aot`, `com.apple.hid.staccato`. Conditional on runtime: **`com.apple.CoreSimulator.display.resizableScene`** — the resizable scene machinery is what makes Split View and the resizable window work.
+
+`com.apple.CoreSimulator.EnhancedMultitasking` is absent, which is the simulator-profile confirmation that there is no Stage Manager on Duo.
+
 ## Simulator
 
 - Exactly three pose buttons — **Closed, Book, Open** — plus Rotate Right. Hold **Option** over them for a hidden 0–180° hinge slider.
 - **No `simctl` pose command.** The community `hinge` CLI drives the private HID protocol the slider uses (usage page `0xFF61`, usage `0x5B`, serialized dict with `provider = "com.apple.Virtualization"`), read back with `xcrun devicectl device motion hinge-angle`.
 - Capture: `xcrun simctl io booted screenshot --display=1` (outer), `--display=3` (inner).
+- **Creating the Duo device needs admin authorization.** The device type ships inside `XcodeSystemResources.pkg`, which Xcode installs during its first-launch component step. Copying `iPhone Duo.simdevicetype` into `~/Library/Developer/CoreSimulator/Profiles/DeviceTypes/` is enough to make `xcrun simctl list devicetypes` show it, but `xcrun simctl create` then fails with `Authorization is required to install the packages`. Run the first-launch install, or `sudo xcodebuild -license accept` plus the package install, before expecting a working Duo device.
 - `DeviceSupportsEnhancedMultitasking` is false — no Stage Manager.
 
 **Known issues that affect testing:** first launch takes several minutes; StandBy unavailable; most app extensions cannot be run or debugged; screenshots and recordings may be **black for a few minutes after boot**; VoiceOver and the Accessibility Inspector cannot convey content inside Device Hub; Device Hub resize mode with a pre-iOS-27-linked app is unsupported and may show a black screen; exiting resize mode other than through the toolbar leaves content mis-sized until reboot.
