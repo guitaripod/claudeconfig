@@ -128,16 +128,28 @@ class Duo:
             status, output = self.duoctl("hinge", str(hinge))
         if status != 0:
             return False, "hinge failed: " + output.splitlines()[-1] if output else "hinge failed"
-        status, output = self.duoctl("rotate", orientation)
+        status, output = self.rotate(orientation)
         if status != 0:
-            return False, "orientation %s not accepted by the app" % orientation
+            return False, ("orientation %s not accepted by the app (if every state fails, the simulator "
+                           "may be wedged: simctl shutdown, then boot it)" % orientation)
         current = self.state() or {}
         expected_screen = "cover" if hinge == 0 else "inner"
         if current.get("activeScreen") != expected_screen:
             return False, "expected the %s screen, got %s" % (expected_screen, current.get("activeScreen"))
-        if current.get("orientation") != orientation:
+        if not str(current.get("orientation")).startswith(orientation):
             return False, "expected %s, got %s" % (orientation, current.get("orientation"))
         return True, ""
+
+    def rotate(self, orientation):
+        """Rotates the active display, trying the opposite landscape when the first is refused.
+
+        A display usually accepts both landscapes. The outer display's camera sits top left in
+        one of them, which is the one Apple's frame artwork expects, so the order is not cosmetic.
+        """
+        status, output = self.duoctl("rotate", orientation)
+        if status != 0 and orientation == "landscape":
+            status, output = self.duoctl("rotate", "landscape-flipped")
+        return status, output
 
     def set_appearance(self, appearance):
         run(["xcrun", "simctl", "ui", self.udid, "appearance", appearance])
@@ -181,6 +193,10 @@ class Duo:
                 continue
             if is_black(path):
                 note = "black capture"
+                continue
+            if not self.is_running():
+                note = "app died during capture"
+                relaunch()
                 continue
             return True, size, ""
         return False, image_size(path) if os.path.exists(path) else None, note
@@ -283,10 +299,8 @@ def main():
                 print("%-8s %-22s %-16s %s %s" % (record["status"].upper(), screen, name,
                                                   record["size"] or "", record["note"]))
 
-    restore_hinge = initial.get("hingeAngle")
-    if restore_hinge in (None, 180):
-        duo.duoctl("open")
-    duo.duoctl("rotate", initial.get("orientation") or "landscape")
+    duo.duoctl("close" if initial.get("activeScreen") == "cover" else "open")
+    duo.duoctl("rotate", initial.get("orientation") or "portrait")
     duo.set_appearance("light")
 
     framed = frame_all([r["raw"] for r in records if r["status"] == "ok"], os.path.join(args.out, "framed"))

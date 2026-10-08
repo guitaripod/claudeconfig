@@ -2,7 +2,7 @@
 
 Apple's wording throughout; "(inferred)" marks a deduction, not a quote. Sources: HIG [Designing for iPhone Duo](https://developer.apple.com/design/human-interface-guidelines/designing-for-iphone-duo), [Preparing your app](https://developer.apple.com/documentation/technologyoverviews/preparing-your-app-for-iphone-duo), Tech Talks 111461 to 111466 (prepare, bars, poses, displays and scenes, camera, design). The goal is not "does not break" but "uses what this state offers".
 
-Contents: [State space](#state-space) · [Excellent per state](#excellent-per-state) · [Use-case patterns](#use-case-patterns) · [Optimisation questions](#optimisation-questions) · [Gaps](#gaps)
+Contents: [State space](#state-space) · [Excellent per state](#excellent-per-state) · [Use-case patterns](#use-case-patterns) · [Recipes](#recipes-proven-on-a-real-app) · [Optimisation questions](#optimisation-questions) · [Gaps](#gaps)
 
 ## State space
 
@@ -56,6 +56,20 @@ Standing rules from Apple: prefer standard containers (split views, tab bars, ar
 | Games | Fill the screen in every pose; aspect ratio over letterboxing | Controls on the stable half |
 | Forms and settings | Centred readable column, not full width | Fields in one half, keyboard in the other |
 | Dashboards and grids | Even column counts; more columns, not bigger tiles | Cells sized so none sits on the fold |
+
+## Recipes proven on a real app
+
+From taking a UIKit list-and-detail app (categories, an item grid, item detail) through the matrix. Each was verified by screenshot on the Duo simulator.
+
+- **List apps become a split view.** Root `UISplitViewController(style: .tripleColumn)` with the existing screens as columns inside navigation controllers: categories primary, items supplementary, detail secondary. Route selection through the split view (`setViewController(_, for:)` then `show(_)`), keeping a push fallback. Result: inner landscape shows items beside detail, book pose rebalances 50/50, the outer display keeps the phone flow.
+- **Collapse onto real content, not a separate compact column.** Do not assign a `.compact` column view controller: it duplicates the screen and shows whichever column it likes. Implement `splitViewController(_:topColumnForCollapsingToProposedTopColumn:)` returning `.secondary` when a real detail is shown, `.supplementary` when items are, else `.primary`. Folding the device closed then keeps the person where they were. Verify the collapsed flow with real taps on the outer display (`duoctl tap`), not only by routing in code.
+- **Reveal the list on first launch.** With nothing selected, a wide display opens on empty columns with the list hidden behind a button. Call `show(.primary)` once after first appearance when not collapsed and no list is selected.
+- **After deleting the shown item,** clear the detail column when expanded and pop when collapsed.
+- **Placeholders without strings.** Empty columns use `UIContentUnavailableConfiguration` with an image only, so no new text has to be translated into every locale.
+- **Even column counts.** For a compositional-layout grid: `let fitted = max(2, Int(width / 250)); let columns = fitted + fitted % 2`. A 951 pt display gives 4 instead of 3, so no column sits on the fold in book pose.
+- **Landscape on the outer display.** Add `UIInterfaceOrientationLandscapeLeft` and `Right` to the iPhone `UISupportedInterfaceOrientations`. It is a product decision for every iPhone, so verify on the outer-landscape state and a real phone.
+- **Hero images and cards** pinned to `view.leadingAnchor` with a constant slide under the status column; pin foreground content to `safeAreaLayoutGuide`.
+- **Demo modes must be safe to relaunch.** A DEBUG launch-argument mode that wipes and reseeds Core Data on every launch crashed about once in fifty relaunches (an async reference-queue callback after a wipe). `capture.py` detects and retries a dead app; do the wipe and reseed inside `performAndWait` with a `reset()` in between.
 
 ## Optimisation questions
 

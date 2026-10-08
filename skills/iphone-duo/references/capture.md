@@ -31,7 +31,7 @@ scripts/capture.py --udid <udid> --bundle-id <id> --out <dir> \
 - States: `outer-portrait`, `outer-landscape`, `inner-landscape`, `inner-portrait`, `book-landscape` (127°), `laptop-portrait` (127°). `--states a,b` selects, `--list-states` prints them.
 - `--appearance light,dark` multiplies the matrix; `--arg` passes launch arguments such as `-AppleLanguages (fi)` for locales.
 - Per capture it waits, checks the app is still running (relaunching a dead one), screenshots, and rejects black or wrongly sized images (retrying with a longer wait). A state the app refuses, such as a landscape the app does not support on the outer display, is recorded as **skipped**, never as a pass.
-- Writes `raw/`, `framed/` and `manifest.json`; exits 1 on any failure. It restores the simulator to light mode and an open, landscape state.
+- Writes `raw/`, `framed/` and `manifest.json`; exits 1 on any failure. It restores light mode and the display and orientation the simulator started on. `outer-landscape` tries the opposite landscape when the first is refused.
 
 ## Reading the result
 
@@ -66,4 +66,5 @@ Plan the set per locale: at least one shot per slot the app supports, then spend
 
 ## Simulator quirks
 
+The active display decides what coordinates mean: `duoctl state` before any manual `tap`, because the cover display and the inner display have different sizes and `simctl launch` opens the app on whichever is active. The outer display can wedge (every rotate refused, the app launching without ever getting a scene); `simctl shutdown` then `boot` clears it. 
 First launch takes several minutes; the first screenshots can be black for a few minutes after boot (the script retries). StandBy and most app extensions are unavailable; VoiceOver and the Accessibility Inspector do not work inside Device Hub. Xcode 27.1 needs macOS 26.6 or later to run.
