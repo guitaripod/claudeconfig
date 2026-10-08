@@ -1,6 +1,6 @@
 # iPhone Duo API surface
 
-Version tags are the SDK the symbol appears in, not the deployment target. Every Duo symbol needs `#available(iOS 27.1, *)` because the fleet floor is iOS 18.0. Apple's docs pages list only iOS/iPadOS 27.1, but the SDK headers annotate tvOS and visionOS 27.1 as well — gate on iOS/iPadOS and let the compiler report the rest.
+Version tags are the SDK the symbol appears in, not the deployment target. Every Duo symbol needs `#available(iOS 27.1, *)` unless the app's deployment target is already 27.1. Apple's docs pages list only iOS/iPadOS 27.1, but the SDK headers annotate tvOS and visionOS 27.1 as well — gate on iOS/iPadOS and let the compiler report the rest.
 
 **Compile-time gating:** Xcode 27.0 and 27.1 ship the same Swift 6.4, so `compiler(>=6.4)` cannot distinguish them. Use `canImport(SwiftUI, _version: 8.0.85)` or `canImport(UIKit, _version: 9127.0.85)`. Runtime gating is `#available(iOS 27.1, *)`.
 

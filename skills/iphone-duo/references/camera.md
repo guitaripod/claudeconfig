@@ -96,4 +96,4 @@ Register the accessory on the **same view as the capture UI** so it is only pres
 
 ## Not available
 
-The simulator cannot test any of this realistically — no camera hardware. Verify on a physical Duo. Given none is owned, mark camera work as requiring hardware and do not claim verification from the simulator.
+The simulator cannot test any of this realistically — no camera hardware. Camera work needs a physical Duo; do not claim verification from the simulator.
