@@ -1,8 +1,10 @@
 # iPhone Duo API surface
 
-Version tags are the SDK the symbol appears in, not the deployment target. Every Duo symbol needs `#available(iOS 27.1, *)` unless the app's deployment target is already 27.1. Apple's docs pages list only iOS/iPadOS 27.1, but the SDK headers annotate tvOS and visionOS 27.1 as well — gate on iOS/iPadOS and let the compiler report the rest.
+Version tags are the SDK the symbol appears in, not the deployment target. Every Duo symbol needs `#available(iOS 27.1, *)` unless the app's deployment target is already 27.1.
 
-**Compile-time gating:** Xcode 27.0 and 27.1 ship the same Swift 6.4, so `compiler(>=6.4)` cannot distinguish them. Use `canImport(SwiftUI, _version: 8.0.85)` or `canImport(UIKit, _version: 9127.0.85)`. Runtime gating is `#available(iOS 27.1, *)`.
+**Availability, verified against the Xcode 27.1 SDK headers:** every Duo symbol is `@available(anyAppleOS 27.1, *)` in SwiftUI/SwiftUICore and `API_AVAILABLE(ios(27.1), tvos(27.1), visionos(27.1)) API_UNAVAILABLE(watchos)` in UIKit. So tvOS and visionOS carry these symbols at 27.1 even though Apple's docs pages list only iOS/iPadOS — **watchOS does not**. Gate on iOS/iPadOS and let the compiler report the rest.
+
+**Compile-time gating:** Xcode 27.0 and 27.1 ship the same Swift 6.4, so `compiler(>=6.4)` cannot distinguish them. Use `canImport(SwiftUI, _version: 8.0.85)` (27.1 ships `8.0.85.29`, 27.0 ships `8.0.84.1.104`) or `canImport(UIKit, _version: 9127.0.85)` (27.1 `9127.0.85.32`, 27.0 `9127.0.84`). The SwiftUI Duo symbols live in **SwiftUICore**, not SwiftUI — they are re-exported by `import SwiftUI`. Runtime gating is `#available(iOS 27.1, *)`.
 
 ---
 
@@ -21,7 +23,22 @@ Regions of your view's coordinate space that hardware or the system reserves. Qu
 
 [SwiftUI](https://developer.apple.com/documentation/swiftui/reservedregion) · [UIKit](https://developer.apple.com/documentation/uikit/uiview/reservedregion)
 
-Division is active only while partially folded — flat it is inactive with a zero-width fold line. The inner camera is an occlusion region, active only while the camera is active. Arrive after the first layout pass; never cache.
+Verified signatures:
+
+```swift
+public func reservedRegions(kind: ReservedRegion.Kind,
+                            options: ReservedRegion.QueryOptions = [],
+                            layoutDirectionBehavior: LayoutDirectionBehavior = .mirrors) -> [ReservedRegion]
+```
+
+```objc
+- (NSArray<UIViewReservedRegion *> *)reservedRegionsOfKind:(UIViewReservedRegionKind *)kind
+                                                   options:(UIViewReservedRegionQueryOptions)options;
+```
+
+Objective-C uses opaque reference types — `UIViewReservedRegionKind`, `UIViewReservedRegionIdentifier`, `UIViewReservedRegionQueryOptions` — with `frame`, `margins`, `kind`, `identifier` and `isActive` on the region itself.
+
+Division is active only while partially folded — flat it is inactive with a zero-width fold line. The inner camera is an occlusion region, active only while the camera is active. Regions arrive after the first layout pass; never cache them. Region frames are mirrored for RTL by default, so `.fixed` is what you want when you need physical positions.
 
 ## Arrangements
 
@@ -59,7 +76,7 @@ Bars move to a side edge on the outer display and on the inner display in landsc
 | `View.toolbarVerticalCompressionBehavior(_:)` | `UINavigationItem.verticalBarCompressionBehavior` | 27.1 |
 | `ToolbarVerticalCompressionBehavior` (`.automatic`, `.prefersTabBar`, `.prefersToolbarItems`) | `UIVerticalBarCompressionBehavior` (`.automatic`, `.prefersTabBar`, `.prefersBarItems`) | 27.1 |
 | `ToolbarContent.axisBehavior(_:)` (`.verticalPreferred`, `.horizontalOnly`) | `UIBarButtonItem.axisBehavior` | 27.1 |
-| `ToolbarContent.visibilityPriority(_:)` | `UIBarButtonItem.visibilityPriority` | SwiftUI 27.1 / UIKit 27.0 |
+| `ToolbarContent.visibilityPriority(_:)` | `UIBarButtonItem.visibilityPriority` | **27.0** |
 | `ToolbarItemVisibilityPriority` (`.low`, `.high`, `.automatic`, `init(lowerThan:)`, `init(higherThan:)`) | `UIBarButtonItemVisibilityPriority` | — |
 | `ToolbarItemPlacement.topBarPinnedTrailing` | `UINavigationItem.pinnedTrailingGroup` | 27.0 |
 | `ToolbarItemPlacement.cancellationAction` | `UINavigationItem.leadingItemGroups` | 27.0 |
@@ -97,12 +114,14 @@ All apps participate in Split View multitasking. New windows can only be created
 
 ## Container margins
 
-| SwiftUI | UIKit | Version |
-|---|---|---|
-| `View.contentMargins(for:)` | `view.directionalLayoutMargins` / `systemMinimumLayoutMargins` | 27.1 |
-| `GeometryProxy.contentMargins(for:)` | — | 27.1 |
+Not a Duo API — `contentMargins` arrived in **iOS 17** and is listed here only because the iOS 27.1 layout-margins change makes it relevant.
 
-`.container` is the variant to use. Relevant because of the iOS 27.1 change where a `UIView`'s default layout margins became zero — see `audit-rules.md` tier 2.
+```swift
+contentMargins(_ edges: EdgeInsets.Set = .all, _ insets: EdgeInsets, for placement: ContentMarginPlacement = .automatic)
+contentMargins(_ edges: EdgeInsets.Set = .all, _ length: CGFloat?, for placement: ContentMarginPlacement = .automatic)
+```
+
+`ContentMarginPlacement` carries `.container`. UIKit's equivalent is `view.systemMinimumLayoutMargins` with `preservesSuperviewLayoutMargins` on the subview — see `audit-rules.md` tier 2. For reading rather than setting, `GeometryProxy.contentMargins(for:)` is separate and is also iOS 17.
 
 ## Camera
 
