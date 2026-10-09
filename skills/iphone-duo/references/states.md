@@ -2,7 +2,7 @@
 
 Apple's wording throughout; "(inferred)" marks a deduction, not a quote. Sources: HIG [Designing for iPhone Duo](https://developer.apple.com/design/human-interface-guidelines/designing-for-iphone-duo), [Preparing your app](https://developer.apple.com/documentation/technologyoverviews/preparing-your-app-for-iphone-duo), Tech Talks 111461 to 111466 (prepare, bars, poses, displays and scenes, camera, design). The goal is not "does not break" but "uses what this state offers".
 
-Contents: [State space](#state-space) · [Excellent per state](#excellent-per-state) · [Use-case patterns](#use-case-patterns) · [Recipes](#recipes-proven-on-a-real-app) · [Optimisation questions](#optimisation-questions) · [Gaps](#gaps)
+Contents: [State space](#state-space) · [Excellent per state](#excellent-per-state) · [Use-case patterns](#use-case-patterns) · [Recipes](#recipes-proven-on-real-apps) · [Optimisation questions](#optimisation-questions) · [Gaps](#gaps)
 
 ## State space
 
@@ -57,9 +57,9 @@ Standing rules from Apple: prefer standard containers (split views, tab bars, ar
 | Forms and settings | Centred readable column, not full width | Fields in one half, keyboard in the other |
 | Dashboards and grids | Even column counts; more columns, not bigger tiles | Cells sized so none sits on the fold |
 
-## Recipes proven on a real app
+## Recipes proven on real apps
 
-From taking a UIKit list-and-detail app (categories, an item grid, item detail) through the matrix. Each was verified by screenshot on the Duo simulator.
+From taking a UIKit list-and-detail app (categories, an item grid, item detail) through the matrix, then five more apps. Each was verified by screenshot on the Duo simulator.
 
 - **List apps become a split view.** Root `UISplitViewController(style: .tripleColumn)` with the existing screens as columns inside navigation controllers: categories primary, items supplementary, detail secondary. Route selection through the split view (`setViewController(_, for:)` then `show(_)`), keeping a push fallback. Result: inner landscape shows items beside detail, book pose rebalances 50/50, the outer display keeps the phone flow.
 - **Collapse onto real content, not a separate compact column.** Do not assign a `.compact` column view controller: it duplicates the screen and shows whichever column it likes. Implement `splitViewController(_:topColumnForCollapsingToProposedTopColumn:)` returning `.secondary` when a real detail is shown, `.supplementary` when items are, else `.primary`. Folding the device closed then keeps the person where they were. Verify the collapsed flow with real taps on the outer display (`duoctl tap`), not only by routing in code.
@@ -72,6 +72,23 @@ From taking a UIKit list-and-detail app (categories, an item grid, item detail) 
 - **Landscape on the outer display.** Add `UIInterfaceOrientationLandscapeLeft` and `Right` to the iPhone `UISupportedInterfaceOrientations`. It is a product decision for every iPhone, so verify on the outer-landscape state and a real phone.
 - **Hero images and cards** pinned to `view.leadingAnchor` with a constant slide under the status column; pin foreground content to `safeAreaLayoutGuide`.
 - **Demo modes must be safe to relaunch.** A DEBUG launch-argument mode that wipes and reseeds Core Data on every launch crashed about once in fifty relaunches (an async reference-queue callback after a wipe). `capture.py` detects and retries a dead app; do the wipe and reseed inside `performAndWait` with a `reset()` in between.
+- **Bars stay horizontal when a library sits beside a persistent player.** Only the column that touches the window's side edge may take the vertical bar. Override `preferredVerticalBarBehavior` to return `.disabled` while the two sit side by side and `.automatic` otherwise, and call `setNeedsUpdateOfVerticalBarConfiguration()` when that changes, as a split view's own columns behave.
+- **Dock media beside its text in any short, wide window,** decided from the window's size and not from the display. The outer display in landscape (compact by compact) gains from it as much as the inner display, so the rule is not a Duo-only branch.
+- **Video beside chat, or above it.** Wide window or book pose: video on one page, chat on the other, composer under the chat. Laptop pose: video in the top region, chat and composer on the stable base so controls and keyboard stay together and nothing is dropped.
+- **Music player pane layout.** A wide window puts the artwork in a column (about a third of the width, half while lyrics or the queue are open) beside the transport; the laptop pose shows lyrics, and the queue once about 96 pt is free, in the room above the base while the controls stay on it.
+- **Even grids take the gap from the fold.** An even column count puts the fold between the two middle columns, so that gap comes from the fold region (the inactive division region's width, inferred) and not from extra spacing, and every cell keeps one width in every pose.
+- **A Kids-category app still adopts landscape deliberately.** Apple asks for landscape on the outer display; gate it per tab, supporting landscape where the content benefits and keeping portrait elsewhere, and record each choice as a decision.
+
+Review-only hints from the same runs; no grep finds them, so look for them while reading each screen (`references/audit-rules.md`, "Review-only hints"):
+
+- **Stale cell registrations** that capture a size class when the registration is created keep the first answer after a fold.
+- **Flow-layout item widths cached** in `viewDidLoad` or a stored property survive a column resize and leave gaps or clipping.
+- **Horizontally scrolling rails** pinned edge to edge start under the vertical bar; inset the content, do not shrink the scroll view.
+- **A vertical bar can overlay a split-view pane** that was pinned to the window edge; check the pane on the bar side in every capture.
+- **A `GeometryReader` in a `ScrollView` background** with a `PreferenceKey` may never deliver the reserved region; put the reader above the `ScrollView`.
+- **Reserved regions only intersect the view that asks.** A small subview sees `[]` while the fold is elsewhere; ask the window or a full-screen view.
+- **`ArrangementView` gives the primary pane about 57%,** and the fold overrides `splitArrangementLayoutRatio` in book pose, so a tuned ratio only shows in the other poses.
+- **The idiom may set policy, never layout.** An orientation policy that must read `userInterfaceIdiom` or call `requestGeometryUpdate` is the one legitimate use; keep it with `duo-audit:ignore` and a reason.
 
 ## Optimisation questions
 

@@ -2,9 +2,16 @@
 
 Detection patterns and replacements, in fix order. Each tier assumes the previous one is clean. `scripts/audit.sh` automates detection and reports file:line; this file is the replacement guidance.
 
-[Tier 1](#tier-1--screen-orientation-idiom) · [Tier 2](#tier-2--safe-areas-and-layout-margins) · [Tier 3](#tier-3--bars) · [Tier 4](#tier-4--plumbing) · [Tier 5](#tier-5--custom-layout-last) · [SwiftUI](#swiftui-specific) · [Objective-C](#objective-c)
+[Running on a real repo](#running-on-a-real-repo) · [Tier 1](#tier-1--screen-orientation-idiom) · [Tier 2](#tier-2--safe-areas-and-layout-margins) · [Tier 3](#tier-3--bars) · [Tier 4](#tier-4--plumbing) · [Tier 5](#tier-5--custom-layout-last) · [Review-only hints](#review-only-hints-from-real-runs) · [SwiftUI](#swiftui-specific) · [Objective-C](#objective-c)
 
 In the script, DEFECT patterns gate the exit code; REVIEW patterns (including `ignoresSafeArea()` with no edges, which is correct for a background, and every Tier 4 check) never do. Tier 5 is review-only.
+
+---
+
+## Running on a real repo
+
+- **`--ios-only`** skips the other platforms and the non-app directories of a shared repo, so only the iPhone target is audited: directories named `macos`, `Mac`, `mac`, `watch`, `Watch`, `linux`, `Linux`, `tvos`, `vision`, `android`, `Design`, `marketing`, `build`, `build-*`, `.build`, `DerivedData`, `Pods`, anything matching `*Tests*`, and names ending in `Mac`, `Linux` or `Watch App` (a `flaccyMac` target). When the repo keeps the iOS app in a subdirectory (`ios/`), point ROOT at it. Without the flag the whole tree is scanned.
+- **`// duo-audit:ignore <reason>`** keeps a legitimate use. Put it at the end of the line the audit prints, on the last line of a multi-line statement, or on a comment line directly above. It suppresses a **DEFECT** only, and the reason is required: a bare directive suppresses nothing and the audit says so. Ignored hits are counted in the summary, listed by `--review` and emitted by `--json` with kind `IGNORED`, so the exceptions stay visible. Typical uses: an orientation policy that must read `userInterfaceIdiom` or `interfaceOrientation`, or call `requestGeometryUpdate`; a sidebar column or overlay panel whose list section sits inside the safe area on purpose. Do not use it to hide a fix that is still owed.
 
 ---
 
@@ -80,7 +87,11 @@ Vertical bars mean one horizontal edge carries the whole inset and the opposite 
 | Hardcoded bar heights as constraint constants: `20`, `44`, `64`, `88`, `34`, `49`, `83` | cannot follow an inset that appears at runtime |
 | `UIKeyboardWillShowNotification` + `UIKeyboardFrameEndUserInfoKey` driving a constraint | screen coordinates, stale on the next resize |
 | `ignoresSafeArea()` with no `edges:` argument | extends content under the vertical bar |
-| `x.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20)` (same for `trailingAnchor`) on foreground content | Pins to the full view, so it runs under the 84 pt status column. Found in a real app as clipped trailing text, a hidden **Done** button and a hidden paywall **close** button. A zero constant on a background or scroll view is fine; the audit flags only non-zero constants. Replace `view` with `view.safeAreaLayoutGuide`. |
+| `x.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20)` (same for `trailingAnchor`) on foreground content | Pins to the full view, so it runs under the 84 pt status column. Found in a real app as clipped trailing text, a hidden **Done** button and a hidden paywall **close** button. A zero constant on a background or scroll view is fine; the audit flags only non-zero constants. Replace `view` with `view.safeAreaLayoutGuide`. The same pin split over several lines (`constraint(`, `equalTo:` and `constant:` on separate lines), through `self.view` or `view!`, on `leftAnchor`/`rightAnchor`, or written as `NSLayoutConstraint(item:...toItem: view...)` is flagged as a multi-line pin: one app had about 25 that a single-line search missed. |
+| SnapKit `$0.leading.trailing.equalTo(view).inset(20)`, or `.edges`/`.horizontalEdges.equalToSuperview().inset(20)` on a subview added straight to the controller's `view` | The SnapKit form of the same pin. Replace with `.equalTo(view.safeAreaLayoutGuide)`. A plain `.edges.equalToSuperview()` with no inset, or any inset on a view inside a cell or container, is not flagged. |
+| `readableContentGuide.leadingAnchor` / `.trailingAnchor` as the only horizontal pin | **iOS 27.1: the readable guide has zero margins**, so text sits flush to the screen edge. **DEFECT** alone, **REVIEW** when the same statement adds a margin (`constant:`, `max(`, `layoutMargins`) or the file pairs it with a `>=` pin to `safeAreaLayoutGuide`. |
+| `NSCollectionLayoutSection` (or `.list(using:)`) in a file that never sets `contentInsetsReference` and does not pin to the safe area | A list or grid section is inset from the collection view, which sits under the vertical bar when it is pinned to `view`. Rows run under the bar. |
+| `NSCollectionLayoutGroup.horizontal(layoutSize:repeatingSubitem:count:)` whose item is `.fractionalWidth(1)` or `.fractionalWidth(1.0)` and whose count is more than 1 (a variable counts) | Each column is as wide as the whole group, so the second column lands off screen. Not a fold rule: it breaks at every width where the count exceeds 1. It sits in Tier 2 because the grid must be right before the safe-area fixes can be judged. |
 | `layoutMargins.left` applied to leading and trailing | same asymmetry defect |
 | `viewRespectsSystemMinimumLayoutMargins = false` | report, do not silently change |
 | Subviews relying on **inherited** layout margins | **iOS 27.1 changed a `UIView`'s default layout margins to zero** |
@@ -88,6 +99,9 @@ Vertical bars mean one horizontal edge carries the whole inset and the opposite 
 **Replacements**
 
 - Foreground content to `safeAreaLayoutGuide`; background and hero media to the superview's edges or `ignoresSafeArea()` with named edges.
+- **Readable guide:** keep `readableContentGuide` for the column width and add the margin yourself, as `equalTo: view.readableContentGuide.leadingAnchor, constant: 16`, or add `greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16` beside it. A readable guide on a card inside a padded container is a false positive worth a `duo-audit:ignore`.
+- **Compositional sections:** `section.contentInsetsReference = .safeArea` (or `.layoutMargins` when the screen already supplies margins) on every list and grid section. Setting it once in the file silences the audit, so check the other sections by eye. Pinning the collection view itself to `view.safeAreaLayoutGuide` also works but clips scrolling at the bar.
+- **Repeated items:** make the item `.fractionalWidth(1.0 / CGFloat(count))` and keep the group at `.fractionalWidth(1)`; derive `count` from `environment.container.effectiveContentSize.width`, and make it even for a grid (Tier 5).
 - `bounds.width - safeAreaInsets.left - safeAreaInsets.right` is **correct as written** — it accounts for both edges. Leave it alone.
 - `view.keyboardLayoutGuide` for keyboard avoidance. Delete the observer and the stored frame.
 - Corners: `view.layoutGuide(for: .safeArea(cornerAdaptation: .horizontal))` or `view.directionalEdgeInsets(for: .safeArea(cornerAdaptation:))` — iOS 26.
@@ -168,6 +182,23 @@ Only when the system genuinely cannot do it.
 5. **Grids: prefer an even number of columns** so content divides cleanly across the fold. Use the *inactive* division region for that decision — it is present whether or not the device is folded.
 
 **Never:** an `ArrangementView` inside a `NavigationSplitView`, `List`, or `ScrollView`; a navigation container inside an `ArrangementView`; a hinge angle in a layout decision; a pose-specific layout that drops controls available in other poses.
+
+---
+
+## Review-only hints from real runs
+
+No grep finds these reliably, so the audit does not report them. Look for each while reading a screen, and confirm on the matrix.
+
+| Hint | What goes wrong | What to do |
+|---|---|---|
+| **Stale cell registrations** | A `CellRegistration` or `configurationUpdateHandler` that captures a size class (or any width) when the registration is created answers once and never again after a fold. | Read `cell.traitCollection` or the current bounds inside the handler. |
+| **Flow-layout item widths cached across a column resize** | `itemSize` or a stored `itemWidth` computed in `viewDidLoad` or `viewWillAppear` outlives a column resize (book pose, Split View, rotation). | Compute from the current bounds in `sizeForItemAt`, and call `invalidateLayout()` when the width changes. |
+| **Horizontally scrolling rails under the vertical bar** | A rail pinned edge to edge starts its first item under the bar column. | Give the content a leading and trailing inset from the safe area (`contentInsetsReference = .safeArea` on an orthogonal section); do not shrink the scroll view. |
+| **A vertical bar overlaying a split-view pane** | The bar sits on the outer edge of the window and covers a pane that was pinned to that edge. | Check the pane on the bar side in the Split View and book captures; pin it to the safe area. |
+| **`GeometryReader` in a `ScrollView` background with a `PreferenceKey`** | The reserved region never arrives through the preference. | Put the reader above the `ScrollView` and pass the value down. |
+| **Reserved regions only intersect the view that asks** | A small subview sees `[]` while the fold is elsewhere. | Ask the window or a full-screen view and convert the frames. |
+| **`ArrangementView` ratio** | The primary pane gets about 57% of the width, and the fold overrides `splitArrangementLayoutRatio` in book pose. | Tune the ratio only for the poses where it applies; do not expect it in book pose. |
+| **The idiom-for-policy exception** | `userInterfaceIdiom` is a Tier 1 defect for layout, but an orientation policy (which orientations to support, a `requestGeometryUpdate` call) has to read it. | Keep it with `// duo-audit:ignore orientation policy` and never branch layout on it. |
 
 ---
 
