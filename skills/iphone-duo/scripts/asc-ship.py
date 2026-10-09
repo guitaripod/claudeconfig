@@ -776,7 +776,7 @@ def submission_id(document):
 def submit(options):
     """Creates the review submission, adds the version and submits it; without --confirm only prints the plan."""
     asc = Asc(not options.confirm)
-    view = asc.json(["versions", "view", "--version-id", options.version_id])
+    view = asc.json(["versions", "view", "--version-id", options.version_id, "--include-build"])
     if view.get("platform") != options.platform:
         raise Fatal("version %s is platform %s, not %s" % (options.version_id, view.get("platform"), options.platform))
     if view.get("state") != EDITABLE_STATE:
