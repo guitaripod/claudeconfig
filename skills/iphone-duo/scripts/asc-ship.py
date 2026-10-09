@@ -10,9 +10,15 @@ creates the review submission, adds the version and submits only with `--confirm
 or later; a ship directory holds shots/<locale>/NN-*.png, placements/header-16x9.png and
 placements/search-3x2.png.
 
+`stage` exits 2 only when `asc validate` reports real errors. While another platform's train is in
+review, validate fails with "N app infos match app"; that is printed as a warning ("validate not
+run") and staging still exits 0, with validate left to run by hand once the train clears.
+`selftest` checks that path and the exit statuses with a mocked asc.
+
     asc-ship.py stage --app 6705124497 --platform IOS --version 4.2.0 --build 170 \\
         --ship ~/duo/ship --whatsnew ~/duo/ship/whatsnew.json [--dry-run]
     asc-ship.py submit --app 6705124497 --platform IOS --version-id <id> --confirm
+    asc-ship.py selftest
 """
 import argparse
 import json
@@ -24,6 +30,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from unittest import mock
 
 ASC_BINARY = os.environ.get("ASC_BIN", "asc")
 DUO_DEVICE_TYPE = "IPHONE_DUO"
@@ -45,6 +52,7 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 CREDENTIALS_FILE = os.environ.get("ASC_CREDENTIALS_ENV", "~/.config/midgar/credentials.env")
 CREDENTIAL_KEYS = ("ASC_KEY_ID", "ASC_ISSUER_ID", "ASC_PRIVATE_KEY_PATH")
 ASC_TIMEOUT = 900
+APP_INFO_CLASH = re.compile(r"\d+ app infos? match", re.IGNORECASE)
 
 HEADER = {
     "file": "header-16x9.png",
@@ -720,23 +728,43 @@ def print_checks(checks):
             say("      at: %s" % " ".join(where))
 
 
+def app_info_clash(stdout, stderr):
+    """The asc error line when validate failed because several app infos match the app, else None.
+
+    That happens while another platform's train (Mac, tvOS) is in review: the app then has more
+    than one app info and validate refuses to pick one.
+    """
+    for line in (stderr + "\n" + stdout).splitlines():
+        if APP_INFO_CLASH.search(line):
+            return re.sub(r"^\s*(?:asc:\s*)?(?:error:\s*)?", "", line, flags=re.IGNORECASE).strip()[:300]
+    return None
+
+
 def step_validate(run):
-    """Step 6: run asc validate and print its errors and warnings; returns the error count."""
+    """Step 6: run asc validate and print its errors and warnings.
+
+    Returns (error count, reason validate could not run or None). The app-info clash is a warning,
+    not a staging failure; any other missing report still stops the run.
+    """
     say("[6/6] asc validate")
     if run.version_id is None:
         say("  version does not exist yet; nothing to validate")
-        return 0
+        return 0, None
     _, stdout, stderr = run.asc.run(["validate", "--app", run.app, "--version-id", run.version_id,
                                      "--platform", run.platform, "--output", "json"], check=False)
     try:
         report = json.loads(stdout)
     except ValueError:
-        raise Fatal("asc validate printed no report: %s" % (stderr.strip() or stdout.strip())[-400:])
+        clash = app_info_clash(stdout, stderr)
+        if clash is None:
+            raise Fatal("asc validate printed no report: %s" % (stderr.strip() or stdout.strip())[-400:])
+        say("  WARNING: validate not run: %s; run it by hand after the Mac or tvOS train clears" % clash)
+        return 0, clash
     summary = report.get("summary", {})
     say("  errors %s, warnings %s, infos %s, blocking %s" % (
         summary.get("errors"), summary.get("warnings"), summary.get("infos"), summary.get("blocking")))
     print_checks([check for check in report.get("checks", []) if check.get("severity") in ("error", "warning")])
-    return int(summary.get("errors") or 0)
+    return int(summary.get("errors") or 0), None
 
 
 def stage(options):
@@ -752,7 +780,7 @@ def stage(options):
     step_whatsnew(run)
     step_screenshots(run)
     step_placements(run)
-    errors = step_validate(run)
+    errors, skipped = step_validate(run)
     say()
     if run.dry_run:
         say("Dry run complete; nothing was written.")
@@ -760,6 +788,8 @@ def stage(options):
     say("Staged version %s (%s). Review it in App Store Connect, then run: asc-ship.py submit --app %s "
         "--platform %s --version-id %s --confirm" % (run.version, run.version_id, run.app, run.platform,
                                                      run.version_id))
+    if skipped:
+        say("Validate was not run, so nothing is known about errors; run asc validate before submitting.")
     if errors:
         say("Staging is complete but asc validate reports %d error(s) a person has to fix before submitting." % errors)
         return 2
@@ -807,6 +837,76 @@ def submit(options):
     return 0
 
 
+class FakeAsc:
+    """A stand-in for Asc whose only call is validate, answering with a canned process result."""
+
+    def __init__(self, stdout, stderr, returncode):
+        self.result = (returncode, stdout, stderr)
+        self.calls = []
+
+    def run(self, args, write=False, check=True):
+        self.calls.append(list(args))
+        return self.result
+
+
+def mocked_stage(dry_run, stdout, stderr, returncode):
+    """Runs stage() with every step but validate stubbed out and validate answered by a mocked asc.
+
+    Returns (exit status, printed output, the validate calls the mock saw).
+    """
+    options = argparse.Namespace(app="1", platform="IOS", version="1.0", build=1, ship="/nonexistent",
+                                 whatsnew=None, dry_run=dry_run, poll_interval=1, build_timeout=1)
+    fake = FakeAsc(stdout, stderr, returncode)
+    captured = []
+    run_class = Run
+
+    def stub_version(run):
+        run.version_id = "VERSION"
+
+    def stub_run(options):
+        run = run_class.__new__(run_class)
+        run.asc, run.app, run.platform, run.version, run.build = fake, "1", "IOS", "1.0", "1"
+        run.ship, run.whatsnew_path, run.dry_run, run.version_id = "/x", None, dry_run, None
+        run.whatsnew, run.shots, run.placement_files = {}, {}, {}
+        return run
+
+    with mock.patch.multiple(
+            sys.modules[__name__], Run=stub_run, scan_shots=lambda ship: {}, scan_placements=lambda ship: {},
+            step_version=stub_version, step_build=lambda run: None, step_whatsnew=lambda run: None,
+            step_screenshots=lambda run: None, step_placements=lambda run: None,
+            say=lambda text="": captured.append(text)):
+        status = stage(options)
+    return status, "\n".join(captured), fake.calls
+
+
+def selftest(options):
+    """Checks the validate paths of stage with a mocked asc, dry run and real run; returns 0 or 1."""
+    clash = "Error: 2 app infos match app 6705124497"
+    report = json.dumps({"summary": {"errors": 1, "warnings": 0, "infos": 0, "blocking": 1}, "checks": []})
+    cases = [
+        ("app-info clash, dry run", True, "", clash, 1, 0, "validate not run: 2 app infos match app 6705124497; "
+         "run it by hand after the Mac or tvOS train clears"),
+        ("app-info clash, real run", False, "", clash, 1, 0, "validate not run: 2 app infos match app 6705124497; "
+         "run it by hand after the Mac or tvOS train clears"),
+        ("real validate error, real run", False, report, "", 1, 2, "errors 1"),
+        ("real validate error, dry run", True, report, "", 1, 0, "errors 1"),
+    ]
+    failures = 0
+    for name, dry_run, stdout, stderr, returncode, expected, fragment in cases:
+        status, output, calls = mocked_stage(dry_run, stdout, stderr, returncode)
+        good = status == expected and fragment in output and bool(calls) and calls[0][0] == "validate"
+        failures += not good
+        say("%s %-32s exit %d (want %d)" % ("ok  " if good else "FAIL", name, status, expected))
+    try:
+        mocked_stage(False, "", "Error: 401 unauthorized", 1)
+        failures += 1
+        say("FAIL unrelated validate failure did not stop the run")
+    except Fatal:
+        say("ok   unrelated validate failure stops the run")
+    say("selftest: %d failed" % failures)
+    return 1 if failures else 0
+
+
 def build_parser():
     """The command line: stage and submit subcommands."""
     parser = argparse.ArgumentParser(description="Stage and submit an iPhone Duo release with asc.")
@@ -826,6 +926,7 @@ def build_parser():
     submission.add_argument("--platform", required=True, choices=["IOS"])
     submission.add_argument("--version-id", required=True)
     submission.add_argument("--confirm", action="store_true")
+    commands.add_parser("selftest", help="check the validate paths of stage with a mocked asc")
     return parser
 
 
@@ -833,7 +934,7 @@ def main():
     """Entry point: dispatches the subcommand and turns failures into messages and exit statuses."""
     options = build_parser().parse_args()
     try:
-        return stage(options) if options.command == "stage" else submit(options)
+        return {"stage": stage, "submit": submit, "selftest": selftest}[options.command](options)
     except Fatal as error:
         print("asc-ship.py: %s" % error, file=sys.stderr)
         return 1

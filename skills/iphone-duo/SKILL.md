@@ -44,7 +44,7 @@ The audit and every source fix work without the SDK. Only compiling Duo symbols 
 
 ### Audit and fix, in tier order
 
-`scripts/audit.sh <repo>` is grep-based, prints file:line, and exits 1 only on **DEFECT** (wrong on Duo). **REVIEW** hits need judgement and never gate. `--review` lists them, `--json` emits one object per hit, `--exclude '*Tests*'` skips paths. A DEFECT that is genuinely fine (a deliberate `UIScreen.main` in a non-UI utility) gets excluded or rewritten, not ignored.
+`scripts/audit.sh <repo>` is grep-based, prints file:line, and exits 1 only on **DEFECT** (wrong on Duo). **REVIEW** hits need judgement and never gate. `--review` lists them, `--json` emits one object per hit, `--exclude '*Tests*'` skips paths, `--ios-only` skips the other platforms of a shared repo. A DEFECT that is genuinely fine (a deliberate `UIScreen.main` in a non-UI utility) gets excluded or rewritten, not ignored.
 
 **Do not reorder.** Each tier assumes the previous one is clean:
 
@@ -101,10 +101,13 @@ Only the iPhone Duo simulator shows vertical bars, reserved regions and the fold
 
 ```bash
 scripts/capture.py --udid <udid> --bundle-id <id> --out <dir> --env <K=V> \
-  --screen items:<K=V> --screen detail:<K=V> --screen settings:<K=V>
+  --screen items:<K=V> --screen detail:<K=V> --screen settings:<K=V> \
+  --screen-arg settings="-screenshotRoute settings"
 ```
 
 It folds, unfolds, sets 127° and rotates through six states (outer portrait and landscape, inner landscape and portrait, book, laptop), launches each screen, rejects black, mis-sized or dead-app captures, frames the rest with `frames`, and writes a manifest. Skipped is not passed: a state the app refuses (landscape on the outer display of a portrait-only app) is a decision to make, not a gap to hide. If the app has a launch-argument demo mode, each screen is one flag; otherwise add one in DEBUG, with its seeding made safe to relaunch.
+
+The script first resets the simulator (closed, portrait, app foreground), recovers a wedged cover display once, pins the status bar to 9:41 and rejects a capture that shows the home screen. `--screen-arg NAME=ARG` passes launch arguments per screen and `--allow-identical SCREEN[:STATE]` accepts a pair that is legitimately identical. Run long matrices in the background; "Lessons from five apps" in `references/capture.md` lists what the first five apps cost.
 
 **Continuity matters as much as poses:** `--states fold-cycle` folds the device closed and open again without relaunching, so what the person was looking at must survive. **Then inspect every cell.** `scripts/sheet.py` builds one framed PNG of every screen × state, which exposes patterns single shots hide (a column where the camera covers every title, a row that never changed). Look for controls under the camera or status column (a Done or close button at the top trailing corner), clipped text, content under the vertical bar, a grid column on the fold, a phone layout stretched across the inner display, and a launcher screen where the app should be.
 
@@ -118,7 +121,7 @@ Done means the SDK checks pass, the full audit exits 0, the matrix has 0 failed,
 
 ## Shipping
 
-App Store Connect takes four Duo screenshot sizes (outer 1398 × 2034 and 2034 × 1398, inner 2007 × 2853 and 2853 × 2007), **ten in total per localization** (one set shared by all four sizes), plus one product page **Header** image, one **Search Results** image and optional previews. Header and Search Results are composed creative assets (5244 × 2950 PNG serves both), not screenshots. Read the live limits with `scripts/asc-specs.py` (needs `asc` 5.12 or later), build the screenshots with `capture.py --spec`, the Header and Search images with `compose.py`, and place them with `asc`. Run it per locale. Placements, commands and the screenshot story are in `references/capture.md`. `scripts/asc-ship.py stage` does the App Store Connect side in one idempotent run (version, build, What's New, screenshots, placements, `asc validate`) and `submit --confirm` sends it to review.
+App Store Connect takes four Duo screenshot sizes (outer 1398 × 2034 and 2034 × 1398, inner 2007 × 2853 and 2853 × 2007), **ten in total per localization** (one set shared by all four sizes), plus one product page **Header** image, one **Search Results** image and optional previews. Header and Search Results are composed creative assets (5244 × 2950 PNG serves both), not screenshots. Read the live limits with `scripts/asc-specs.py` (needs `asc` 5.12 or later), build the screenshots with `capture.py --spec`, the Header and Search images with `compose.py`, and place them with `asc`. Run it per locale. Placements, commands and the screenshot story are in `references/capture.md`. `scripts/asc-ship.py stage` does the App Store Connect side in one idempotent run (version, build, What's New, screenshots, placements, `asc validate`) and `submit --confirm` sends it to review. While another platform's train is in review, `asc validate` cannot run ("N app infos match app"); `stage` warns and exits 0, so run validate by hand afterwards.
 
 **Build host.** The Duo adaptation exists only in a binary linked against the iOS 27.1 SDK, so the build host must run Xcode 27.1 (needs macOS 26.6 or later) **and** be a stable macOS: a beta host stamps `BuildMachineOSBuild` and the upload is rejected (ITMS-90111). A host or VM still on Xcode 26.x produces a binary that never adapts. Tart guests cannot update their own macOS (`softwareupdate` fails with "Failed to find SFR recovery volume"), so a new guest has to be created from an IPSW. Check all three before starting the release: `xcodebuild -version`, `sw_vers -buildVersion`, `xcrun vtool -show-build <archive binary>` reads `sdk 27.1`. A recipe that worked (2026-10-09): pull Cirrus Labs' `macos-tahoe-base` image (it tracks the latest macOS 26.x, 26.6.2 then), clone it, grow the disk (`tart set <name> --disk-size 100`, then `sudo diskutil apfs resizeContainer disk0s2 0` in the guest), copy Xcode 27.1 into `/Applications` and select it, then run `buildvm provision` with `BUILDVM_NAME=<name>`; it skips the Xcode copy when one exists. Budget about 45 GB of host disk, and the first archive downloads the iOS platform (about 13 GB). Password ssh to a fresh guest needs `-o PubkeyAuthentication=no`, or the agent's keys exhaust the server's attempts.
 

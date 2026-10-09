@@ -1,6 +1,6 @@
 # Capturing every state, and the App Store Connect slots
 
-Contents: [Tools](#tools) · [The matrix script](#the-matrix-script) · [Reading the result](#reading-the-result) · [What cannot be scripted](#what-cannot-be-scripted) · [App Store Connect](#app-store-connect) · [Simulator quirks](#simulator-quirks)
+Contents: [Tools](#tools) · [The matrix script](#the-matrix-script) · [Lessons from five apps](#lessons-from-five-apps) · [Reading the result](#reading-the-result) · [What cannot be scripted](#what-cannot-be-scripted) · [App Store Connect](#app-store-connect) · [Simulator quirks](#simulator-quirks)
 
 ## Tools
 
@@ -28,11 +28,34 @@ scripts/capture.py --udid <udid> --bundle-id <id> --out <dir> \
 ```
 
 - `--screen NAME[:K=V,K=V]` is one screen and the launch variables that route to it (passed as `SIMCTL_CHILD_*`). An app with a launch-argument demo mode makes every screen one flag. Without one, use `--arg` and `duoctl tap`.
+- `--screen-arg NAME=ARG` (repeatable) appends launch arguments for one screen after the bundle id, split like a shell: `--screen-arg settings='-screenshotRoute settings'` suits apps that read UserDefaults arguments. `--arg` comes first, then the screen's own.
+- Every duoctl call carries `-d <udid>`, so agents on separate simulators cannot drive each other's. The script exits if duoctl lacks the flag or cannot reach the udid.
 - States: `outer-portrait`, `outer-landscape`, `inner-landscape`, `inner-portrait`, `book-landscape` (127°), `laptop-portrait` (127°). `--states a,b` selects, `--list-states` prints them.
 - `--states fold-cycle` is the continuity test: each screen is launched once on the open inner display, the device is folded closed and opened again without relaunching, and all three moments are captured (`fold-open`, `fold-closed`, `fold-reopen`). Compare them: the same item or screen should survive the fold, and the split layout should return. Verified on a real app: an item open beside its list stayed open on the outer display and the split came back on reopening.
 - `--appearance light,dark` multiplies the matrix; `--arg` passes launch arguments such as `-AppleLanguages (fi)` for locales.
+- **Warm-up:** before the first state the simulator is closed on the cover display in portrait with the first screen in the foreground, so a landscape start no longer fails every cell. `--settle` is the wait after each launch (default 4 s); `--reopen-settle` (default 4 s, never below `--settle`) is the wait after the unfold of `fold-cycle`, where a chat was once captured mid-scroll.
+- **Recovery:** a refused rotation wedges the cover display, so the script does one `simctl shutdown` and `boot`, restores appearance and status bar, relaunches and retries before it records `skipped`. Each attempt is in the manifest's `recoveries` (`reason`, `state`, `recovered`, `fixed`); a pose that still refuses is not recovered again, and a run recovers at most three times.
+- **Status bar:** the run overrides it (9:41, charged, full bars; `--keep-status-bar` disables that) and clears it in a `finally`, also after errors. Verified on the Duo: the override reaches its vertical status column (time, battery ring with the charging bolt, Wi-Fi), so shots no longer show the live clock and battery.
 - Per capture it waits, checks the app is still running (relaunching a dead one), screenshots, and rejects black or wrongly sized images (retrying with a longer wait), and fails a capture identical to another screen in the same state. A state the app refuses, such as a landscape the app does not support on the outer display, is recorded as **skipped**, never as a pass.
-- Writes `raw/`, `framed/` and `manifest.json`; exits 1 on any failure. It restores light mode and the display and orientation the simulator started on. `outer-landscape` tries the opposite landscape when the first is refused.
+- `--allow-identical SCREEN[:STATE]` (repeatable) is for screens that are legitimately identical in a pose, such as an inspector that looks like the chat beside it: the capture stays `ok`, gets `"identical": "identical-ok"` and a note, and is counted in the summary. Without it the duplicate check fails the later screen.
+- **Home screen check:** with no GUI scripting, `simctl terminate` shows SpringBoard, so the script photographs the home screen once per pose and appearance (`home/`, listed in the manifest as `homeReferences`; the outer portrait one at warm-up) and rejects and relaunches a capture whose mean colour difference to it is under 2. Limit: only poses the run visits have a reference, and `fold-closed` uses the outer portrait one, so a `fold-cycle` run on its own checks fold-open and fold-closed but not a pose never visited. A liveness check (`launchctl`) still runs on every capture.
+- Writes `raw/`, `framed/`, `home/` and `manifest.json`; exits 1 on any failure. It restores light mode and the display and orientation the simulator started on. `outer-landscape` tries the opposite landscape when the first is refused.
+- **Rotation refused for good on the outer display** is recorded as `skipped` with `rotation refused by duoctl; ask the app's own scene to rotate (UIWindowScene.requestGeometryUpdate behind a DEBUG launch argument)`. HID rotation cannot force a scene the app does not allow, so the route is inside the app: behind a DEBUG-only launch argument (`--screen-arg NAME='-forceLandscape'`), call `windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape))` after launch, and make the app's supported orientations include landscape on the outer display if Apple's guidance (landscape there) is to be met.
+
+## Lessons from five apps
+
+- Run long captures in the background: a tool call dies at 10 minutes, a full matrix takes longer. Redirect the output to a log and poll it.
+- Give every parallel agent its own simulator and pass its udid to duoctl (`-d`); the default only works when one Duo is booted.
+- `xcodebuild test` leaves the simulator shut down; boot it again before the next capture.
+- `xcode-select` may point at Xcode 27.0, which never adapts the app: build with `DEVELOPER_DIR=$HOME/xcode-27.1/Xcode.app/Contents/Developer`.
+- The 27.1 runtime cannot create iPad devices, so check iPad on a simulator with a 27.0 runtime, and verify each screenshot is the app and not the home screen before trusting it.
+- An app with an embedded Watch app fails simulator builds on this Mac (WatchKit unresolved): remove the Watch product from the built app and re-sign it.
+- Release worktrees need the gitignored files copied in (`Secrets.swift`, `.env.local`) and `PATH=/opt/homebrew/bin` so git-lfs is found.
+- Stage the release from a detached worktree so the rsync to the build host is small.
+- Build numbers are per platform and version train, and must exceed the global maximum across all of them.
+- Screenshot processing on the Duo type can take about 10 minutes for the last locales. Library images read `PREPARE_FOR_SUBMISSION` once uploaded; that is usable.
+- A version created by API arrives with every localization copied from the previous one and an empty What's New: fill it for every locale.
+- `asc validate` needs a single app info; while another platform's train is in review it fails with "N app infos match app", which `asc-ship.py stage` reports as "validate not run" and exits 0. Run it by hand once the Mac or tvOS train clears.
 
 ## Mock data for the shots
 
@@ -109,7 +132,7 @@ Order that worked end to end (Inventory 2.1.0, 2026-10-09): build and upload wit
 ## Staging with asc-ship.py
 
 `scripts/asc-ship.py stage --app <id> --platform IOS --version <V> --build <N> --ship <dir> --whatsnew <json> [--dry-run]` does the whole Submitting order up to `asc validate`, so a person only reviews and submits. `<dir>` holds `shots/<locale>/NN-*.png` (ten opaque RGB PNGs in the four Duo sizes), `placements/header-16x9.png` and `placements/search-3x2.png`.
-- Reuses (renaming if needed) or creates the editable version, waits for the build to be `VALID` (30 s polls, 40 min), attaches it, checks export compliance, sets What's New per locale and reads it back, uploads one locale at a time with `--replace --confirm` (pausing on the reorder-set error) and verifies ten per locale in order, `COMPLETE`, Duo sizes only, then places Header and Search and prints `asc validate` verbatim.
+- Reuses (renaming if needed) or creates the editable version, waits for the build to be `VALID` (30 s polls, 40 min), attaches it, checks export compliance, sets What's New per locale and reads it back, uploads one locale at a time with `--replace --confirm` (pausing on the reorder-set error) and verifies ten per locale in order, `COMPLETE`, Duo sizes only, then places Header and Search and prints `asc validate` verbatim. When validate fails with "N app infos match app" (another platform's train is in review) it prints `validate not run: <reason>; run it by hand after the Mac or tvOS train clears` and still exits 0; `stage` exits 2 only for real validate errors. `asc-ship.py selftest` checks both paths with a mocked asc.
 - Safe to re-run: staged locales and placements are skipped. `--dry-run` runs every `asc` call with `--read-only`. It reports age rating, copyright and declarations, never edits them.
 - It loads `ASC_*` from `~/.config/midgar/credentials.env` (without them `asc` hangs on the keychain). `submit --app <id> --platform IOS --version-id <v> --confirm` creates the review submission, adds the version and submits; without `--confirm` it prints the plan.
 

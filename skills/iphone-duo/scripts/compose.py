@@ -56,17 +56,24 @@ def fit_height(image, height):
 
 
 def shadow_for(image, blur):
-    """A soft dark silhouette of the image's alpha, for depth under a device."""
-    alpha = image.getchannel("A").point(lambda value: int(value * SHADOW_OPACITY))
-    silhouette = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    silhouette.putalpha(alpha)
-    return silhouette.filter(ImageFilter.GaussianBlur(blur))
+    """A soft dark silhouette of the image's alpha, for depth under a device.
+
+    The canvas is padded by three blur radii on every side, so the blur falls off to nothing
+    instead of being cut at the image bounds, which draws a hard rectangle under a device whose
+    frame sits close to its edge. Returns the shadow and the padding.
+    """
+    padding = round(blur * 3)
+    alpha = Image.new("L", (image.width + 2 * padding, image.height + 2 * padding), 0)
+    alpha.paste(image.getchannel("A").point(lambda value: int(value * SHADOW_OPACITY)), (padding, padding))
+    silhouette = Image.new("RGBA", alpha.size, (0, 0, 0, 0))
+    silhouette.putalpha(alpha.filter(ImageFilter.GaussianBlur(blur)))
+    return silhouette, padding
 
 
 def paste_device(canvas, device, position, blur):
     """Pastes a device with its shadow onto an RGB canvas."""
-    shadow = shadow_for(device, blur)
-    canvas.paste(shadow, (position[0], position[1] + round(blur * 0.8)), shadow)
+    shadow, padding = shadow_for(device, blur)
+    canvas.paste(shadow, (position[0] - padding, position[1] - padding + round(blur * 0.8)), shadow)
     canvas.paste(device, position, device)
 
 
