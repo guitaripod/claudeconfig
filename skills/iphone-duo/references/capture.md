@@ -46,8 +46,11 @@ Seed it in a DEBUG-only mode switched by launch variables (`SIMCTL_CHILD_*`), ne
 
 ## Reading the result
 
+`scripts/sheet.py --manifest <run>/manifest.json [--manifest ...] --out sheet.png` builds one PNG of every permutation in its device frame: rows are screens, columns are states, empty cells labelled `none`. Later manifests patch earlier ones, so a re-run of a few cells fixes a full run. Look at it first: columns and rows expose what single shots hide (a column where every title sits under the camera, a row that never changed).
+
 Every cell gets looked at. Build a contact sheet per screen so one glance covers all states (Pillow: paste each raw image scaled to a common height). Things to find, from real runs:
 
+- **Outer landscape facing the wrong way.** Closed, the camera and bar column are on the left in `landscape-flipped`, which is where Apple's frame artwork draws the camera. The other direction puts the bar on the right, so the frame's camera lands on the nav title. `capture.py` uses `landscape-flipped` for `outer-landscape` for that reason.
 - A control hidden under the camera or status column (a Done or close button at the top trailing corner).
 - Text clipped by the status column; content running under the vertical bar.
 - A column straddling the fold in `book-landscape` (a 3-column grid on a 951 pt display puts the middle column on the fold).

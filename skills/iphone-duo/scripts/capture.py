@@ -11,7 +11,7 @@ Connect slot sizes, retries black or mis-sized captures, and frames the good one
 
 States (name, hinge angle, interface orientation):
     outer-portrait   closed, portrait     -> App Store slot 1398x2034
-    outer-landscape  closed, landscape    -> App Store slot 2034x1398
+    outer-landscape  closed, landscape-flipped -> App Store slot 2034x1398 (camera and bar column on the left, as Apple's frame artwork draws it)
     inner-landscape  open, landscape      -> App Store slot 2853x2007
     inner-portrait   open, portrait       -> App Store slot 2007x2853
     book-landscape   127 degrees, landscape (vertical fold, inner display)
@@ -52,7 +52,7 @@ SLOT_SIZES = {
 
 STATES = [
     ("outer-portrait", 0, "portrait", "outer-portrait"),
-    ("outer-landscape", 0, "landscape", "outer-landscape"),
+    ("outer-landscape", 0, "landscape-flipped", "outer-landscape"),
     ("inner-landscape", 180, "landscape", "inner-landscape"),
     ("inner-portrait", 180, "portrait", "inner-portrait"),
     ("book-landscape", 127, "landscape", "inner-landscape"),
@@ -186,19 +186,22 @@ class Duo:
         expected_screen = "cover" if hinge == 0 else "inner"
         if current.get("activeScreen") != expected_screen:
             return False, "expected the %s screen, got %s" % (expected_screen, current.get("activeScreen"))
-        if not str(current.get("orientation")).startswith(orientation):
+        if str(current.get("orientation")).split("-")[0] != orientation.split("-")[0]:
             return False, "expected %s, got %s" % (orientation, current.get("orientation"))
         return True, ""
 
     def rotate(self, orientation):
         """Rotates the active display, trying the opposite landscape when the first is refused.
 
-        A display usually accepts both landscapes. The outer display's camera sits top left in
-        one of them, which is the one Apple's frame artwork expects, so the order is not cosmetic.
+        A display usually accepts both landscapes. Closed, the outer display's camera and bar
+        column sit on the left in `landscape-flipped`, which is where Apple's frame artwork draws
+        the camera; the other direction puts the bar on the right and the frame's camera over
+        the content. The order is not cosmetic.
         """
         status, output = self.duoctl("rotate", orientation)
-        if status != 0 and orientation == "landscape":
-            status, output = self.duoctl("rotate", "landscape-flipped")
+        alternate = {"landscape": "landscape-flipped", "landscape-flipped": "landscape"}.get(orientation)
+        if status != 0 and alternate:
+            status, output = self.duoctl("rotate", alternate)
         return status, output
 
     def set_appearance(self, appearance):
