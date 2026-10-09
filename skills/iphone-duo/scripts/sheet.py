@@ -17,7 +17,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 STATE_ORDER = ["outer-portrait", "outer-landscape", "inner-landscape", "inner-portrait",
-               "book-landscape", "laptop-portrait"]
+               "book-landscape", "laptop-portrait", "fold-open", "fold-closed", "fold-reopen"]
 FONT_CANDIDATES = ["/System/Library/Fonts/Helvetica.ttc", "/System/Library/Fonts/SFNS.ttf",
                    "/Library/Fonts/Arial.ttf"]
 BACKGROUND = (28, 28, 30)

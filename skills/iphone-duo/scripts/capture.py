@@ -17,6 +17,11 @@ States (name, hinge angle, interface orientation):
     book-landscape   127 degrees, landscape (vertical fold, inner display)
     laptop-portrait  127 degrees, portrait  (horizontal fold, inner display)
 
+Continuity: `--states fold-cycle` (explicit, never in the default set) launches each screen once on
+the open inner display, folds the device closed, then opens it again without relaunching, and
+captures all three, so state carried across the fold (the open item, scroll position, a sheet) can
+be compared: fold-open, fold-closed, fold-reopen.
+
 Writes DIR/raw/, DIR/framed/ and DIR/manifest.json, and exits 1 if any capture failed. A state
 the app refuses (an orientation it does not support on the outer display) is recorded as
 skipped, never as a pass.
@@ -57,6 +62,12 @@ STATES = [
     ("inner-portrait", 180, "portrait", "inner-portrait"),
     ("book-landscape", 127, "landscape", "inner-landscape"),
     ("laptop-portrait", 127, "portrait", "inner-portrait"),
+]
+
+FOLD_CYCLE = [
+    ("fold-open", 180, "landscape", "inner-landscape"),
+    ("fold-closed", 0, "portrait", "outer-portrait"),
+    ("fold-reopen", 180, "landscape", "inner-landscape"),
 ]
 
 ATTEMPTS = 4
@@ -291,6 +302,28 @@ def coverage(records, spec_path):
     return unmet
 
 
+def run_fold_cycle(duo, args, screen, environment, raw_dir, records, tag):
+    """Launches a screen on the open inner display, then folds closed and open again, capturing each."""
+    posed, note = duo.set_pose(180, "landscape")
+    launched = False
+    if posed:
+        launched, output = duo.launch(environment, args.arg)
+        note = "" if launched else "launch failed: " + output[-120:]
+    for name, hinge, orientation, slot in FOLD_CYCLE:
+        raw = os.path.join(raw_dir, "%s__%s.png" % (screen, name))
+        record = {"screen": screen, "state": name, "appearance": "light", "slot": slot, "raw": raw,
+                  "status": "skipped", "note": note, "size": None, "device": None, "framed": None}
+        if launched:
+            stepped, note = duo.set_pose(hinge, orientation)
+            if stepped:
+                ok, size, note = duo.capture(raw, slot, lambda: duo.launch(environment, args.arg))
+                record.update(status="ok" if ok else "failed", note=note, size=size)
+            else:
+                record.update(note=note)
+        records.append(record)
+        print("%-8s %-22s %-16s %s %s" % (record["status"].upper(), screen, name, record["size"] or "", record["note"]))
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Capture an app on every iPhone Duo state.")
     parser.add_argument("--udid", help="Duo simulator UDID (default: the only booted iPhone Duo)")
@@ -331,7 +364,8 @@ def main():
         sys.exit("capture.py: duoctl is not on PATH; see references/capture.md to install it")
 
     udid = resolve_udid(args.udid)
-    wanted = [name for name in args.states.split(",") if name] or [state[0] for state in STATES]
+    requested = [name for name in args.states.split(",") if name]
+    wanted = [name for name in requested if name != "fold-cycle"] or ([] if "fold-cycle" in requested else [state[0] for state in STATES])
     unknown = set(wanted) - set(state[0] for state in STATES)
     if unknown:
         sys.exit("capture.py: unknown states %s" % ", ".join(sorted(unknown)))
@@ -371,6 +405,10 @@ def main():
                 records.append(record)
                 print("%-8s %-22s %-16s %s %s" % (record["status"].upper(), screen, name,
                                                   record["size"] or "", record["note"]))
+
+    if "fold-cycle" in requested:
+        for screen, environment in screens:
+            run_fold_cycle(duo, args, screen, environment, raw_dir, records, len(appearances) > 1)
 
     duo.duoctl("close" if initial.get("activeScreen") == "cover" else "open")
     duo.duoctl("rotate", initial.get("orientation") or "portrait")
