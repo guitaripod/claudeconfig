@@ -106,6 +106,13 @@ Order that worked end to end (Inventory 2.1.0, 2026-10-09): build and upload wit
 - **Fan-out screenshot uploads can stop mid-run** with "Can't Add/Remove Relationship when reorder Set". Do not trust the exit text: list every locale (`asc screenshots list --version-id <v> --locale <l>`), check ten per locale, in order, no duplicates, all four sizes and `COMPLETE`. `--resume` once produced a duplicate and a wrong order; the reliable repair is one locale at a time with `--replace --confirm`, retrying after a pause.
 - **Capture per locale with `--only`** (screen and state pairs) and `--arg=-AppleLanguages --arg="(<lang>)"`: ten captures take about a minute and a half per locale.
 
+## Staging with asc-ship.py
+
+`scripts/asc-ship.py stage --app <id> --platform IOS --version <V> --build <N> --ship <dir> --whatsnew <json> [--dry-run]` does the whole Submitting order up to `asc validate`, so a person only reviews and submits. `<dir>` holds `shots/<locale>/NN-*.png` (ten opaque RGB PNGs in the four Duo sizes), `placements/header-16x9.png` and `placements/search-3x2.png`.
+- Reuses (renaming if needed) or creates the editable version, waits for the build to be `VALID` (30 s polls, 40 min), attaches it, checks export compliance, sets What's New per locale and reads it back, uploads one locale at a time with `--replace --confirm` (pausing on the reorder-set error) and verifies ten per locale in order, `COMPLETE`, Duo sizes only, then places Header and Search and prints `asc validate` verbatim.
+- Safe to re-run: staged locales and placements are skipped. `--dry-run` runs every `asc` call with `--read-only`. It reports age rating, copyright and declarations, never edits them.
+- It loads `ASC_*` from `~/.config/midgar/credentials.env` (without them `asc` hangs on the keychain). `submit --app <id> --platform IOS --version-id <v> --confirm` creates the review submission, adds the version and submits; without `--confirm` it prints the plan.
+
 ## Simulator quirks
 
 Simulator screenshots carry an **alpha channel**, and App Store Connect rejects them ("image has an alpha channel or transparency"). `capture.py` rewrites every capture as opaque RGB; upload the raw captures, not the framed images (framed images have other dimensions and are for review and the Header and Search compositions). 
