@@ -60,29 +60,36 @@ Split View halves, Picture in Picture, multiple windows, the software keyboard (
 
 ## App Store Connect
 
-Apple's [screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications) define four Duo slots, each up to ten screenshots, per localization:
+Needs `asc` 5.12 or later (Duo support landed in 5.12.0; `asc version`, upgrade with the installer in the `app-store` skill). Read Apple's current numbers first, never from memory: `scripts/asc-specs.py` prints them from `asc asset-library specs`. As of 2026-10-09:
 
-| Slot | Pixels |
-|---|---|
-| Outer, portrait | 1398 × 2034 |
-| Outer, landscape | 2034 × 1398 |
-| Inner, portrait | 2007 × 2853 |
-| Inner, landscape | 2853 × 2007 |
+| Placement | Group | Max | Accepts |
+|---|---|---|---|
+| Duo screenshots (`APP_SCREENSHOT`, display type `APP_IPHONE_DUO`) | `IPHONE_DUO_PROFILE` | 10 | 2034 × 1398, 1398 × 2034, 2853 × 2007, 2007 × 2853; PNG or JPEG; no alpha |
+| Duo previews (`APP_PREVIEW`) | `IPHONE_DUO_PROFILE` | 3 | video 1920 × 886 or 886 × 1920, 23 fps, 15 to 30 s, **audio required** |
+| Product page **Header** (`PRODUCT_PAGE_HEADER_ASSET`) | `DEFAULT_PROFILE` | 1 | image 5244 × 2950 PNG (16:9, universal) or 3840 × 1646 PNG (21:9); or video 3840 × 1646, 5 to 30 s |
+| **Search Results** (`APP_STORE_SEARCH_RESULTS_ASSET`) | `DEFAULT_PROFILE` | 1 | image 5244 × 2950 PNG (universal) or 3:2 from 1920 × 1280 to 3840 × 2560, PNG or JPEG; or video 3:2, 5 to 30 s |
 
-Optional today; required for submissions built with the iOS 27.1 SDK or later from April 2027. Apple's news of 2026-10-05 says apps optimised for Duo can be submitted now. The slots are by display and orientation only, so there is no separate slot per pose: tell the pose story inside them (flat, book and laptop shots in the inner slots, the bar-side layout in the outer ones). Resizing existing portrait shots does not meet the spec; capture at the exact sizes, which `capture.py` enforces.
+Header and Search Results are creative assets, one per localization, not Duo-specific and not screenshots: they are composed marketing images. The universal 5244 × 2950 PNG satisfies both. Duo screenshots are optional now and required for submissions built with the iOS 27.1 SDK from April 2027; optimised apps can be submitted today. The screenshot slots are by display and orientation, not pose, so tell the pose story inside them (flat, book and laptop shots in the inner slots, the bar-side layout in the outer ones). Resizing existing shots does not meet the spec.
 
-Plan the set per locale: at least one shot per slot the app supports, then spend the remaining nine on distinct poses and screens. That multiplies by locales: 4 slots × up to 10 × every locale the listing carries, so script it (`--arg -AppleLanguages`) and upload from the manifest.
+Produce and place:
 
-**Placements beyond the four sizes.** App Store Connect's UI can present more than the four public sizes, for example product page **Header** and **Search Results** art, each with outer and inner variants in both orientations. Apple's public pages reachable without a login (screenshot specifications, the Duo hub) do not list them, so do not guess sizes. Read the real list from App Store Connect (the screenshot and product page sections of the version) or from the owner, write it as a coverage spec, and run `capture.py --spec`:
+```bash
+scripts/capture.py ... --spec spec.json                    # screenshots, all four sizes enforced
+scripts/compose.py --out <dir> --hero <inner framed> --second <outer framed>   # Header and Search images
+asc asset-library images upload --library-id <id> --file <png> --category CREATIVE_ASSETS
+asc localizations placements create --localization-id <id> --image-id <id> \
+    --placement-type PRODUCT_PAGE_HEADER_ASSET            # or APP_STORE_SEARCH_RESULTS_ASSET
+asc screenshots upload ...                                 # Duo screenshots, display type APP_IPHONE_DUO
+```
+
+`asc localizations placements create` takes `--placement-group IPHONE_DUO_PROFILE` for screenshots and previews, and `DEFAULT_PROFILE` for Header and Search. It never removes an existing placement and does not submit for review. The coverage spec for `capture.py --spec` is the four Duo sizes with the count you plan per locale, so none is forgotten:
 
 ```json
-{"cells": [{"name": "header inner landscape", "size": [2853, 2007], "min": 3,
+{"cells": [{"name": "inner landscape", "size": [2853, 2007], "min": 4,
             "states": ["inner-landscape", "book-landscape"]}]}
 ```
 
-Each cell is reported `MET` or `SHORT`, and the run fails while any is short, so a placement or orientation cannot be forgotten. A placement that is a composed image (device art, text) rather than a raw screenshot is built from the framed output, not captured directly.
-
-**Upload path is unverified.** As of 2026-10-09: `asc` 5.4.0 lists no Duo display type, one forum report says the App Store Connect API's screenshot display-type enum has no Duo case yet, and secondary sources disagree on whether uploads opened on October 5. Before promising a date, check the App Store Connect web UI and `asc screenshots sizes --all`, and keep the framed output ready.
+Plan per locale: every slot the app supports gets at least one shot and up to ten, plus one Header and one Search image and, if wanted, previews. Multiply by every locale on the listing, and script it (`--arg -AppleLanguages`). Uploading changes the draft listing, so stage and review the files before placing them.
 
 ## Simulator quirks
 
