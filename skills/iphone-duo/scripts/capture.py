@@ -107,6 +107,20 @@ def image_size(path):
         return None
 
 
+def strip_alpha(path):
+    """Rewrites a capture as opaque RGB. Simulator screenshots carry an alpha channel that App Store Connect rejects."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return False
+    with Image.open(path) as image:
+        if "A" not in image.getbands():
+            return True
+        flattened = image.convert("RGB")
+    flattened.save(path, "PNG")
+    return True
+
+
 def is_black(path):
     """True when the image is effectively all black. Returns False if Pillow is unavailable."""
     try:
@@ -258,6 +272,8 @@ class Duo:
             if is_black(path):
                 note = "black capture"
                 continue
+            if not strip_alpha(path):
+                note = "Pillow missing: capture still has an alpha channel and App Store Connect will reject it"
             if not self.is_running():
                 note = "app died during capture"
                 relaunch()

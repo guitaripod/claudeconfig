@@ -68,12 +68,12 @@ Needs `asc` 5.12 or later (Duo support landed in 5.12.0; `asc version`, upgrade 
 
 | Placement | Group | Max | Accepts |
 |---|---|---|---|
-| Duo screenshots (`APP_SCREENSHOT`, display type `APP_IPHONE_DUO`) | `IPHONE_DUO_PROFILE` | 10 | 2034 × 1398, 1398 × 2034, 2853 × 2007, 2007 × 2853; PNG or JPEG; no alpha |
+| Duo screenshots (`APP_SCREENSHOT`, display type `APP_IPHONE_DUO`) | `IPHONE_DUO_PROFILE` | **10 in total** | 2034 × 1398, 1398 × 2034, 2853 × 2007, 2007 × 2853; PNG or JPEG; **no alpha** |
 | Duo previews (`APP_PREVIEW`) | `IPHONE_DUO_PROFILE` | 3 | video 1920 × 886 or 886 × 1920, 23 fps, 15 to 30 s, **audio required** |
 | Product page **Header** (`PRODUCT_PAGE_HEADER_ASSET`) | `DEFAULT_PROFILE` | 1 | image 5244 × 2950 PNG (16:9, universal) or 3840 × 1646 PNG (21:9); or video 3840 × 1646, 5 to 30 s |
 | **Search Results** (`APP_STORE_SEARCH_RESULTS_ASSET`) | `DEFAULT_PROFILE` | 1 | image 5244 × 2950 PNG (universal) or 3:2 from 1920 × 1280 to 3840 × 2560, PNG or JPEG; or video 3:2, 5 to 30 s |
 
-Header and Search Results are creative assets, one per localization, not Duo-specific and not screenshots: they are composed marketing images. The universal 5244 × 2950 PNG satisfies both. Duo screenshots are optional now and required for submissions built with the iOS 27.1 SDK from April 2027; optimised apps can be submitted today. The screenshot slots are by display and orientation, not pose, so tell the pose story inside them (flat, book and laptop shots in the inner slots, the bar-side layout in the outer ones). Resizing existing shots does not meet the spec.
+Header and Search Results are creative assets, one per localization, not Duo-specific and not screenshots: they are composed marketing images. The universal 5244 × 2950 PNG satisfies both. The Duo group is one set with a cap of 10 per localization, shared by all four sizes (the dry run accepts mixed sizes in one upload), so spend the ten deliberately; Duo screenshots are optional now and required for submissions built with the iOS 27.1 SDK from April 2027; optimised apps can be submitted today. The screenshot slots are by display and orientation, not pose, so tell the pose story inside them (flat, book and laptop shots in the inner slots, the bar-side layout in the outer ones). Resizing existing shots does not meet the spec.
 
 Produce and place:
 
@@ -83,7 +83,8 @@ scripts/compose.py --out <dir> --hero <inner framed> --second <outer framed>   #
 asc asset-library images upload --library-id <id> --file <png> --category CREATIVE_ASSETS
 asc localizations placements create --localization-id <id> --image-id <id> \
     --placement-type PRODUCT_PAGE_HEADER_ASSET            # or APP_STORE_SEARCH_RESULTS_ASSET
-asc screenshots upload ...                                 # Duo screenshots, display type APP_IPHONE_DUO
+asc screenshots upload --app <id> --version-id <v> --locale en-US --path <dir of RAW captures> \
+    --device-type IPHONE_DUO [--dry-run | --replace --confirm]   # Duo screenshots, display type APP_IPHONE_DUO
 ```
 
 `asc localizations placements create` takes `--placement-group IPHONE_DUO_PROFILE` for screenshots and previews, and `DEFAULT_PROFILE` for Header and Search. It never removes an existing placement and does not submit for review. The coverage spec for `capture.py --spec` is the four Duo sizes with the count you plan per locale, so none is forgotten:
@@ -93,9 +94,10 @@ asc screenshots upload ...                                 # Duo screenshots, di
             "states": ["inner-landscape", "book-landscape"]}]}
 ```
 
-Plan per locale: every slot the app supports gets at least one shot and up to ten, plus one Header and one Search image and, if wanted, previews. Multiply by every locale on the listing, and script it (`--arg -AppleLanguages`). Uploading changes the draft listing, so stage and review the files before placing them.
+Plan per locale (ten shots in all, numbered so they sort in show order): lead with the inner landscape list-and-detail hero, then the book pose, inner portrait and laptop poses, then the outer portrait and landscape layouts; plus one Header and one Search image and, if wanted, previews. Multiply by every locale on the listing, and script it (`--arg -AppleLanguages`). Uploading changes the draft listing, so stage and review the files before placing them.
 
 ## Simulator quirks
 
+Simulator screenshots carry an **alpha channel**, and App Store Connect rejects them ("image has an alpha channel or transparency"). `capture.py` rewrites every capture as opaque RGB; upload the raw captures, not the framed images (framed images have other dimensions and are for review and the Header and Search compositions). 
 The active display decides what coordinates mean: `duoctl state` before any manual `tap`, because the cover display and the inner display have different sizes and `simctl launch` opens the app on whichever is active. The outer display can wedge (every rotate refused, the app launching without ever getting a scene); `simctl shutdown` then `boot` clears it. 
 First launch takes several minutes; the first screenshots can be black for a few minutes after boot (the script retries). StandBy and most app extensions are unavailable; VoiceOver and the Accessibility Inspector do not work inside Device Hub. Xcode 27.1 needs macOS 26.6 or later to run.
