@@ -140,7 +140,7 @@ add_pattern 2 DEFECT "multi-line pin to view edge, not safe area" '@scan_multili
 add_pattern 2 DEFECT "SnapKit pin to view, not safe area" '@scan_snapkit_pins' "pin foreground content to view.safeAreaLayoutGuide, as in .equalTo(view.safeAreaLayoutGuide).inset(20); a plain .edges.equalToSuperview() on a background is fine"
 add_pattern 2 DEFECT "bare readableContentGuide as a horizontal pin" '@scan_readable_bare' "iOS 27.1 readable margins are zero: add the margin as a constant, or pair it with a >= pin to safeAreaLayoutGuide"
 add_pattern 2 REVIEW  "readableContentGuide pin with a margin fallback" '@scan_readable_fallback'
-add_pattern 2 DEFECT "compositional section without contentInsetsReference" '@scan_section_insets' "set section.contentInsetsReference = .safeArea (or .layoutMargins) on every list and grid section, or pin the collection view to safeAreaLayoutGuide"
+add_pattern 2 REVIEW "compositional section without contentInsetsReference" '@scan_section_insets' "rows under the vertical bar on the capture mean it is a defect (Master of Flags Settings and Tip Jar); a scroll view already inset by the bar is fine (Solar Beam grids): set section.contentInsetsReference = .safeArea (or .layoutMargins) when the capture shows it"
 add_pattern 2 DEFECT "full-width item repeated in a multi-column group" '@scan_repeating_full_width' "give the item .fractionalWidth(1.0 / CGFloat(count)) so the columns share the group width; fractionalWidth(1) per column pushes the second off screen"
 
 add_pattern 3 DEFECT "custom bar construction" '(UIToolbar|UINavigationBar|UITabBar)[[:space:]]*\([[:space:]]*\)'

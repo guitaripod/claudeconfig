@@ -44,7 +44,7 @@ The audit and every source fix work without the SDK. Only compiling Duo symbols 
 
 ### Audit and fix, in tier order
 
-`scripts/audit.sh <repo>` is grep-based, prints file:line, and exits 1 only on **DEFECT** (wrong on Duo). **REVIEW** hits need judgement and never gate. `--review` lists them, `--json` emits one object per hit, `--exclude '*Tests*'` skips paths, `--ios-only` skips the other platforms of a shared repo. A DEFECT that is genuinely fine (a deliberate `UIScreen.main` in a non-UI utility) gets excluded or rewritten, not ignored.
+`scripts/audit.sh <repo>` is grep-based, prints file:line, and exits 1 only on **DEFECT** (wrong on Duo). **REVIEW** hits need judgement and never gate. `--review` lists them, `--json` emits one object per hit, `--exclude '*Tests*'` skips paths, `--ios-only` skips the other platforms of a shared repo. A DEFECT that is genuinely fine (an orientation policy that must read the idiom, a deliberate `UIScreen.main` in a non-UI utility) gets rewritten, or marked `duo-audit:ignore <reason>` on that line, never silently skipped.
 
 **Do not reorder.** Each tier assumes the previous one is clean:
 
