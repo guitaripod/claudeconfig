@@ -352,6 +352,8 @@ def parse_arguments():
     parser.add_argument("--states", default="", help="comma list of states (default: all)")
     parser.add_argument("--appearance", default="light", help="comma list of light,dark (default: light)")
     parser.add_argument("--settle", type=float, default=4.0, help="seconds to wait after each launch")
+    parser.add_argument("--only", default="", metavar="SCREEN:STATE,...",
+                        help="capture only these screen and state pairs, grouped by state to save pose changes")
     parser.add_argument("--spec", help="JSON coverage spec of the cells App Store Connect requires")
     parser.add_argument("--list-states", action="store_true")
     return parser.parse_args()
@@ -392,6 +394,18 @@ def main():
         name, _, variables = spec.partition(":")
         screens.append((name, dict(global_env, **parse_pairs(variables))))
 
+    only = set()
+    for pair in filter(None, args.only.split(",")):
+        if ":" not in pair:
+            sys.exit("capture.py: --only takes SCREEN:STATE pairs, got %r" % pair)
+        only.add(tuple(pair.split(":", 1)))
+    if only:
+        known = set(name for name, _ in screens)
+        stray = [pair for pair in only if pair[0] not in known or pair[1] not in [state[0] for state in STATES]]
+        if stray:
+            sys.exit("capture.py: --only names an unknown screen or state: %s" % stray)
+        wanted = [state for state in wanted if any(pair[1] == state for pair in only)]
+
     duo = Duo(udid, args.bundle_id, args.settle)
     initial = duo.state() or {}
     raw_dir = os.path.join(args.out, "raw")
@@ -403,8 +417,12 @@ def main():
         for name, hinge, orientation, slot in STATES:
             if name not in wanted:
                 continue
+            if only and not any(pair[1] == name for pair in only):
+                continue
             posed, pose_note = duo.set_pose(hinge, orientation)
             for screen, environment in screens:
+                if only and (screen, name) not in only:
+                    continue
                 suffix = "" if len(appearances) == 1 else "-" + appearance
                 raw = os.path.join(raw_dir, "%s__%s%s.png" % (screen, name, suffix))
                 record = {"screen": screen, "state": name, "appearance": appearance, "slot": slot,

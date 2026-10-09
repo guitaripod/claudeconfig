@@ -96,6 +96,16 @@ asc screenshots upload --app <id> --version-id <v> --locale en-US --path <dir of
 
 Plan per locale (ten shots in all, numbered so they sort in show order): lead with the inner landscape list-and-detail hero, then the book pose, inner portrait and laptop poses, then the outer portrait and landscape layouts; plus one Header and one Search image and, if wanted, previews. Multiply by every locale on the listing, and script it (`--arg -AppleLanguages`). Uploading changes the draft listing, so stage and review the files before placing them.
 
+## Submitting
+
+Order that worked end to end (Inventory 2.1.0, 2026-10-09): build and upload with `buildvm` on a stable Xcode 27.1 host, wait for the build to be `VALID`, `asc versions attach-build`, set What's New for every locale and read it back, upload the Duo sets and place Header and Search, `asc validate`, then create the review submission, add the app version, and submit.
+
+- **`asc validate` first, fix every error.** It caught two newly required age-rating fields, `socialMedia` and `socialMediaAgeRestricted`; set them with `asc age-rating edit --app <id> --social-media false --social-media-age-restricted false` only when the app genuinely has no social features. It also flagged a copyright without a year and a locale description missing the Terms of Use link (a past rejection cause); fix those too.
+- **Placed Header and Search images are reviewed with the version.** Adding them to the submission as separate items fails with "Asset is locked by an embedded review submission"; leave them out.
+- **Submit:** `asc review submissions-create --app <id> --platform IOS`, `asc review items add --submission <id> --item-type appStoreVersions --item-id <version>`, `asc review submissions-submit --id <id> --confirm`; the version then reads `WAITING_FOR_REVIEW`.
+- **Fan-out screenshot uploads can stop mid-run** with "Can't Add/Remove Relationship when reorder Set". Do not trust the exit text: list every locale (`asc screenshots list --version-id <v> --locale <l>`), check ten per locale, in order, no duplicates, all four sizes and `COMPLETE`. `--resume` once produced a duplicate and a wrong order; the reliable repair is one locale at a time with `--replace --confirm`, retrying after a pause.
+- **Capture per locale with `--only`** (screen and state pairs) and `--arg=-AppleLanguages --arg="(<lang>)"`: ten captures take about a minute and a half per locale.
+
 ## Simulator quirks
 
 Simulator screenshots carry an **alpha channel**, and App Store Connect rejects them ("image has an alpha channel or transparency"). `capture.py` rewrites every capture as opaque RGB; upload the raw captures, not the framed images (framed images have other dimensions and are for review and the Header and Search compositions). 
