@@ -27,6 +27,7 @@ Everything here applies to every session on every machine. Machine-specific rule
 
 ## iOS apps
 - Run on my iPhone Air (devicectl name "iPhone Air", id `0A19DF7B-F393-5AA6-AD32-F997CC562974`), never a simulator or the iPhone XS unless I say so.
+- Store and marketing screenshots: frame EVERY device type (iPhone, iPhone Duo, iPad, Mac, Watch) with the `frames` CLI (`frames-cli` skill: `frames doctor` first, `frames --json info` to see the match), never a hand-drawn bezel or rounded rectangle; composition scripts call `frames` for the bezel and only add background and captions.
 - Every mobile app carries a file-based logger (`AppLogger` + `LogFileWriter`); add it to any app that lacks one. Logger pattern, signing, xtool-on-Linux and Sign in with Apple debugging: `ios-dev` skill. App Store Connect, releases and revenue: `app-store` skill.
 
 ## Web
