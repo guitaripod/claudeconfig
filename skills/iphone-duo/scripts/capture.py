@@ -158,6 +158,92 @@ def is_black(path):
         small = image.convert("L").resize((64, 64))
         return ImageStat.Stat(small).mean[0] < 2.0
 
+MINIMUM_SDK = (27, 1)
+RAIL_MINIMUM_SHARE = 0.05
+
+
+def app_sdk(udid, bundle_id):
+    """The iOS SDK version the installed app was linked against, or None when it cannot be read.
+
+    Behaviour on Duo is stamped by the linked SDK: an app linked against 27.0 or earlier never adapts and
+    gets a phone-sized window beside a black rail. Debug builds keep the code in `<name>.debug.dylib`,
+    so every Mach-O in the bundle's main directory is read and the highest stamp wins.
+    """
+    status, output = run(["xcrun", "simctl", "get_app_container", udid, bundle_id, "app"])
+    if status != 0:
+        return None
+    bundle = output.strip().splitlines()[-1]
+    try:
+        import plistlib
+        with open(os.path.join(bundle, "Info.plist"), "rb") as handle:
+            executable = plistlib.load(handle).get("CFBundleExecutable")
+    except (OSError, ValueError):
+        return None
+    versions = []
+    for name in (executable, "%s.debug.dylib" % executable):
+        path = os.path.join(bundle, name or "")
+        if not os.path.exists(path):
+            continue
+        status, text = run(["xcrun", "vtool", "-show-build", path])
+        match = re.search(r"\bsdk (\d+)\.(\d+)", text) if status == 0 else None
+        if match:
+            versions.append((int(match.group(1)), int(match.group(2))))
+    return max(versions) if versions else None
+
+
+def require_current_sdk(udid, bundle_id, allow_legacy):
+    """Exits when the installed app was linked against an SDK older than 27.1, which cannot adapt."""
+    version = app_sdk(udid, bundle_id)
+    if version is None:
+        sys.exit("capture.py: cannot read the SDK of %s on %s; install the app on that simulator first "
+                 "(xcrun simctl install) or pass --allow-legacy-sdk" % (bundle_id, udid))
+    if version < MINIMUM_SDK and not allow_legacy:
+        sys.exit("capture.py: %s is linked against SDK %d.%d. Only an app linked against iOS 27.1 or later adapts "
+                 "to iPhone Duo; an older one is shown as a phone-sized window beside a black rail, so every capture "
+                 "would be wrong. Build with Xcode 27.1 (DEVELOPER_DIR=<Xcode 27.1>/Contents/Developer xcodebuild "
+                 "-destination 'platform=iOS Simulator,id=%s', no -sdk flag), check `xcrun vtool -show-build` reads "
+                 "sdk 27.1, reinstall, and run again. See SKILL.md, \"SDK first\"." % (bundle_id, version[0], version[1], udid))
+    return version
+
+
+def legacy_rail(path):
+    """Describes a solid black band along an edge of a capture that is otherwise lit, or returns None.
+
+    That band is the rail an app not linked against 27.1 is shown beside. A dark-themed app is not
+    flagged, since its middle is as dark as the band. Returns None when Pillow is unavailable.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    with Image.open(path) as image:
+        gray = image.convert("L").resize((256, 256))
+    pixels = list(gray.getdata())
+    rows = [pixels[y * 256:(y + 1) * 256] for y in range(256)]
+    centre = [value for row in rows[64:192] for value in row[64:192]]
+    if sum(centre) / len(centre) < 40:
+        return None
+    side_rows = rows[51:205]
+    columns = lambda x: [row[x] for row in side_rows]
+    dark = lambda values: sum(1 for value in values if value < 10) / len(values) > 0.97
+    for edge, order in (("trailing", range(255, -1, -1)), ("leading", range(256))):
+        width = 0
+        for x in order:
+            if not dark(columns(x)):
+                break
+            width += 1
+        if width / 256 >= RAIL_MINIMUM_SHARE:
+            return "%s black rail, %d%% of the width" % (edge, round(100 * width / 256))
+    for edge, order in (("top", range(256)), ("bottom", range(255, -1, -1))):
+        height = 0
+        for y in order:
+            if not dark(rows[y][51:205]):
+                break
+            height += 1
+        if height / 256 >= RAIL_MINIMUM_SHARE:
+            return "%s black rail, %d%% of the height" % (edge, round(100 * height / 256))
+    return None
+
 
 DUPLICATE_DIFFERENCE = 2.0
 
@@ -548,6 +634,10 @@ def parse_arguments():
     parser.add_argument("--only", default="", metavar="SCREEN:STATE,...",
                         help="capture only these screen and state pairs, grouped by state to save pose changes")
     parser.add_argument("--spec", help="JSON coverage spec of the cells App Store Connect requires")
+    parser.add_argument("--allow-legacy-sdk", action="store_true",
+                        help="capture an app linked against an SDK older than 27.1 (it will not adapt)")
+    parser.add_argument("--allow-black-rail", action="store_true",
+                        help="keep captures that show a black rail along an edge")
     parser.add_argument("--list-states", action="store_true")
     return parser.parse_args()
 
@@ -654,6 +744,7 @@ def main():
 
     udid = resolve_udid(args.udid)
     require_reachable(udid)
+    require_current_sdk(udid, args.bundle_id, args.allow_legacy_sdk)
     requested = [name for name in args.states.split(",") if name]
     args.fold_cycle = "fold-cycle" in requested
     wanted = [name for name in requested if name != "fold-cycle"] or ([] if args.fold_cycle else [state[0] for state in STATES])
@@ -706,6 +797,14 @@ def main():
         duo.set_appearance("light")
 
     flag_duplicates(records, allowed)
+    if not args.allow_black_rail:
+        for record in records:
+            rail = legacy_rail(record["raw"]) if record["status"] == "ok" else None
+            if rail:
+                record["status"] = "failed"
+                record["note"] = ("%s: the app is not adapting to the display (not linked against 27.1, or its window "
+                                  "is not filling the screen); --allow-black-rail keeps it" % rail)
+                print("%-8s %-22s %-16s %s" % ("FAILED", record["screen"], record["state"], record["note"]))
     framed = frame_all([r["raw"] for r in records if r["status"] == "ok"], os.path.join(args.out, "framed"))
     for record in records:
         if record["raw"] in framed:

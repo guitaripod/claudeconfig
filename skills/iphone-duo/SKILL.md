@@ -39,6 +39,8 @@ Behaviour is stamped by the linked SDK, not the deployment target. An app linked
 - `xcodebuild -showsdks` lists an iOS Simulator 27.1 SDK.
 - `xcrun vtool -show-build <binary>` reads `sdk 27.1`. A command-line build with `-sdk` but no `SDKROOT` was stamped 27.0 and silently lost the vertical bar and `toolbarVerticalEdge`.
 - The Duo simulator runtime is a separate multi-GB download (`xcodebuild -downloadPlatform iOS`).
+- **A 27.0 build looks like** a phone-sized window beside a solid black rail (about 8% of the inner display, 17% of the outer). `capture.py` refuses an app stamped below 27.1 and fails captures showing a rail (`--allow-legacy-sdk`, `--allow-black-rail` override).
+- **Host with only Xcode 27.0:** `xip --expand` the 27.1 release candidate into a spare directory and build with `DEVELOPER_DIR=<dir>/Xcode.app/Contents/Developer xcodebuild … -destination "platform=iOS Simulator,id=<duo udid>"` (no `-sdk`); `vtool -show-build` on the `.debug.dylib` must read `sdk 27.1`; reinstall on the simulator.
 
 The audit and every source fix work without the SDK. Only compiling Duo symbols and pose screenshots need it. For Apple's generic half (scene lifecycle, orientation, idiom), also run its `app-resizability` skill: `xcrun agent skills export --output-dir ~/duo-skills` (needs a running Xcode). This skill is the Duo layer on top.
 
