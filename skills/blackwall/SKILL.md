@@ -5,7 +5,7 @@ description: Benchmark a local model that llama-swap serves on the Arch box's RT
 
 # blackwall
 
-`blackwall` (source `~/Dev/python/blackwall`, public at github.com/guitaripod/blackwall; installed here with `uv tool install --editable`, so edits are live) runs a fixed suite against any llama-swap model and writes results to `~/.local/share/blackwall/bench.db`. It then rebuilds `~/.local/share/blackwall/leaderboard.html`. The published page (`scripts/publish.sh max` in the repo, then commit and push `site/`) shows the RTX PRO 6000 alone; phone runs stay in the database and in `blackwall ls --device phone`.
+`blackwall` (source `~/Dev/python/blackwall`, public at github.com/guitaripod/blackwall; installed here with `uv tool install --editable`, so edits are live) runs a fixed suite against any llama-swap model and writes results to `~/.local/share/blackwall/bench.db`. It then rebuilds `~/.local/share/blackwall/leaderboard.html`. The published page (`scripts/publish.sh max` in the repo, then commit and push `site/`) shows the RTX PRO 6000 alone; phone runs stay in the database and in `blackwall ls --device phone`. To cut a release: bump `__version__` in `blackwall/__init__.py`, add the version's section to `CHANGELOG.md`, run `scripts/publish.sh max`, commit and push, then `git tag -a X.Y.Z -m "Blackwall X.Y.Z" && git push origin X.Y.Z` (the release workflow does the rest). Tags have no `v`.
 
 ## Running
 
