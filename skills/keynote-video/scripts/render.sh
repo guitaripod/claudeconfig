@@ -7,11 +7,19 @@ shift 3
 cd "$project"
 mkdir -p out "$outdir"
 npx tsc --noEmit
+jobs=$(( $(nproc) < 8 ? $(nproc) : 8 ))
 for pair in "$@"; do
   composition="${pair%%:*}"
   name="${pair##*:}"
-  if ! npx remotion render src/index.ts "$composition" "out/silent-$name.mp4" \
-    --codec=h264 --crf=16 --pixel-format=yuv420p --muted --concurrency="$(nproc)" >"out/render-$name.log" 2>&1; then
+  rendered=0
+  for attempt in 1 2; do
+    if npx remotion render src/index.ts "$composition" "out/silent-$name.mp4" \
+      --codec=h264 --crf=16 --pixel-format=yuv420p --muted --concurrency="$jobs" >"out/render-$name.log" 2>&1; then
+      rendered=1
+      break
+    fi
+  done
+  if [ "$rendered" = 0 ]; then
     tail -15 "out/render-$name.log"
     echo "render failed: composition '$composition'" >&2
     exit 1

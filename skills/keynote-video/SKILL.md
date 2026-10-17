@@ -5,6 +5,8 @@ description: Build an Apple-keynote-style launch video for an app (dark backgrou
 
 # Keynote launch video
 
+Tailscode screenshots: `references/tailscode-masters.md` (how to reshoot current masters; tags lag the build under review).
+
 Full reference build: `~/Dev/film/tailscode-launch` (8 scenes: device swap, row of four clients, SVG diagram, square layouts). `template/` is the lean starter: open, title, one device scene with a highlight ring, end card.
 
 ## Flow
@@ -39,6 +41,8 @@ python3 $S/check-timing.py <outdir>/video.mp4 <music.wav> <cut frames...>
 ## Lessons
 
 - Static hero shots die after 3 s: add beat-timed `Callout` rings. Read boxes off a 921x2000 view of a 1320x2868 master; the component converts (x 1320/921, bezel offset 75,66 in the 1470x3000 framed PNG).
+- A row of device thumbnails reads as clip art. For "every platform together" use a layered family shot (laptop back and centre, desktop window behind top right, tablet and phone in front, staggered reveal): `FamilyShot` in the reference build.
+- Remotion fails with "Visited localhost but got no response" at 28 parallel tabs; `render.sh` caps at 8 and retries once.
 - Crossfading two devices ghosts them: fade the outgoing one in 12 frames ending on the beat, start the incoming 6 to 8 frames later.
 - SVG lines of zero height render nothing with gradients or filters in the default units: use `userSpaceOnUse` for both.
 - Contact sheets caught every real bug (clipped 1:1 row, invisible link line, cropped device). `ffmpeg fps=1/3` samples are offset about 1.2 s: use explicit `-ss` (`qa-sheet.sh`) or `remotion still` for exact frames.
