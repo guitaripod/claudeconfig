@@ -1,5 +1,5 @@
 export const FPS = 30;
-export const TOTAL = 1620;
+export const TOTAL = 900;
 export const OVERLAP = 14;
 export const BEAT_SECONDS = 0.85742;
 export const FIRST_BEAT = 0.632;
@@ -8,17 +8,13 @@ export const beatFrame = (k: number): number => Math.round((FIRST_BEAT + BEAT_SE
 
 export const local = (beats: number): number => Math.round(beats * BEAT_SECONDS * FPS);
 
-export type SceneId = 'open' | 'title' | 'lock' | 'board' | 'diff' | 'clients' | 'private' | 'end';
+export type SceneId = 'open' | 'title' | 'device' | 'end';
 
 const STARTS: [SceneId, number][] = [
   ['open', 0],
   ['title', beatFrame(4)],
-  ['lock', beatFrame(9)],
-  ['board', beatFrame(19)],
-  ['diff', beatFrame(29)],
-  ['clients', beatFrame(38)],
-  ['private', beatFrame(48)],
-  ['end', beatFrame(56)],
+  ['device', beatFrame(9)],
+  ['end', beatFrame(28)],
 ];
 
 export interface SceneSpan {

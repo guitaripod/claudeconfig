@@ -6,11 +6,16 @@ outdir="$3"
 shift 3
 cd "$project"
 mkdir -p out "$outdir"
+npx tsc --noEmit
 for pair in "$@"; do
   composition="${pair%%:*}"
   name="${pair##*:}"
-  npx remotion render src/index.ts "$composition" "out/silent-$name.mp4" \
-    --codec=h264 --crf=16 --pixel-format=yuv420p --muted --concurrency="$(nproc)" 2>&1 | tail -1
+  if ! npx remotion render src/index.ts "$composition" "out/silent-$name.mp4" \
+    --codec=h264 --crf=16 --pixel-format=yuv420p --muted --concurrency="$(nproc)" >"out/render-$name.log" 2>&1; then
+    tail -15 "out/render-$name.log"
+    echo "render failed: composition '$composition'" >&2
+    exit 1
+  fi
   ffmpeg -y -v error -i "out/silent-$name.mp4" -i "$music" -map 0:v -map 1:a \
     -c:v copy -c:a aac -b:a 192k -ar 48000 -movflags +faststart -shortest "$outdir/$name.mp4"
   echo "== $name"

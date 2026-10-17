@@ -230,19 +230,20 @@ export const Callout: React.FC<{deviceHeight: number; targets: RingTarget[]}> = 
   );
 };
 
-export const LinuxWindow: React.FC<{
+export const WindowShot: React.FC<{
+  src: string;
+  aspect: number;
   height?: number;
   width?: number;
   at?: number;
   len: number;
   fadeAt?: number;
   fadeFrames?: number;
-}> = ({height, width, at = 6, len, fadeAt, fadeFrames = 18}) => {
+}> = ({src, aspect, height, width, at = 6, len, fadeAt, fadeFrames = 18}) => {
   const frame = useCurrentFrame();
   const progress = reveal(frame, at, 38);
   const scale = 0.95 + 0.05 * progress + 0.04 * (frame / len);
   const out = fadeAt === undefined ? 1 : fadeOut(frame, fadeAt, fadeFrames);
-  const aspect = 2560 / 1440;
   const w = width ?? (height as number) * aspect;
   const h = height ?? (width as number) / aspect;
   return (
@@ -266,7 +267,7 @@ export const LinuxWindow: React.FC<{
         }}
       />
       <Img
-        src={staticFile('raw/linux-columns.png')}
+        src={staticFile(src)}
         style={{
           position: 'relative',
           width: '100%',

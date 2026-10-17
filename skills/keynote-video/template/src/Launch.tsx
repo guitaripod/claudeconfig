@@ -3,26 +3,13 @@ import {AbsoluteFill, Sequence, useCurrentFrame} from 'remotion';
 import {fadeOut, reveal} from './anim';
 import {Backdrop} from './parts';
 import {BG} from './theme';
-import {
-  BoardScene,
-  ClientsScene,
-  DiffScene,
-  EndScene,
-  LockScene,
-  OpenScene,
-  PrivateScene,
-  TitleScene,
-} from './scenes';
+import {DeviceScene, EndScene, OpenScene, TitleScene} from './scenes';
 import {OVERLAP, SPANS, SceneId} from './timing';
 
 const SCENES: Record<SceneId, React.FC<{len: number}>> = {
   open: OpenScene,
   title: TitleScene,
-  lock: LockScene,
-  board: BoardScene,
-  diff: DiffScene,
-  clients: ClientsScene,
-  private: PrivateScene,
+  device: DeviceScene,
   end: EndScene,
 };
 
