@@ -14,6 +14,7 @@
     "deny": [],
     "defaultMode": "default"
   },
+  "model": "sonnet",
   "availableModels": [
     "opus",
     "sonnet",
@@ -105,6 +106,11 @@
   "spinnerTipsEnabled": false,
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
+  "modelSettings": {
+    "claude-sonnet-5-5": {
+      "effortLevel": "xhigh"
+    }
+  },
   "showThinkingSummaries": false,
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
@@ -113,6 +119,5 @@
   "autoCompactEnabled": true,
   "switchModelsOnFlag": false,
   "fileCheckpointingEnabled": false,
-  "agentPushNotifEnabled": true,
-  "model": "sonnet"
+  "agentPushNotifEnabled": true
 }
