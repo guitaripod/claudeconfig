@@ -185,17 +185,24 @@ def main():
         return round(it, 3), round(min(float(np.argmax(seg)) / MFPS if len(seg) else d * 0.5, d), 3)
 
     def pick(pool, out_t, d, want_long, exclude=(), avoid=()):
-        lok = lambda c: (c["dur"] + MARGIN) >= d
+        def lok(c):
+            if c["srcdur"] < d + MARGIN:
+                return False
+            return (c["dur"] + MARGIN) >= d or not want_long
         free = lambda c: lu.get(c["id"], -99) <= out_t - NOREPEAT
         fresh = [c for c in pool if c["id"] not in exclude and uc.get(c["id"], 0) == 0
-                 and (not want_long or lok(c))]
+                 and lok(c)]
         if fresh:
             div = [c for c in fresh if c["src"] not in avoid]; return (div or fresh)[0]
-        cand = [c for c in pool if c["id"] not in exclude and free(c) and (not want_long or lok(c))]
+        cand = [c for c in pool if c["id"] not in exclude and free(c) and lok(c)]
         if cand:
             div = [c for c in cand if c["src"] not in avoid] or cand
             return min(div, key=lambda c: uc.get(c["id"], 0))
-        cand = [c for c in pool if lok(c)] or pool
+        cand = [c for c in pool if lok(c)]
+        if not cand:
+            raise SystemExit(
+                f"no clip can fill a {d:.2f}s cut: every source window is shorter. "
+                "Lower the preset's shot/beat length or ingest longer sources.")
         return min(cand, key=lambda c: (uc.get(c["id"], 0), lu.get(c["id"], -99)))
 
     assign, hidx, hero_srcs = [], 0, set()
@@ -220,6 +227,8 @@ def main():
         elif tag == "low":
             clip = pick(low, ot, de, True, avoid=recent)
         elif tag == "build":
+            clip = pick(mid, ot, de, False, avoid=recent)
+        elif tag == "body":
             clip = pick(mid, ot, de, False, avoid=recent)
         else:
             clip = pick(high, ot, de, False, avoid=recent)

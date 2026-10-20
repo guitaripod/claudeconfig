@@ -66,9 +66,10 @@ def main():
         pool = [c for c in clips if c["dur"] >= MARGIN + 0.1]
     if not pool:
         raise SystemExit("no usable scenes — run scenes.py first")
-    feasible = max(c["dur"] for c in pool) - MARGIN
-    target = max(min(target, hi, feasible), min(lo, feasible))
-    lo = min(lo, feasible)
+    feasible = sorted(c["dur"] - MARGIN for c in pool)
+    cap = feasible[int(len(feasible) * 0.75)] if feasible else MARGIN
+    target = max(min(target, hi, cap), min(lo, cap))
+    lo = min(lo, cap)
 
     order = pacing.get("order", "chronological")
     cuts = make_cuts(dur, target, lo, hi, choose_order(pool, order))
