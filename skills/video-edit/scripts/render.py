@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import preset
+import overlays as ovl
 from look import color_chain
 
 ROOT = os.path.abspath(sys.argv[1])
@@ -140,6 +141,18 @@ def retime_fx(s):
     return p
 
 
+def audio_filter(cfg):
+    """Silence and duck windows from project.json "audio", as volume timelines."""
+    spec = cfg.get("audio") or {}
+    parts = []
+    for a, b in spec.get("silence", []):
+        parts.append(f"volume=0:enable='between(t,{float(a):.3f},{float(b):.3f})'")
+    for a, b, db in spec.get("duck", []):
+        parts.append(f"volume={10 ** (float(db) / 20):.4f}:"
+                     f"enable='between(t,{float(a):.3f},{float(b):.3f})'")
+    return ",".join(parts)
+
+
 def vf(s):
     d, F, eff = s["dur"], s["impact"], s["effects"]; p = []
     if s.get("crop"): p.append(f"crop={s['crop']}")
@@ -149,6 +162,9 @@ def vf(s):
         p += retime_fx(s)
         p.append(f"setsar=1,fps={FPS},format=yuv420p")
         return ",".join(p)
+    sp = float(s.get("speed", 1.0))
+    if abs(sp - 1.0) > 1e-3:
+        p += [f"setpts=PTS/{sp}", f"fps={FPS}"]
     if "freezeflash" in eff:
         Fc = min(max(F, 0.35), max(d - 0.25, 0.35))
         p += [f"trim=0:{Fc:.3f},setpts=PTS-STARTPTS",
@@ -265,17 +281,30 @@ def main():
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat",
         "-safe", "0", "-i", f"{ROOT}/work/concat{tag}.txt", "-c", "copy",
         "-video_track_timescale", str(FPS * 1000), f"{ROOT}/work/video{tag}.mp4"], check=True)
+    video = f"{ROOT}/work/video{tag}.mp4"
+    ov = ovl.chain(CFG, OW, OH, f"{ROOT}/work")
+    if ov:
+        burned = f"{ROOT}/work/video{tag}_overlay.mp4"
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                            "-i", video, "-vf", ov, "-an", *enc(False),
+                            "-pix_fmt", "yuv420p", burned], capture_output=True, text=True)
+        if r.returncode != 0:
+            print(r.stderr.strip()[-400:]); return 1
+        video = burned
+        print(f"overlays burned ({len(CFG.get('overlays') or [])})")
     out = f"{ROOT}/out/edit{'_landscape' if LS else ''}{'_draft' if DRAFT else ''}.mp4"
     audio = CFG.get("audio_master") or ""
     master = f"{ROOT}/{audio}" if audio else ""
+    af = audio_filter(CFG)
+    afargs = ["-af", af] if af else []
     if master and os.path.exists(master):
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", f"{ROOT}/work/video{tag}.mp4", "-i", master,
-            "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
+            "-i", video, "-i", master,
+            "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", *afargs,
             "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart", out], check=True)
     else:
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", f"{ROOT}/work/video{tag}.mp4", "-c:v", "copy",
+            "-i", video, "-c:v", "copy",
             "-movflags", "+faststart", out], check=True)
         print("no master audio — rendering silent")
     dur = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",

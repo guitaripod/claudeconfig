@@ -34,7 +34,41 @@ def none(i, hero, primary, entry, downbeat, tag):
     return []
 
 
-PLANS = {"aggressive": aggressive, "quality": quality, "none": none}
+def product(i, hero, primary, entry, downbeat, tag):
+    """Text-beat friendly: no flashes, snaps and slides carry the cuts."""
+    if hero or entry:
+        return ["zoomsnap"]
+    if i % 4 == 0:
+        return ["slideu"]
+    return ["punch"] if i % 2 == 0 else []
+
+
+def broadcast(i, hero, primary, entry, downbeat, tag):
+    """Wipes and punch; replay speed comes from render.speed."""
+    if hero:
+        return ["whipl", "punch"]
+    if entry:
+        return ["whipr"]
+    return ["punch"] if i % 2 == 0 else ["slideu"]
+
+
+def trailer(i, hero, primary, entry, downbeat, tag):
+    """Hard transitions, no flashes; titles and silence ranges do the drama."""
+    if hero or entry:
+        return ["zoomsnap"]
+    if i % 3 == 0:
+        return ["whipl"]
+    return ["punch"]
+
+
+def slow(i, hero, primary, entry, downbeat, tag):
+    """Sparse: one move on a hero, otherwise nothing."""
+    return ["punch"] if hero else []
+
+
+PLANS = {"aggressive": aggressive, "quality": quality, "none": none,
+         "product": product, "broadcast": broadcast, "trailer": trailer,
+         "slow": slow}
 
 
 def get(name):

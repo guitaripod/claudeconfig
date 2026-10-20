@@ -30,6 +30,7 @@ FPS = CFG["fps"]
 RENDER = preset.require(P, "render")
 RETIME = RENDER["mode"] == "retime"
 SPEED = RENDER.get("speed", {})
+SPEED_CYCLE = RENDER.get("speed_cycle", {})
 PLAN = effect_plans.get(preset.require(P, "effects", "plan"))
 NOREPEAT, MARGIN = 8.0, 0.5
 
@@ -217,13 +218,21 @@ def main():
         i, tag, d, ot = c["i"], c["tag"], c["dur"], c["start"]
         nf = round(c["end"] * FPS) - round(c["start"] * FPS)
         entry = round(c["start"], 2) in drop_t; db = round(c["start"], 2) in db_set
-        speed = SPEED.get("hero" if c["hero"] else tag, 1.0) if RETIME else 1.0
+        skey = "hero" if c["hero"] else tag
+        cyc = SPEED_CYCLE.get(skey) or SPEED_CYCLE.get("*")
+        speed = (float(cyc[i % len(cyc)]) if cyc
+                 else float(SPEED.get(skey, 1.0)))
+        if not (RETIME or SPEED or SPEED_CYCLE):
+            speed = 1.0
         de = d * speed
         manual, prim = None, False
         hint = c.get("src")
+        pin = c.get("in_tc")
         hinted = [x for x in usable if x["src"] == hint] if hint else []
         if hinted:
             clip = pick(hinted, ot, de, False, avoid=recent)
+            if pin is not None:
+                manual = (float(pin), 0.5)
         elif c["hero"]:
             prim = bool(drop_t) and abs(c["start"] - min(drop_t, key=lambda x: abs(x - c["start"]))) < 0.6 and d > 1.0
             ov = OV[hidx] if hidx < len(OV) else None; hidx += 1
