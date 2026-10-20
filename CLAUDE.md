@@ -14,7 +14,7 @@ Everything here applies to every session on every machine. Machine-specific rule
 ## Git
 - Default branch is `master`, never `main`: `git init -b master`; if a host made `main`, `git branch -m main master`, push `-u`, `gh repo edit --default-branch master`, then delete `main`.
 - NEVER add Co-Authored-By or "Generated with Claude Code" to commits or PRs (enforced by `hooks/guard-bash.sh`).
-- Commit finished, verified work yourself, in the repo's message style, never bundling my unrelated in-flight changes. Pushing is mine to ask for.
+- Commit finished, verified work yourself, in the repo's message style and the imperative mood ("Fix…", "Add…", "Remove…"), never bundling my unrelated in-flight changes. Pushing is mine to ask for.
 - License: GPL-3.0 for every new repo (`gh api /licenses/gpl-3.0 -q .body > LICENSE`), never MIT unless I ask.
 
 ## Autonomy
