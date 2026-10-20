@@ -25,12 +25,12 @@ def choose_order(clips, order):
     return sorted(clips, key=lambda c: (c["src"], c["start"]))
 
 
-def make_cuts(duration, target, lo, hi, pool):
+def make_cuts(duration, target, lo, hi, pool, cap):
     cuts, t, k, last = [], 0.0, 0, None
     while t < duration - 1e-6:
         remaining = duration - t
         shot = min(target, remaining)
-        if cuts and remaining < lo:
+        if cuts and remaining < lo and cuts[-1]["dur"] + remaining <= cap:
             cuts[-1]["end"] = round(duration, 4)
             cuts[-1]["dur"] = round(cuts[-1]["end"] - cuts[-1]["start"], 4)
             break
@@ -117,7 +117,7 @@ def main():
         cap = feasible[int(len(feasible) * 0.75)] if feasible else MARGIN
         target = max(min(target, hi, cap), min(lo, cap))
         lo = min(lo, cap)
-        cuts = make_cuts(dur, target, lo, hi, choose_order(pool, order))
+        cuts = make_cuts(dur, target, lo, hi, choose_order(pool, order), cap)
     sections = [{"start": 0.0, "end": dur, "label": "body"}]
     tl = {
         "producer": "shots",

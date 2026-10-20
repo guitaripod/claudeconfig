@@ -5,7 +5,9 @@
 # corrupts files; local copies are sequential for the same reason.
 set -uo pipefail
 ROOT="${1:?usage: ingest.sh <workdir> <file|dir|youtube-id|url>...}"; shift
-mkdir -p "$ROOT/src"
+mkdir -p "$ROOT/src" "$ROOT/assets"
+
+is_img() { case "${1##*.}" in jpg|jpeg|png|webp|JPG|JPEG|PNG|WEBP) return 0;; *) return 1;; esac; }
 
 ok() {  # returns 0 if file decodes clean (few NAL/errors)
   local f="$1"; [ -f "$f" ] || return 1
@@ -39,15 +41,24 @@ for arg in "$@"; do
   if [ -d "$arg" ]; then
     while IFS= read -r f; do
       f="${f%$'\r'}"
+      if is_img "$f"; then
+        cp -n -- "$f" "$ROOT/assets/" && echo "IMG  $(basename -- "$f")"
+        continue
+      fi
       if to_mp4 "$f" && ok "$ROOT/src/$(basename -- "${f%.*}").mp4"; then
         echo "OK   $(basename -- "${f%.*}")"
       else
         echo "FAIL $f (copy/remux or decode)"
       fi
-    done < <(find "$arg" -maxdepth 2 -type f \( -iname '*.mp4' -o -iname '*.mov' -o -iname '*.mkv' -o -iname '*.webm' \) | sort)
+    done < <(find "$arg" -maxdepth 2 -type f \( -iname '*.mp4' -o -iname '*.mov' -o -iname '*.mkv' \
+      -o -iname '*.webm' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) | sort)
     continue
   fi
   if [ -f "$arg" ]; then
+    if is_img "$arg"; then
+      cp -n -- "$arg" "$ROOT/assets/" && echo "IMG  $(basename -- "$arg")"
+      continue
+    fi
     if to_mp4 "$arg" && ok "$ROOT/src/$(basename -- "${arg%.*}").mp4"; then
       echo "OK   $(basename -- "${arg%.*}")"
     else
