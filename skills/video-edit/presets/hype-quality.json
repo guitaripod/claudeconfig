@@ -16,6 +16,7 @@
     "mode": "retime",
     "rotate": true,
     "interpolate": "rife",
+    "base_zoom": 0.03,
     "speed": {"hero": 0.5, "drop": 0.65, "peak": 0.65, "build": 0.75, "low": 0.85},
     "tech": "hqdn3d=1.5:1.0:2.5:2.5,unsharp=5:5:0.9:5:5:0.35,cas=0.55,eq=contrast=1.09:saturation=1.30:gamma=0.99,vibrance=intensity=0.22,curves=master='0/0 0.12/0.08 0.5/0.53 0.9/0.95 1/1'",
     "encoder": {"cq": 17, "crf": 16, "maxrate": "90M", "bufsize": "180M"}

@@ -32,19 +32,21 @@ WORKERS = min(6, (os.cpu_count() or 4))
 _enc = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], capture_output=True, text=True).stdout
 NVENC = "h264_nvenc" in _enc
 OSW, OSH = int(round(OW * 1.06 / 2)) * 2, int(round(OH * 1.06 / 2)) * 2
+SOURCE_CROP = CFG.get("source_crop", "")
+PRE = (SOURCE_CROP + ",") if SOURCE_CROP else ""
 if ROTATE:
     FILL = (("" if LS else "transpose=1,") +
             f"scale={OW}:{OH}:force_original_aspect_ratio=increase,crop={OW}:{OH},")
 else:
     FILL = f"scale={OSW}:{OSH}:force_original_aspect_ratio=increase,crop={OW}:{OH},"
-GRADE = FILL + color_chain(CFG)
+GRADE = PRE + FILL + color_chain(CFG)
 
 
 def seg_grade(s):
     """Fill/framing is structural and always applies; only the colour varies.
     (A per-segment grade used to replace GRADE wholesale and silently drop the
     scale/crop, so any shot-level coloring broke the framing.)"""
-    return FILL + color_chain(CFG, s)
+    return PRE + FILL + color_chain(CFG, s)
 
 
 MCI = f"minterpolate=fps={FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
@@ -129,7 +131,9 @@ def slowmo(speed):
 
 def retime_fx(s):
     """Output-timeline effects for a retimed segment: drift zoom plus soft flashes."""
-    d, eff = s["dur"], s["effects"]; p = [zoom(0.03, d)]
+    d, eff = s["dur"], s["effects"]
+    z = float(RENDER.get("base_zoom", 0.0))
+    p = [zoom(z, d)] if z > 0 else []
     if "beatflash" in eff: p.append("eq=brightness='if(lt(t\\,0.04)\\,0.35\\,0)':eval=frame")
     if "dropflash" in eff:
         p.append("eq=brightness='if(lt(t\\,0.06)\\,0.6\\,if(lt(t\\,0.18)\\,0.6*(1-(t-0.06)/0.12)\\,0))':eval=frame")
@@ -155,7 +159,9 @@ def vf(s):
         tr = next((e for e in eff if e in _TRANS), None)
         if tr: p += transition(tr)
         elif "punch" in eff: p.append(zoom(0.12, d))
-        else: p.append(zoom(0.09, d))
+        else:
+            z = float(RENDER.get("base_zoom", 0.0))
+            if z > 0: p.append(zoom(z, d))
         if "beatflash" in eff:
             p.append(f"eq=brightness='if(lt(t\\,0.04)\\,{0.5 * FLASH:.3f}\\,0)':eval=frame")
         if "dropflash" in eff:

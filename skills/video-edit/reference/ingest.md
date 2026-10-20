@@ -43,3 +43,13 @@ Flags promo cards / synthetic graphics per clip AND per frame (`badframes.npz`),
 - `screen`: disables the flag entirely — a rendered interface IS the content.
 
 Tuning knobs live in `colorscan.py` (`green` promo card, `pitch` grass, detail/saturation/brightness thresholds). If a domain produces false positives, change the profile before changing numbers.
+
+## Reel sources with burned-in UI
+
+TikTok downloads carry a top bar, a bottom progress bar and sometimes burned captions. Fast cuts hide them; long holds do not. Set an optional pre-framing crop in `project.json` and the renderer applies it before the output fill:
+
+```json
+"source_crop": "crop=iw:ih*0.92:0:ih*0.04"
+```
+
+Start at 8% (4% top + 4% bottom) and widen if the progress bar survives; 12% removes the usual inset UI at the cost of composition. This is a project choice, not a preset default: cropping every source is a style decision.

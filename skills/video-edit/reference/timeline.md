@@ -45,6 +45,7 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
   "motion_floor": 0.045,             // quality floor on clip motion_max; default from preset scan.motion_floor
   "ignore_graphic": false,           // ignore colorscan's graphic flag
   "domain": "sports",                // overrides preset scan.profile
+  "source_crop": "crop=iw:ih*0.92:0:ih*0.04",  // optional pre-framing crop (reel UI)
   "flash_gain": 1.0, "rgb_shift": 7, // override preset effect intensities
   "grade": "",                       // legacy; only used where no look resolves
   "narration": {"duck_db": -8.5, "lines": [
@@ -75,6 +76,7 @@ The direction file. `preset.py` merges the project's canvas and effect intensiti
     "mode": "cuts",                         // cuts | retime
     "rotate": false,                        // 90deg full-bleed portrait
     "interpolate": "none",                  // none | rife
+    "base_zoom": 0.0,                       // slow push on every cut; 0 = none
     "speed": {"hero": 1.0},                 // retime only
     "tech": "",                             // technical look prefix
     "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}
@@ -83,7 +85,8 @@ The direction file. `preset.py` merges the project's canvas and effect intensiti
   "scan": {"profile": "sports", "motion_floor": 0.045},  // sports | generic | screen
   "gates": {"beat_offset_max": 2, "density": true, "black": true,
             "freeze": true, "exposure_max": 3, "av_drift": true},
-  "deliver": "tiktok"                       // tiktok | master
+  "deliver": "tiktok",                      // tiktok | master
+  "delivery": {"canvas": {"w": 1080, "h": 2340}, "bitrate": "18M"}
 }
 ```
 

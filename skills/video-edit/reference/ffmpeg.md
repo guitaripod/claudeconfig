@@ -14,6 +14,7 @@
 - `mode`: `cuts` (segments rendered at normal speed) or `retime` (speed map + interpolation).
 - `rotate`: `transpose=1` (90° clockwise) then scale-increase + center-crop to `out_w×out_h`. A 1920×1080 source maps 1:1 onto 1080×1920 with zero pixels lost. Companion `--landscape` render skips the transpose.
 - `interpolate`: `rife` uses `rife-ncnn-vulkan` optical flow when the binary is on PATH (`HYPE_RIFE_BIN` / `HYPE_RIFE_MODEL` override, `HYPE_NO_RIFE=1` disables); otherwise `minterpolate`. Any RIFE failure falls back per segment, so the render never breaks on a missing binary. Two RIFE processes max (VRAM).
+- `base_zoom`: a slow push on every cut, as a fraction over the shot's duration. `0` means a dead-static shot — used by `calm`, where any drift is a style choice, not a default.
 - `speed`: per-tag retime multipliers (retime mode only).
 - `encoder`: `{cq, crf, maxrate, bufsize}`; NVENC `p6` when available, libx264 `medium` otherwise.
 - `--draft` is half-res + fast preset; always draft and read the contact sheet before a full render.

@@ -9,6 +9,7 @@
     "mode": "cuts",
     "rotate": false,
     "interpolate": "none",
+    "base_zoom": 0.0,
     "encoder": {"cq": 21, "crf": 19, "maxrate": "40M", "bufsize": "120M"}
   },
   "grade": {"seed": "fixed", "base": "kodak", "tech": ""},
