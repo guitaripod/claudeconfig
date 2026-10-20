@@ -11,7 +11,7 @@ python3 $S/render.py <workdir> --draft
 python3 $S/contact_sheet.py <workdir> --draft --n 40
 ```
 
-`frames/contact.png` tiles N evenly-sampled frames of the draft. Reject: black frames, broadcast wipes, sponsor/score bumpers, menus, typography, static graphics, duplicated shots, near-empty frames, the wrong subject. If any appear, fix the pool (drop sources, tighten `colorscan` thresholds, raise the motion floor) and re-run — not the frame.
+`frames/contact.png` tiles N evenly-sampled frames of the draft. Reject: black frames, broadcast wipes, sponsor/score bumpers, menus, typography, watermarks and creator handles, static graphics, duplicated shots, near-empty frames, the wrong subject. If any appear, fix the pool (drop sources, tighten `colorscan` thresholds, raise the motion floor) and re-run — not the frame.
 
 ## Segment grid — precision review
 
