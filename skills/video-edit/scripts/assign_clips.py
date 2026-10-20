@@ -198,7 +198,7 @@ def main():
         cand = [c for c in pool if lok(c)] or pool
         return min(cand, key=lambda c: (uc.get(c["id"], 0), lu.get(c["id"], -99)))
 
-    assign, hidx = [], 0
+    assign, hidx, hero_srcs = [], 0, set()
     for c in cut:
         i, tag, d, ot = c["i"], c["tag"], c["dur"], c["start"]
         nf = round(c["end"] * FPS) - round(c["start"] * FPS)
@@ -214,7 +214,9 @@ def main():
                         "label": lab_map.get(ov["src"], ov["src"]), "crop_ov": ov.get("crop")}
                 manual = (round(ov["in_tc"], 3), round(ov.get("impact", 0.6), 3))
             else:
-                clip = pick(hero_pool, ot, de, True, exclude=hused); hused.add(clip["id"])
+                clip = pick(hero_pool, ot, de, True, exclude=hused, avoid=hero_srcs)
+                hused.add(clip["id"])
+            hero_srcs.add(clip["src"])
         elif tag == "low":
             clip = pick(low, ot, de, True, avoid=recent)
         elif tag == "build":
