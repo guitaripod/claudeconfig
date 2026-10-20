@@ -10,11 +10,14 @@ segment/clip so it can be banned via project.json "exclude_clips".
 Every frame must be real footage — no black, no wipes, no bumpers, no static filler."""
 import sys, json, subprocess, os, math, glob
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import preset
+
 ROOT = os.path.abspath(sys.argv[1])
-CFG = json.load(open(f"{ROOT}/project.json"))
+CFG, P = preset.load(ROOT)
 DRAFT = "--draft" in sys.argv
 N = int(sys.argv[sys.argv.index("--n") + 1]) if "--n" in sys.argv else 40
-ROT = "transpose=2," if CFG.get("style") == "remaster" else ""
+ROT = "transpose=2," if P["render"].get("rotate") else ""
 os.makedirs(f"{ROOT}/frames", exist_ok=True)
 
 

@@ -1,19 +1,27 @@
 #!/usr/bin/env bash
-# setup.sh <workdir> [--narration] — create the working tree + a python venv with
-# scene/audio deps. --narration also builds asr-venv (torch CPU + whisper + demucs) for
-# narrate.py voice-over edits (~2GB, opt-in). Idempotent. Prints the encoder render.py uses.
+# setup.sh <workdir> [--narration] — create the working tree and a python for the
+# pipeline at <workdir>/py. Uses the system interpreter when it already has the
+# scene/audio deps; otherwise builds a per-workdir venv. Idempotent. Prints the
+# encoder render.py will pick.
 set -euo pipefail
 ROOT="${1:?usage: setup.sh <workdir> [--narration]}"
 mkdir -p "$ROOT"/{src,seg,work,out,frames}
 
-if [ ! -x "$ROOT/.venv/bin/python" ]; then
+wrap() { printf '#!/bin/sh\nexec %s "$@"\n' "$1" > "$2"; chmod +x "$2"; }
+
+if [ -x "$ROOT/.venv/bin/python" ]; then
+  wrap "$ROOT/.venv/bin/python" "$ROOT/py"
+elif python3 -c "import scenedetect, numpy, soundfile, librosa, cv2" 2>/dev/null; then
+  wrap python3 "$ROOT/py"
+else
   python3 -m venv "$ROOT/.venv"
   "$ROOT/.venv/bin/pip" -q install --upgrade pip
   "$ROOT/.venv/bin/pip" -q install "scenedetect" opencv-python-headless numpy soundfile librosa scipy
+  wrap "$ROOT/.venv/bin/python" "$ROOT/py"
 fi
-"$ROOT/.venv/bin/python" - <<'PY'
+"$ROOT/py" - <<'PY'
 import scenedetect, numpy, soundfile, librosa, cv2
-print("venv OK: scenedetect", scenedetect.__version__, "| cv2", cv2.__version__)
+print("deps OK: scenedetect", scenedetect.__version__, "| cv2", cv2.__version__)
 PY
 
 for t in yt-dlp ffmpeg ffprobe; do command -v "$t" >/dev/null || echo "WARNING: $t not on PATH"; done
@@ -34,6 +42,8 @@ if [[ " ${*} " == *" --narration "* ]]; then
     "$V/bin/pip" -q install torch --index-url https://download.pytorch.org/whl/cpu
     "$V/bin/pip" -q install openai-whisper demucs soundfile scipy numpy
   fi
-  "$V/bin/python" -c "import whisper, demucs, soundfile, scipy; print('narration venv OK (whisper+demucs) — narrate.py ready')"
+  wrap "$V/bin/python" "$ROOT/py-narrate"
+  "$ROOT/py-narrate" -c "import whisper, demucs, soundfile, scipy; print('narration deps OK')"
 fi
 echo "workdir ready: $ROOT"
+echo "PY=$ROOT/py"

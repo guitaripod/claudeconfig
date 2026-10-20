@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """restore.py <workdir> [--segs 0,5,12 | --heroes] — SeedVR2 restoration of
-segments' source windows before the final render. Default is EVERY segment
-(production optimizes for quality, not speed); --segs/--heroes narrow it.
+segments' source windows before the final render. Opt-in only: never part of the
+default workflow (the detail is imperceptible after social re-encode). Default
+target is EVERY segment; --segs/--heroes narrow it.
 Extracts each segment's exact render input window (same fast-seek -ss, so
 pinned in_tcs stay valid), runs SeedVR2 3B fp8 on it at native resolution
 (~2.7s/frame on the RTX PRO 6000 Blackwell; needs ~10GB free VRAM, which

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """narrate.py <workdir> — compose a spoken narration track and mix it UNDER the OST,
-overwriting master.wav sample-exact (zero A/V drift). Opt-in voice-over for hype edits.
+overwriting master.wav sample-exact (zero A/V drift). Opt-in voice-over for music edits.
 
 Reads project.json["narration"]:
   {

@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""extract_audio.py <workdir> <song_path_or_url> [--style classic|remaster]
+"""extract_audio.py <workdir> <song_path_or_url> --preset <name>
    [--fps N] [--w N] [--h N] [--start 0] [--end 0] [--keep-tail] [--pitch 1.0]
 
---style picks the art direction and its canvas defaults (overridable with
---fps/--w/--h): classic = 1920x1080@30 teal-orange montage; remaster =
-1080x1920@60 full-bleed 90deg-rotated landscape with a 4K-remaster grade and
-slow-mo interpolation (the TikTok "quality edit" genre).
+The song producer's entry point: downloads/extracts the song, trims trailing
+silence, frame-aligns the timeline, writes sample-exact analysis (22.05k mono)
+and master (44.1k stereo) WAVs, and writes project.json naming the preset. The
+preset supplies the canvas and the starting grade; --fps/--w/--h override it.
 
 --pitch shifts pitch by the given ratio (e.g. 1.04 = +4%) with rubberband, tempo
 unchanged — use to dodge platform Content-ID matching. Applied before analysis so
 the beat grid and both WAVs stay sample-consistent.
 
-Downloads/extracts the song, trims trailing silence, frame-aligns the timeline, and
-writes sample-exact analysis (22.05k mono) + master (44.1k stereo) WAVs. Emits
-project.json — the single config every other script reads. Run with the venv python.
+Run with the venv python (needs librosa/soundfile).
 """
 import sys, os, json, subprocess, argparse, random
 import numpy as np
@@ -21,25 +19,32 @@ import soundfile as sf
 import librosa
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import preset
 from look import LOOKS, CHARACTER
 
 SR_A = 22050
-
-# The remaster style keeps a signature technical base (denoise/sharpen/HDR-ish pop);
-# its colour still resolves through look.py like every other style.
-REMASTER_BASE = ("hqdn3d=1.5:1.0:2.5:2.5,unsharp=5:5:0.9:5:5:0.35,cas=0.55,"
-                 "eq=contrast=1.09:saturation=1.30:gamma=0.99,vibrance=intensity=0.22,"
-                 "curves=master='0/0 0.12/0.08 0.5/0.53 0.9/0.95 1/1'")
-CANVAS = {"classic": (1920, 1080, 30), "remaster": (1080, 1920, 60)}
+VIDEO_EXT = (".mp4", ".mkv", ".mov", ".webm", ".avi", ".m4v", ".ts")
 
 
 def sh(a): return subprocess.run(a, capture_output=True, text=True)
 
 
+def audio_source(path, root):
+    """librosa cannot decode most video containers; extract the audio first."""
+    if not path.lower().endswith(VIDEO_EXT):
+        return path
+    out = f"{root}/song_from_video.wav"
+    r = sh(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", path,
+            "-vn", "-c:a", "pcm_s24le", out])
+    if r.returncode != 0:
+        sys.exit("could not extract audio from the video:\n" + r.stderr[-500:])
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("root"); ap.add_argument("song")
-    ap.add_argument("--style", choices=("classic", "remaster"), default="classic")
+    ap.add_argument("--preset", required=True)
     ap.add_argument("--fps", type=int, default=None)
     ap.add_argument("--w", type=int, default=None); ap.add_argument("--h", type=int, default=None)
     ap.add_argument("--start", type=float, default=0.0)
@@ -49,8 +54,11 @@ def main():
                     help="pitch ratio, tempo preserved (1.04 = +4%%; anti-Content-ID)")
     a = ap.parse_args()
     root = os.path.abspath(a.root)
-    cw, ch, cfps = CANVAS[a.style]
-    a.w = a.w or cw; a.h = a.h or ch; a.fps = a.fps or cfps
+    ppath = os.path.join(preset.PRESETS, f"{a.preset}.json")
+    if not os.path.exists(ppath):
+        raise preset.PresetError(f'unknown preset "{a.preset}".\n' + preset.list_text())
+    p = preset.read(ppath)
+    a.w = a.w or p["canvas"]["w"]; a.h = a.h or p["canvas"]["h"]; a.fps = a.fps or p["canvas"]["fps"]
 
     song = a.song
     if song.startswith("http"):
@@ -61,6 +69,7 @@ def main():
         song = subprocess.run(["bash", "-c", f"ls {root}/song_src.*"],
                               capture_output=True, text=True).stdout.split("\n")[0].strip()
     assert os.path.exists(song), f"song not found: {song}"
+    song = audio_source(song, root)
 
     if a.pitch != 1.0:
         pitched = f"{root}/song_pitched.wav"
@@ -105,31 +114,34 @@ def main():
     cfg = {}
     if os.path.exists(f"{root}/project.json"):
         cfg = json.load(open(f"{root}/project.json"))
-    # No house grade. A fresh workdir gets a RANDOM starting look so no two edits
-    # open on the same filter; an authored look (look.py set/shuffle) always wins.
+    # A preset pins its grade or asks for a roll. A fresh workdir under a
+    # "random" preset opens on a different look each time; an authored look
+    # (look.py set/shuffle) always wins.
     look = cfg.get("look")
     if not look:
-        look = {"base": random.choice([k for k in LOOKS if k != "neutral"]),
-                "sections": {}, "sources": {}, "segments": {}, "drift": 0.0}
-    look["tech"] = REMASTER_BASE if a.style == "remaster" else look.get("tech", "")
-    grade = cfg.get("grade", "")
+        spec = p["grade"]
+        base = spec.get("base") or random.choice([k for k in LOOKS if k != "neutral"])
+        look = {"base": base, "sections": {}, "sources": {}, "segments": {}, "drift": 0.0}
+    if p["render"].get("tech"):
+        look["tech"] = p["render"]["tech"]
     cfg.update({
         "root": root, "fps": a.fps, "dur": round(float(dur), 4),
         "total_frames": int(round(dur * a.fps)),
         "out_w": a.w, "out_h": a.h, "sr_analysis": SR_A,
         "audio_analysis": "song_22k_mono.wav", "audio_master": "master.wav",
-        "style": a.style,
-        "grade": grade,
+        "preset": p["name"],
+        "grade": cfg.get("grade", ""),
         "look": look,
         "hero_overrides": cfg.get("hero_overrides", []),
         "pitch": a.pitch,
     })
+    cfg.pop("style", None)
     json.dump(cfg, open(f"{root}/project.json", "w"), indent=1)
-    print(f"style={a.style} dur={dur:.3f}s ({cfg['total_frames']} frames @ {a.fps}fps "
+    print(f"preset={p['name']} dur={dur:.3f}s ({cfg['total_frames']} frames @ {a.fps}fps "
           f"{a.w}x{a.h}) analysis={na} master={nm} samples → project.json")
     b = look.get("base")
     print(f"look={b} — {CHARACTER.get(b, 'custom chain')}\n"
-          f"  This is a random roll, not a house style. See the options:\n"
+          f"  Change it after seeing this edit's footage:\n"
           f"    python3 $S/look.py {root} preview      # every look on one real frame\n"
           f"    python3 $S/look.py {root} set base=<name> peak=<name> drift=0.3")
 

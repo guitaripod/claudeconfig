@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
-"""build_spine.py <workdir> — Phase 0: audio-driven editing spine. Deterministic.
-Reads project.json; writes spine.json (beats, downbeats, energy curve, sections,
-cutlist with hero slots). Run with the venv python (needs librosa/scipy)."""
-import sys, json
+"""beat_spine.py <workdir> — song producer: audio-driven timeline. Deterministic.
+Reads project.json + the preset; writes timeline.json (beats, downbeats, energy
+curve, sections, cutlist with hero slots). Run with the venv python (librosa)."""
+import sys, os
 import numpy as np
 import librosa
 import scipy.stats
 from scipy.ndimage import gaussian_filter1d
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import preset
+import timeline
+
 ROOT = sys.argv[1]
-CFG = json.load(open(f"{ROOT}/project.json"))
-STYLE = CFG.get("style", "classic")
+CFG, P = preset.load(ROOT)
+if P.get("timeline") != "beat":
+    raise SystemExit(f'preset "{P["name"]}" declares timeline "{P.get("timeline")}" — '
+                     "this producer is for beat-driven edits; run scene_timeline.py instead")
+PACING = preset.require(P, "pacing")
 SR, HOP, N_FFT = CFG["sr_analysis"], 512, 2048
 DUR, FPS_OUT = CFG["dur"], CFG["fps"]
 FPS = SR / HOP
-TEMPO_BAND = (70.0, 200.0)                 # wide; octave-corrected below
 WAV = f"{ROOT}/{CFG['audio_analysis']}"
 
 
@@ -143,36 +149,38 @@ def main():
             t = max(c, key=lambda x: x[1])[0]
             if all(abs(t - h) > 6 for h in heroes): heroes.append(t)
     heroes = sorted(set(heroes))
-    hb_prim, hb_rest = (4, 3) if STYLE == "remaster" else (3, 2)
+    hb_prim, hb_rest = PACING["hero_beats"]
     hero_dur = {round(h, 5): (hb_prim * period if abs(h - prim) < 1e-3 else hb_rest * period)
                 for h in heroes}
 
-    # cutlist: tile 0..DUR on the beat grid; cadence tracks energy
+    # cutlist: tile 0..DUR on the beat grid; cadence comes from the preset
+    steps = preset.require(P, "pacing", "steps")
+    first_min = float(PACING.get("first_cut_min_s", 0.0))
+    hbw = float(PACING.get("halfbeat_window", 0.0))
     half = np.unique(np.round(np.concatenate([beats, (beats[:-1] + beats[1:]) / 2]), 5))
     def nb(t, step):
         grid = half if step < 1 else beats; tgt = t + step * period
         j = min(np.searchsorted(grid, t + period * 0.25), len(grid) - 1)
         while j < len(grid) - 1 and grid[j] < tgt - 1e-6: j += 1
         return float(min(grid[j], DUR))
-    def hwin(t): return any(abs(t - h) <= 1.5 * period for h in heroes)
+    def hwin(t): return any(abs(t - h) <= hbw * period for h in heroes)
+    def step_at(lb, fr, t):
+        v = steps[lb]
+        if lb == "build" and isinstance(v, list):
+            return v[min(int(fr * len(v)), len(v) - 1)]
+        if lb == "drop" and isinstance(v, list):
+            bi = int(round((t - beats[0]) / period))
+            return v[bi % len(v)]
+        return v
     B = [0.0, float(beats[0]) if beats[0] > 1e-6 else nb(0.0, 8)]
     t, g, first = B[1], 0, True
-    while t < DUR - 1e-6 and g < 8000:
+    while t < DUR - 1e-6 and g < int(PACING.get("max_cuts", 8000)):
         g += 1; lb, fr = sfrac(t)
-        if STYLE == "remaster":
-            if lb == "low": step = 8
-            elif lb == "build": step = {0: 4, 1: 4, 2: 2}[min(int(fr * 3), 2)]
-            elif lb == "peak": step = 2
-            else:
-                bi = int(round((t - beats[0]) / period)); step = 4 if bi % 4 == 3 else 2
-            if first: step = max(step, int(np.ceil(2.2 / period)))
-        elif lb == "low": step = 8
-        elif lb == "build": step = {0: 4, 1: 2, 2: 1}[min(int(fr * 3), 2)]
-        elif lb == "peak": step = 2
-        else:
-            if hwin(t) and not any(abs(t - h) < 1e-3 for h in heroes): step = 0.5
-            else:
-                bi = int(round((t - beats[0]) / period)); step = 2 if bi % 4 == 3 else 1
+        step = step_at(lb, fr, t)
+        if lb == "drop" and hbw and hwin(t) and not any(abs(t - h) < 1e-3 for h in heroes):
+            step = 0.5
+        if first and first_min:
+            step = max(step, int(np.ceil(first_min / period)))
         first = False
         x = nb(t, step)
         if x <= t + 1e-6: x = nb(t, max(step, 1) + 1)
@@ -184,7 +192,7 @@ def main():
     B = np.unique(np.clip(np.round(np.array(B), 5), 0, DUR))
     m = [B[0]]
     for b in B[1:]:
-        if b - m[-1] < 0.15: m[-1] = b
+        if b - m[-1] < float(PACING.get("min_cut_s", 0.15)): m[-1] = b
         else: m.append(b)
     m[-1] = DUR; B = np.array(m); B[0] = 0.0
     cut = [{"i": k, "start": round(float(B[k]), 4), "end": round(float(B[k + 1]), 4),
@@ -193,24 +201,22 @@ def main():
     for h in heroes:                                  # flag the nearest cut to each hero time —
         j = min(range(len(cut)), key=lambda i: abs(cut[i]["start"] - h))  # robust to float-round
         cut[j]["hero"] = True                         # drift that silently dropped the freeze slot
-    for k in range(len(cut) - 1):
-        assert abs(cut[k]["end"] - cut[k + 1]["start"]) < 1e-6 and cut[k]["dur"] > 0
-    assert abs((cut[-1]["end"] - cut[0]["start"]) - DUR) < 1e-3
-
     d = np.diff(beats); cv = float(np.std(d) / np.mean(d)) if len(d) else 0.0
     ec = {"hz": 20.0, "t": [round(float(x), 3) for x in np.arange(0, DUR, 0.05)],
           "e": [round(float(np.interp(x, tf, E)), 4) for x in np.arange(0, DUR, 0.05)]}
-    spine = {"meta": {"duration": DUR, "fps": FPS_OUT, "sr": SR,
-                      "qc": {"beat_cv": round(cv, 4), "beat_count": len(beats),
-                             "drop_confidence": conf, "n_cuts": len(cut),
-                             "hero_times": [round(h, 3) for h in heroes]}},
-             "bpm": round(BPM, 3), "beat_period": round(period, 4),
-             "beats": [round(float(b), 4) for b in beats],
-             "downbeats": [round(float(b), 4) for b in downbeats],
-             "onsets": [round(float(o), 4) for o in onsets],
-             "sections": [{"start": round(s, 4), "end": round(e, 4), "label": l} for s, e, l in sec],
-             "drops": drops, "energy_curve": ec, "cutlist": cut}
-    json.dump(spine, open(f"{ROOT}/spine.json", "w"), indent=1)
+    tl = {"producer": "beat", "preset": P["name"],
+          "meta": {"duration": DUR, "fps": FPS_OUT, "sr": SR,
+                   "qc": {"beat_cv": round(cv, 4), "beat_count": len(beats),
+                          "drop_confidence": conf, "n_cuts": len(cut),
+                          "hero_times": [round(h, 3) for h in heroes]}},
+          "bpm": round(BPM, 3), "beat_period": round(period, 4),
+          "beats": [round(float(b), 4) for b in beats],
+          "downbeats": [round(float(b), 4) for b in downbeats],
+          "onsets": [round(float(o), 4) for o in onsets],
+          "sections": [{"start": round(s, 4), "end": round(e, 4), "label": l} for s, e, l in sec],
+          "drops": drops, "energy_curve": ec, "cutlist": cut}
+    timeline.check(tl)
+    timeline.write(ROOT, tl)
     dens = {}
     for c in cut: dens.setdefault(c["tag"], []).append(c["dur"])
     print(f"BPM={BPM:.1f} cv={cv:.3f} beats={len(beats)} cuts={len(cut)} "

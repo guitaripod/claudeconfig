@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
-"""colorscan.py <workdir> — Phase 1b: flag promo cards + synthetic graphics.
+"""colorscan.py <workdir> — Phase 2: flag promo cards + synthetic graphics.
 Adds green/graphic flags to scenes.json and writes badframes.npz (per-frame
 graphic mask) so the assigner can steer in-points off wipes/bumpers/score-numbers.
-This tuning is for sports broadcast footage; adjust thresholds for other domains."""
+
+The detector is a domain profile, not a universal rule: "sports" keys off pitch
+and broadcast promo cards, "generic" only rejects flat bright cards, "screen"
+keeps rendered interfaces (they are the content) and disables the flag. Override
+with project.json "domain", otherwise the preset's "scan.profile" applies.
+"""
 import sys, json, subprocess, glob, os
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import preset
+
 ROOT = sys.argv[1]
+CFG, P = preset.load(ROOT)
+PROFILE = CFG.get("domain") or preset.require(P, "scan", "profile")
+if PROFILE not in ("sports", "generic", "screen"):
+    raise SystemExit(f'unknown scan profile "{PROFILE}"; available: sports, generic, screen')
 CW, CH, CFPS = 64, 36, 5.0
 
 
@@ -15,7 +27,7 @@ def features(path):
         f"fps={CFPS},scale={CW}:{CH}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
         capture_output=True).stdout
     a = np.frombuffer(raw, np.uint8); nf = len(a) // (CW * CH * 3)
-    if nf < 1: return (np.zeros(1),) * 5
+    if nf < 1: return (np.zeros(1),) * 6
     a = a[:nf * CW * CH * 3].reshape(nf, CH, CW, 3).astype(np.float32)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]; mx, mn = a.max(3), a.min(3)
     gray = 0.299 * r + 0.587 * g + 0.114 * b
@@ -27,31 +39,40 @@ def features(path):
     return greencard, pitch, sat, detail, bright, white
 
 
+def bad_frames(profile, gc, pit, sat, det, bri, wht):
+    if profile == "screen":
+        return np.zeros(len(gc), dtype=bool)
+    if profile == "sports":
+        # little pitch AND (flat OR oversaturated OR big bright logo/number),
+        # a green promo card, or a white replay-card / typography overlay
+        return (((pit < 0.10) & ((det < 20) | (sat > 0.50) | (bri > 0.20)))
+                | (gc > 0.6) | (wht > 0.30))
+    return ((det < 18) & (bri > 0.25)) | (wht > 0.35)
+
+
 def main():
     scenes = json.load(open(f"{ROOT}/scenes.json")); clips = scenes["clips"]
     by = {}
     for c in clips: by.setdefault(c["src"], []).append(c)
-    ng, ngr, bad_masks = 0, 0, {}
+    ng, ngr, bad_masks, sports = 0, 0, {}, PROFILE != "screen"
     for path in sorted(glob.glob(f"{ROOT}/src/*.mp4")):
         sid = os.path.splitext(os.path.basename(path))[0]
         if sid not in by: continue
         gc, pit, sat, det, bri, wht = features(path)
-        # per-frame "graphic": little pitch AND (flat OR oversaturated OR big bright logo/number),
-        # a green promo card, or a white replay-card / typography overlay
-        bad = ((pit < 0.10) & ((det < 20) | (sat > 0.50) | (bri > 0.20))) | (gc > 0.6) | (wht > 0.30)
-        bad_masks[sid] = bad.astype(np.uint8)
+        bad = bad_frames(PROFILE, gc, pit, sat, det, bri, wht).astype(np.uint8)
+        bad_masks[sid] = bad
         def sl(arr, s, e):
             i0, i1 = int(s * CFPS), max(int(e * CFPS), int(s * CFPS) + 1)
             seg = arr[i0:i1] if i1 <= len(arr) else arr[i0:]
             return seg if len(seg) else arr[max(i0 - 1, 0):i0 + 1]
         for c in by[sid]:
-            c["green"] = round(float((sl(gc, c["start"], c["end"]) > 0.7).mean()), 3)
+            c["green"] = round(float((sl(gc, c["start"], c["end"]) > 0.7).mean()), 3) if sports else 0.0
             c["graphic"] = bool(sl(bad, c["start"], c["end"]).mean() > 0.45
                                or (sl(wht, c["start"], c["end"]) > 0.30).mean() > 0.34)
             ng += c["green"] > 0.25; ngr += c["graphic"]
     np.savez(f"{ROOT}/badframes.npz", cfps=np.array([CFPS]), **bad_masks)
     json.dump(scenes, open(f"{ROOT}/scenes.json", "w"), indent=1)
-    print(f"green promo-card clips: {ng} | graphic/bumper clips: {ngr} | badframes.npz saved")
+    print(f"profile={PROFILE} | green promo-card clips: {ng} | graphic/bumper clips: {ngr} | badframes.npz saved")
 
 
 if __name__ == "__main__":

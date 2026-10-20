@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
-"""render.py <workdir> [--draft] [--landscape] — Phase 3b: render each segment
-(grade+effects), concat, mux the master audio. Auto-detects NVENC (falls back to
-libx264). Writes out/edit.mp4 (or out/edit_draft.mp4). Reads project.json.
---landscape (remaster only): companion render of the SAME edit on a swapped
-canvas (1920x1080) without the 90deg rotation → out/edit_landscape.mp4.
-Remaster full renders interpolate with RIFE (rife-ncnn-vulkan, optical flow on
-the GPU) when the binary is on PATH — HYPE_NO_RIFE=1 forces the legacy
-minterpolate chain, which also remains the per-segment fallback."""
+"""render.py <workdir> [--draft] [--landscape] — Phase 4: render each segment
+(grade+effects), concat, mux the master audio if there is one. Auto-detects
+NVENC (falls back to libx264). Writes out/edit.mp4 (or out/edit_draft.mp4).
+Reads project.json + its preset: "render.mode": "cuts" | "retime",
+"render.rotate" for the 90deg full-bleed portrait variant,
+"render.interpolate": "rife" for optical-flow retiming. --landscape (rotated
+presets only) renders the companion 16:9 master without rotation."""
 import sys, json, subprocess, os, shutil, threading
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import preset
 from look import color_chain
 
 ROOT = os.path.abspath(sys.argv[1])
-CFG = json.load(open(f"{ROOT}/project.json"))
+CFG, P = preset.load(ROOT)
+RENDER = preset.require(P, "render")
+RETIME = RENDER["mode"] == "retime"
+ROTATE = bool(RENDER.get("rotate"))
 DRAFT = "--draft" in sys.argv
 LS = "--landscape" in sys.argv
-if LS and CFG.get("style", "classic") != "remaster":
-    sys.exit("--landscape is only for the remaster style (classic is already landscape)")
+if LS and not ROTATE:
+    sys.exit("--landscape is only for a rotated preset (the plain preset is already landscape)")
 SEG = f"{ROOT}/seg_ls" if LS else f"{ROOT}/seg"
 FPS = CFG["fps"]
 FW, FH = (CFG["out_h"], CFG["out_w"]) if LS else (CFG["out_w"], CFG["out_h"])
@@ -28,9 +31,8 @@ WORKERS = min(6, (os.cpu_count() or 4))
 
 _enc = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], capture_output=True, text=True).stdout
 NVENC = "h264_nvenc" in _enc
-STYLE = CFG.get("style", "classic")
 OSW, OSH = int(round(OW * 1.06 / 2)) * 2, int(round(OH * 1.06 / 2)) * 2
-if STYLE == "remaster":
+if ROTATE:
     FILL = (("" if LS else "transpose=1,") +
             f"scale={OW}:{OH}:force_original_aspect_ratio=increase,crop={OW}:{OH},")
 else:
@@ -46,13 +48,14 @@ def seg_grade(s):
 
 
 MCI = f"minterpolate=fps={FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
-FLASH = float(CFG.get("flash_gain", 1.0))
-RGB = int(CFG.get("rgb_shift", 7))
+FLASH = float(P["effects"]["flash_gain"])
+RGB = int(P["effects"]["rgb_shift"])
 
 _RIFE_BIN = os.environ.get("HYPE_RIFE_BIN") or shutil.which("rife-ncnn-vulkan")
 _RIFE_MODEL = os.environ.get("HYPE_RIFE_MODEL") or (
     os.path.join(os.path.dirname(os.path.realpath(_RIFE_BIN)), "rife-v4.6") if _RIFE_BIN else "")
-RIFE = (STYLE == "remaster" and not DRAFT and os.environ.get("HYPE_NO_RIFE") != "1"
+RIFE = (RETIME and RENDER.get("interpolate") == "rife" and not DRAFT
+        and os.environ.get("HYPE_NO_RIFE") != "1"
         and bool(_RIFE_BIN) and os.path.isdir(_RIFE_MODEL))
 RIFE_SLOTS = threading.Semaphore(2)
 _FPSC, _FPSC_LOCK = {}, threading.Lock()
@@ -124,9 +127,8 @@ def slowmo(speed):
     return p
 
 
-def remaster_fx(s):
-    """Output-timeline effects for a remaster segment: drift zoom plus the soft
-    flashes — applied after retiming, so t is edit time."""
+def retime_fx(s):
+    """Output-timeline effects for a retimed segment: drift zoom plus soft flashes."""
     d, eff = s["dur"], s["effects"]; p = [zoom(0.03, d)]
     if "beatflash" in eff: p.append("eq=brightness='if(lt(t\\,0.04)\\,0.35\\,0)':eval=frame")
     if "dropflash" in eff:
@@ -138,9 +140,9 @@ def vf(s):
     d, F, eff = s["dur"], s["impact"], s["effects"]; p = []
     if s.get("crop"): p.append(f"crop={s['crop']}")
     p.append(seg_grade(s)); p.append("setpts=PTS-STARTPTS")
-    if STYLE == "remaster":
+    if RETIME:
         p += slowmo(s.get("speed", 1.0))
-        p += remaster_fx(s)
+        p += retime_fx(s)
         p.append(f"setsar=1,fps={FPS},format=yuv420p")
         return ",".join(p)
     if "freezeflash" in eff:
@@ -166,11 +168,11 @@ def vf(s):
 
 
 def enc(preset_draft=False):
-    cq, crf = ("17", "16") if STYLE == "remaster" else ("20", "18")
+    e = RENDER["encoder"]; cq, crf = str(e["cq"]), str(e["crf"])
     if NVENC:
         return ["-c:v", "h264_nvenc", "-preset", "p1" if preset_draft else "p6", "-tune", "hq",
                 "-rc", "vbr", "-cq", "30" if preset_draft else cq, "-b:v", "0",
-                "-maxrate", "90M" if STYLE == "remaster" else "60M", "-bufsize", "180M",
+                "-maxrate", e["maxrate"], "-bufsize", e["bufsize"],
                 "-spatial-aq", "1", "-temporal-aq", "1"]
     return ["-c:v", "libx264", "-preset", "veryfast" if preset_draft else "medium",
             "-crf", "26" if preset_draft else crf]
@@ -196,7 +198,7 @@ def render_rife(s, src, out, inp):
                 "-n", str(s["nf"]), "-j", "4:4:4", "-f", "%05d.png"],
                 capture_output=True, text=True)
         if r.returncode != 0 or len(os.listdir(outd)) != s["nf"]: return False
-        post = ",".join(remaster_fx(s) + [f"setsar=1,fps={FPS},format=yuv420p"])
+        post = ",".join(retime_fx(s) + [f"setsar=1,fps={FPS},format=yuv420p"])
         r = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
             "-framerate", str(FPS), "-i", f"{outd}/%05d.png", "-vf", post,
             "-frames:v", str(s["nf"]), "-fps_mode", "cfr", *enc(False),
@@ -218,7 +220,7 @@ def render_one(s):
             "-bf", "3", "-video_track_timescale", str(FPS * 1000), "-an", out]
     r = subprocess.run(base, capture_output=True, text=True)
     if r.returncode == 0: return s["i"], True, "mci" if RIFE else "ok"
-    sm = ",".join(slowmo(s.get("speed", 1.0))) + "," if STYLE == "remaster" else ""
+    sm = ",".join(slowmo(s.get("speed", 1.0))) + "," if RETIME else ""
     vf2 = f"{('crop=' + s['crop'] + ',') if s.get('crop') else ''}{seg_grade(s)},setpts=PTS-STARTPTS,{sm}setsar=1,fps={FPS},format=yuv420p"
     fb = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(s["in_tc"]),
           "-t", str(inp), "-i", src, "-vf", vf2, "-frames:v", str(s["nf"]), "-fps_mode", "cfr",
@@ -237,8 +239,9 @@ def nbf(p):
 def main():
     segs = json.load(open(f"{ROOT}/assign.json"))["segments"]
     want = sum(s["nf"] for s in segs); os.makedirs(SEG, exist_ok=True)
-    print(f"render {len(segs)} segs {OW}x{OH} {STYLE} {'DRAFT' if DRAFT else 'FULL'} "
-          f"enc={'nvenc' if NVENC else 'libx264'} interp={'rife' if RIFE else 'mci'} x{WORKERS}")
+    print(f"render {len(segs)} segs {OW}x{OH} preset={P['name']}/{RENDER['mode']} "
+          f"{'DRAFT' if DRAFT else 'FULL'} enc={'nvenc' if NVENC else 'libx264'} "
+          f"interp={'rife' if RIFE else ('mci' if RETIME else 'none')} x{WORKERS}")
     fails, fb, mci = [], [], []
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         for i, ok, m in ex.map(render_one, segs):
@@ -257,9 +260,18 @@ def main():
         "-safe", "0", "-i", f"{ROOT}/work/concat{tag}.txt", "-c", "copy",
         "-video_track_timescale", str(FPS * 1000), f"{ROOT}/work/video{tag}.mp4"], check=True)
     out = f"{ROOT}/out/edit{'_landscape' if LS else ''}{'_draft' if DRAFT else ''}.mp4"
-    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", f"{ROOT}/work/video{tag}.mp4",
-        "-i", f"{ROOT}/{CFG['audio_master']}", "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
-        "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart", out], check=True)
+    audio = CFG.get("audio_master") or ""
+    master = f"{ROOT}/{audio}" if audio else ""
+    if master and os.path.exists(master):
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", f"{ROOT}/work/video{tag}.mp4", "-i", master,
+            "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
+            "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart", out], check=True)
+    else:
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", f"{ROOT}/work/video{tag}.mp4", "-c:v", "copy",
+            "-movflags", "+faststart", out], check=True)
+        print("no master audio — rendering silent")
     dur = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
         "-of", "csv=p=0", out], capture_output=True, text=True).stdout.strip()
     print(f"\n✅ {out}  dur={dur}s  size={os.path.getsize(out) / 1048576:.1f}MB")

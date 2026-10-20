@@ -1,0 +1,27 @@
+{
+  "name": "hype-quality",
+  "summary": "The genre's slow-mo variant: 60fps interpolated retime, rotated full-bleed portrait, sharp high-bitrate grade.",
+  "canvas": {"w": 1080, "h": 1920, "fps": 60},
+  "timeline": "beat",
+  "pacing": {
+    "steps": {"low": 8, "build": [4, 4, 2], "peak": 2, "drop": [2, 2, 2, 4]},
+    "first_cut_min_s": 2.2,
+    "halfbeat_window": 0.0,
+    "hero_beats": [4, 3],
+    "max_cuts": 8000,
+    "min_cut_s": 0.15
+  },
+  "effects": {"plan": "quality", "flash_gain": 1.0, "rgb_shift": 0},
+  "render": {
+    "mode": "retime",
+    "rotate": true,
+    "interpolate": "rife",
+    "speed": {"hero": 0.5, "drop": 0.65, "peak": 0.65, "build": 0.75, "low": 0.85},
+    "tech": "hqdn3d=1.5:1.0:2.5:2.5,unsharp=5:5:0.9:5:5:0.35,cas=0.55,eq=contrast=1.09:saturation=1.30:gamma=0.99,vibrance=intensity=0.22,curves=master='0/0 0.12/0.08 0.5/0.53 0.9/0.95 1/1'",
+    "encoder": {"cq": 17, "crf": 16, "maxrate": "90M", "bufsize": "180M"}
+  },
+  "grade": {"seed": "random", "base": null, "tech": ""},
+  "scan": {"profile": "sports", "motion_floor": 0.045},
+  "gates": {"beat_offset_max": 2, "density": true, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
+  "deliver": "tiktok"
+}

@@ -1,0 +1,25 @@
+{
+  "name": "hype",
+  "summary": "Beat-locked montage: fast cuts, dense effects, landscape build, TikTok vertical delivery.",
+  "canvas": {"w": 1920, "h": 1080, "fps": 30},
+  "timeline": "beat",
+  "pacing": {
+    "steps": {"low": 8, "build": [4, 2, 1], "peak": 2, "drop": [1, 1, 1, 2]},
+    "first_cut_min_s": 0.0,
+    "halfbeat_window": 1.5,
+    "hero_beats": [3, 2],
+    "max_cuts": 8000,
+    "min_cut_s": 0.15
+  },
+  "effects": {"plan": "aggressive", "flash_gain": 1.0, "rgb_shift": 7},
+  "render": {
+    "mode": "cuts",
+    "rotate": false,
+    "interpolate": "none",
+    "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}
+  },
+  "grade": {"seed": "random", "base": null, "tech": ""},
+  "scan": {"profile": "sports", "motion_floor": 0.045},
+  "gates": {"beat_offset_max": 2, "density": true, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
+  "deliver": "tiktok"
+}

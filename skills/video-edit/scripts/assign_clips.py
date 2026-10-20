@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""assign_clips.py <workdir> — Phase 3a: map clips to cutlist segments.
+"""assign_clips.py <workdir> — Phase 3: map clips to timeline segments.
 Zero reuse, source diversity, quality floor, graphic-aware in-points, effect plan,
-motion-centered framing for vertical output. Writes assign.json.
+motion-centered framing for the output aspect. Preset decides the effect plan,
+retime speeds and whether framing is rotated. Writes assign.json.
 project.json keys it honors:
   "hero_overrides": [{"src","in_tc","impact"[,"crop"]}...] (hero-time order) — hand-pinned
     marquee moments; empty = motion-driven heroes.
   "exclude_clips": [clip_id...] — banned from the pool (visual-review rejects, or clips
     already used by a sibling edit in a multi-video batch).
-  "motion_floor": 0.045 — the quality floor on clip motion_max. Sports footage earns the
-    default; a domain whose whole frame is synthetic (a UI, a menu, an interface demo) reads
-    an order of magnitude lower and needs it dropped or the pool comes back empty.
+  "motion_floor": 0.045 — the quality floor on clip motion_max (default from the
+    preset's scan.motion_floor). Sports footage earns the default; a domain whose whole
+    frame is synthetic (a UI, a menu, an interface demo) reads an order of magnitude
+    lower and needs it dropped or the pool comes back empty.
   "ignore_graphic": false — colorscan's graphic/bumper flag is a sports heuristic (little
     pitch + flat or oversaturated). Set true when the subject IS a rendered interface, or
     every clip is banned as a bumper."""
@@ -17,12 +19,19 @@ import sys, json, subprocess, glob, os
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import preset
+import timeline
+import effect_plans
+
 ROOT = os.path.abspath(sys.argv[1])
-CFG = json.load(open(f"{ROOT}/project.json"))
+CFG, P = preset.load(ROOT)
 FPS = CFG["fps"]
-STYLE = CFG.get("style", "classic")
+RENDER = preset.require(P, "render")
+RETIME = RENDER["mode"] == "retime"
+SPEED = RENDER.get("speed", {})
+PLAN = effect_plans.get(preset.require(P, "effects", "plan"))
 NOREPEAT, MARGIN = 8.0, 0.5
-SPEED = {"hero": 0.5, "drop": 0.65, "peak": 0.65, "build": 0.75, "low": 0.85}
 
 
 def probe_dur(p):
@@ -90,9 +99,9 @@ def motion_window_x(src, it, d, w, h, ww):
     return max(0, min(x, w - ww))
 
 
-def frame_segments_for_vertical(assign):
-    if STYLE == "remaster":
-        print("remaster: full-bleed rotated landscape — no vertical crop framing")
+def frame_for_output(assign):
+    if RENDER.get("rotate"):
+        print("rotated preset: full-bleed landscape, no per-segment crop framing")
         return
     ar = CFG["out_w"] / CFG["out_h"]
     todo = [a for a in assign if not a["_manual_crop"] and not a["crop"]
@@ -103,17 +112,17 @@ def frame_segments_for_vertical(assign):
         x = motion_window_x(a["src"], a["in_tc"], a["dur"], a["_w"], a["_h"], ww)
         a["crop"] = f"{ww}:{a['_h']}:{x}:0"
     with ThreadPoolExecutor(8) as ex: list(ex.map(one, todo))
-    print(f"vertical framing: motion-centered crop on {len(todo)} segments")
+    print(f"output framing: motion-centered crop on {len(todo)} segments")
 
 
 def main():
-    spine = json.load(open(f"{ROOT}/spine.json"))
+    tl = timeline.load(ROOT)
     scenes = json.load(open(f"{ROOT}/scenes.json"))
     mot = np.load(f"{ROOT}/motion.npz")
     badf = np.load(f"{ROOT}/badframes.npz"); BFPS = float(badf["cfps"][0])
-    MFPS = scenes["mfps"]; clips = scenes["clips"]; cut = spine["cutlist"]
-    drop_t = {round(d["time"], 2) for d in spine["drops"]}
-    db_set = {round(b, 2) for b in spine["downbeats"]}
+    MFPS = scenes["mfps"]; clips = scenes["clips"]; cut = tl["cutlist"]
+    drop_t = {round(d["time"], 2) for d in tl["drops"]}
+    db_set = {round(b, 2) for b in tl["downbeats"]}
     OV = CFG.get("hero_overrides", [])
 
     srcs = sorted(glob.glob(f"{ROOT}/src/*.mp4"))
@@ -122,7 +131,8 @@ def main():
     scrop = {s: detect_crop(f"{ROOT}/src/{s}.mp4", d) for s, d in sdur.items()}
     for c in clips: c["srcdur"] = sdur.get(c["src"], 0)
     EXC = set(CFG.get("exclude_clips", []))
-    FLOOR = float(CFG.get("motion_floor", 0.045))
+    SCAN = preset.require(P, "scan")
+    FLOOR = float(CFG.get("motion_floor", SCAN.get("motion_floor", 0.045)))
     GRAPHIC_OK = bool(CFG.get("ignore_graphic", False))
     usable = [c for c in clips if not c["dark"] and c.get("green", 0) <= 0.25
               and (GRAPHIC_OK or not c.get("graphic", False))
@@ -133,6 +143,11 @@ def main():
         print(f"quality floor: motion_max>={FLOOR}"
               + (" graphic flag ignored" if GRAPHIC_OK else ""))
     print(f"usable pool: {len(usable)} clips / {len(set(c['src'] for c in usable))} sources")
+    if not usable:
+        raise SystemExit(
+            "no usable clips. Lower project.json \"motion_floor\" (synthetic/interface footage "
+            "reads an order of magnitude lower than sports), set \"domain\" for the scan "
+            f"profile, or clear {len(EXC)} exclude_clips.")
     hero_pool = sorted([c for c in usable if c["dur"] >= 0.9], key=lambda c: -c["motion_max"])
     high = sorted(usable, key=lambda c: -c["motion"])
     med = float(np.median([x["motion"] for x in usable]))
@@ -188,11 +203,11 @@ def main():
         i, tag, d, ot = c["i"], c["tag"], c["dur"], c["start"]
         nf = round(c["end"] * FPS) - round(c["start"] * FPS)
         entry = round(c["start"], 2) in drop_t; db = round(c["start"], 2) in db_set
-        speed = SPEED["hero" if c["hero"] else tag] if STYLE == "remaster" else 1.0
+        speed = SPEED.get("hero" if c["hero"] else tag, 1.0) if RETIME else 1.0
         de = d * speed
-        eff, manual = [], None
+        manual, prim = None, False
         if c["hero"]:
-            prim = abs(c["start"] - min(drop_t, key=lambda x: abs(x - c["start"]))) < 0.6 and d > 1.0
+            prim = bool(drop_t) and abs(c["start"] - min(drop_t, key=lambda x: abs(x - c["start"]))) < 0.6 and d > 1.0
             ov = OV[hidx] if hidx < len(OV) else None; hidx += 1
             if ov:
                 clip = {"src": ov["src"], "id": -1 - hidx, "fps": fps_map.get(ov["src"], FPS),
@@ -200,29 +215,13 @@ def main():
                 manual = (round(ov["in_tc"], 3), round(ov.get("impact", 0.6), 3))
             else:
                 clip = pick(hero_pool, ot, de, True, exclude=hused); hused.add(clip["id"])
-            eff = ["freezeflash", "shake"] if prim else ["punch", "shake", "rgbsplit"]
         elif tag == "low":
-            clip = pick(low, ot, de, True, avoid=recent); eff = ["punch"] if i == 0 else []
+            clip = pick(low, ot, de, True, avoid=recent)
         elif tag == "build":
             clip = pick(mid, ot, de, False, avoid=recent)
-            eff = ["punch", "beatflash"] if (db and i % 4 == 0) else (["punch"] if i % 2 == 0 else [])
         else:
             clip = pick(high, ot, de, False, avoid=recent)
-            if entry: eff = ["dropflash", "shake", "punch"]
-            elif db:
-                eff = ["punch", "shake"] if i % 2 == 0 else ["punch", "beatflash"]
-                if tag == "drop" and clip["motion_max"] > 0.15 and i % 6 == 0: eff = [eff[0], "rgbsplit"]
-            else: eff = ["punch"] if (tag == "drop" or i % 2 == 0) else []
-        if STYLE == "remaster":
-            if c["hero"]: eff = ["dropflash"] if prim else ["beatflash"]
-            elif entry: eff = ["dropflash"]
-            elif db and i % 4 == 0: eff = ["beatflash"]
-            else: eff = []
-        elif not c["hero"]:
-            eff = ["punch", "dropflash" if db else "beatflash"]
-            if entry or i % 3 == 0: eff.append("shake")
-            if i % 3 == 1: eff.append("rgbsplit")
-            if i == 0: eff = ["punch", "dropflash", "shake"]
+        eff = PLAN(i, c["hero"], prim, entry, db, tag)
         recent = (recent + [clip["src"]])[-3:]
         nth = uc.get(clip["id"], 0); uc[clip["id"]] = nth + 1; lu[clip["id"]] = ot
         it, imp = manual if manual else inpoint(clip, de + MARGIN, nth)
@@ -235,7 +234,7 @@ def main():
             "_h": clip.get("h") or dims.get(clip["src"], (0, 0))[1],
             "_manual_crop": bool(clip.get("crop_ov"))})
 
-    frame_segments_for_vertical(assign)
+    frame_for_output(assign)
     for a in assign: a.pop("_w", None); a.pop("_h", None); a.pop("_manual_crop", None)
 
     tot = sum(a["nf"] for a in assign)

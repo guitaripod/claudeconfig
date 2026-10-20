@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """look.py <workdir> <list|preview|set|shuffle|show> [...] — the colour direction.
 
-The look is the one part of a hype edit with no house style: pacing is fixed,
-coloring is yours. This module holds a library of genuinely different grades and
-resolves which one a given segment renders through, so a single edit can change
+Colour is the editable part of an edit: this module holds a library of genuinely
+different grades plus resolution rules, and it never touches pacing or framing.
+It resolves which one a given segment renders through, so a single edit can change
 its coloring by section, by source, or shot to shot.
 
   list                      names + one-line character of every look
