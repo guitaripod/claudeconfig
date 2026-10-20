@@ -131,14 +131,17 @@ def main():
     scrop = {s: detect_crop(f"{ROOT}/src/{s}.mp4", d) for s, d in sdur.items()}
     for c in clips: c["srcdur"] = sdur.get(c["src"], 0)
     EXC = set(CFG.get("exclude_clips", []))
+    EXC_SRC = set(CFG.get("exclude_sources", []))
     SCAN = preset.require(P, "scan")
     FLOOR = float(CFG.get("motion_floor", SCAN.get("motion_floor", 0.045)))
     GRAPHIC_OK = bool(CFG.get("ignore_graphic", False))
+    COVER = bool(CFG.get("cover_sources", False))
     usable = [c for c in clips if not c["dark"] and c.get("green", 0) <= 0.25
               and (GRAPHIC_OK or not c.get("graphic", False))
               and c["motion_max"] >= FLOOR and c["srcdur"] > 0
-              and c["id"] not in EXC]
+              and c["id"] not in EXC and c["src"] not in EXC_SRC]
     if EXC: print(f"exclude_clips: {len(EXC)} banned")
+    if EXC_SRC: print(f"exclude_sources: {len(EXC_SRC)} banned")
     if FLOOR != 0.045 or GRAPHIC_OK:
         print(f"quality floor: motion_max>={FLOOR}"
               + (" graphic flag ignored" if GRAPHIC_OK else ""))
@@ -154,7 +157,7 @@ def main():
     mid = sorted(usable, key=lambda c: abs(c["motion"] - med))
     low = sorted(usable, key=lambda c: c["motion"])
     fps_map = {c["src"]: c["fps"] for c in clips}; lab_map = {c["src"]: c["label"] for c in clips}
-    lu, uc, hused, recent = {}, {}, set(), []
+    lu, uc, su, hused, recent = {}, {}, {}, set(), []
 
     def mslice(sid, a, b):
         arr = mot[sid] if sid in mot.files else np.zeros(1)
@@ -186,17 +189,21 @@ def main():
 
     def pick(pool, out_t, d, want_long, exclude=(), avoid=()):
         def lok(c):
-            if c["srcdur"] < d + MARGIN:
+            if c["srcdur"] < d + 0.1:
                 return False
             return (c["dur"] + MARGIN) >= d or not want_long
         free = lambda c: lu.get(c["id"], -99) <= out_t - NOREPEAT
         fresh = [c for c in pool if c["id"] not in exclude and uc.get(c["id"], 0) == 0
                  and lok(c)]
         if fresh:
-            div = [c for c in fresh if c["src"] not in avoid]; return (div or fresh)[0]
+            base = [c for c in fresh if su.get(c["src"], 0) == 0] if COVER else fresh
+            if not base: base = fresh
+            div = [c for c in base if c["src"] not in avoid]; return (div or base)[0]
         cand = [c for c in pool if c["id"] not in exclude and free(c) and lok(c)]
         if cand:
-            div = [c for c in cand if c["src"] not in avoid] or cand
+            base = [c for c in cand if su.get(c["src"], 0) == 0] if COVER else cand
+            if not base: base = cand
+            div = [c for c in base if c["src"] not in avoid] or base
             return min(div, key=lambda c: uc.get(c["id"], 0))
         cand = [c for c in pool if lok(c)]
         if not cand:
@@ -213,7 +220,11 @@ def main():
         speed = SPEED.get("hero" if c["hero"] else tag, 1.0) if RETIME else 1.0
         de = d * speed
         manual, prim = None, False
-        if c["hero"]:
+        hint = c.get("src")
+        hinted = [x for x in usable if x["src"] == hint] if hint else []
+        if hinted:
+            clip = pick(hinted, ot, de, False, avoid=recent)
+        elif c["hero"]:
             prim = bool(drop_t) and abs(c["start"] - min(drop_t, key=lambda x: abs(x - c["start"]))) < 0.6 and d > 1.0
             ov = OV[hidx] if hidx < len(OV) else None; hidx += 1
             if ov:
@@ -234,8 +245,10 @@ def main():
             clip = pick(high, ot, de, False, avoid=recent)
         eff = PLAN(i, c["hero"], prim, entry, db, tag)
         recent = (recent + [clip["src"]])[-3:]
+        su[clip["src"]] = su.get(clip["src"], 0) + 1
         nth = uc.get(clip["id"], 0); uc[clip["id"]] = nth + 1; lu[clip["id"]] = ot
-        it, imp = manual if manual else inpoint(clip, de + MARGIN, nth)
+        win = de + MARGIN if clip.get("srcdur", 0) >= de + MARGIN else de
+        it, imp = manual if manual else inpoint(clip, win, nth)
         assign.append({"i": i, "start": round(c["start"], 4), "dur": round(d, 4), "nf": nf,
             "tag": tag, "hero": c["hero"], "src": clip["src"], "clip_id": clip["id"],
             "in_tc": it, "impact": imp, "speed": speed,
@@ -255,6 +268,10 @@ def main():
     adj = sum(1 for a, b in zip(assign, assign[1:]) if a["src"] == b["src"])
     json.dump({"fps": FPS, "segments": assign}, open(f"{ROOT}/assign.json", "w"), indent=1)
     print(f"{len(assign)} segments Σframes={tot} reuse={reuse} consecutive-same-source={adj}")
+    if COVER:
+        allsrc = {c["src"] for c in clips}; cov = {a["src"] for a in assign}
+        print(f"cover_sources: {len(cov)}/{len(allsrc)} sources")
+        if allsrc - cov: print("  missing:", sorted(allsrc - cov))
     print("heroes:", [(a["i"], a["label"], a["effects"]) for a in assign if a["hero"]])
 
 

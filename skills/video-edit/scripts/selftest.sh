@@ -55,6 +55,20 @@ python3 "$HERE/render.py" "$W/calm" >/dev/null
 python3 "$HERE/qc.py" "$W/calm" >/dev/null
 test -s "$W/calm/out/edit.mp4"
 
+echo "== cover_sources"
+python3 - "$W/calm" <<'PY'
+import json, sys
+p = sys.argv[1] + "/project.json"
+c = json.load(open(p))
+c["cover_sources"] = True
+c["pacing"] = {"target_shot_s": 3.0, "min_shot_s": 1.0, "max_shot_s": 5.0}
+json.dump(c, open(p, "w"), indent=1)
+PY
+"$PY" "$HERE/scene_timeline.py" "$W/calm" >/dev/null
+cov=$("$PY" "$HERE/assign_clips.py" "$W/calm")
+echo "$cov" | grep -q "cover_sources: 3/3" || {
+  echo "$cov"; echo "FAIL: cover_sources did not cover every source"; exit 1; }
+
 echo "== preset guard"
 mkdir -p "$W/bad"
 echo '{}' > "$W/bad/project.json"

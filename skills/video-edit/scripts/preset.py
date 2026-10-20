@@ -65,6 +65,8 @@ def load(root):
     }
     p["effects"]["flash_gain"] = float(cfg.get("flash_gain", p["effects"].get("flash_gain", 1.0)))
     p["effects"]["rgb_shift"] = int(cfg.get("rgb_shift", p["effects"].get("rgb_shift", 0)))
+    if cfg.get("pacing"):
+        p["pacing"] = {**p.get("pacing", {}), **cfg["pacing"]}
     if cfg.get("domain"):
         p["scan"]["profile"] = cfg["domain"]
     return cfg, p

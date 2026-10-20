@@ -46,6 +46,8 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
   "ignore_graphic": false,           // ignore colorscan's graphic flag
   "domain": "sports",                // overrides preset scan.profile
   "source_crop": "crop=iw:ih*0.92:0:ih*0.04",  // optional pre-framing crop (reel UI)
+  "cover_sources": false,            // one cut per source before any repeats
+  "exclude_sources": ["<srcid>"],    // ban every clip from these files
   "flash_gain": 1.0, "rgb_shift": 7, // override preset effect intensities
   "grade": "",                       // legacy; only used where no look resolves
   "narration": {"duck_db": -8.5, "lines": [

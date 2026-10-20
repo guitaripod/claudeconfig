@@ -47,6 +47,41 @@ def make_cuts(duration, target, lo, hi, pool):
     return cuts
 
 
+def cover_cuts(clips, duration, target, hi, order):
+    """One cut per source first, then repeat the cycle until the duration is filled.
+    Each cut carries a source hint that assign_clips.py honors, so every ingested
+    source appears at least once even when the pool has more sources than cuts."""
+    by = {}
+    for c in clips:
+        by.setdefault(c["src"], []).append(c)
+    picks = []
+    for src, cs in by.items():
+        best = (max(cs, key=lambda c: c["motion_max"]) if order == "motion"
+                else max(cs, key=lambda c: (c["dur"], c["motion_max"])))
+        shot = min(target, hi, max(best["dur"] - 0.1, 0.6))
+        picks.append((src, shot))
+    picks.sort()
+    cuts, t = [], 0.0
+    while t < duration - 1e-6:
+        for src, shot in picks:
+            if t >= duration - 1e-6:
+                break
+            d = min(shot, duration - t)
+            if d < 0.6 and cuts:
+                cuts[-1]["end"] = round(duration, 4)
+                cuts[-1]["dur"] = round(cuts[-1]["end"] - cuts[-1]["start"], 4)
+                t = duration
+                break
+            end = round(t + d, 4)
+            cuts.append({"i": len(cuts), "start": round(t, 4), "end": end,
+                         "dur": round(end - t, 4), "tag": "body", "hero": False,
+                         "src": src})
+            t = end
+        if len(cuts) > 20000:
+            raise SystemExit("cover cutlist did not converge")
+    return cuts
+
+
 def main():
     root = os.path.abspath(sys.argv[1])
     cfg, p = preset.load(root)
@@ -61,18 +96,28 @@ def main():
     lo = float(pacing["min_shot_s"])
     hi = float(pacing["max_shot_s"])
     target = float(pacing["target_shot_s"])
-    pool = [c for c in clips if not c.get("dark") and c["dur"] >= lo + MARGIN]
-    if not pool:
-        pool = [c for c in clips if c["dur"] >= MARGIN + 0.1]
+    cover = bool(cfg.get("cover_sources"))
+    exc = set(cfg.get("exclude_clips", []))
+    exc_src = set(cfg.get("exclude_sources", []))
+    base_pool = [c for c in clips if not c.get("dark")
+                 and c["id"] not in exc and c["src"] not in exc_src]
+    if cover:
+        pool = base_pool
+    else:
+        pool = [c for c in base_pool if c["dur"] >= lo + MARGIN]
+        if not pool:
+            pool = [c for c in base_pool if c["dur"] >= MARGIN + 0.1]
     if not pool:
         raise SystemExit("no usable scenes — run scenes.py first")
-    feasible = sorted(c["dur"] - MARGIN for c in pool)
-    cap = feasible[int(len(feasible) * 0.75)] if feasible else MARGIN
-    target = max(min(target, hi, cap), min(lo, cap))
-    lo = min(lo, cap)
-
     order = pacing.get("order", "chronological")
-    cuts = make_cuts(dur, target, lo, hi, choose_order(pool, order))
+    if cover:
+        cuts = cover_cuts(pool, dur, target, hi, order)
+    else:
+        feasible = sorted(c["dur"] - MARGIN for c in pool)
+        cap = feasible[int(len(feasible) * 0.75)] if feasible else MARGIN
+        target = max(min(target, hi, cap), min(lo, cap))
+        lo = min(lo, cap)
+        cuts = make_cuts(dur, target, lo, hi, choose_order(pool, order))
     sections = [{"start": 0.0, "end": dur, "label": "body"}]
     tl = {
         "producer": "shots",

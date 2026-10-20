@@ -35,8 +35,10 @@ PY=<workdir>/py                       # use this for scripts that import numpy/l
 With music — the duration comes from the track:
 
 ```bash
-$PY $S/extract_audio.py <workdir> "<song file or URL>" --preset hype [--start 12 --end 45] [--pitch 1.04]
+$PY $S/extract_audio.py <workdir> "<song file or URL>" --preset hype [--start 12 --end 45] [--loop 1] [--pitch 1.04]
 ```
+
+`--loop 12` repeats the silence-trimmed track twelve times and scales the project duration with it — how a short reel audio backs a longer footage-led cut.
 
 Without music — duration is explicit:
 
@@ -53,6 +55,8 @@ bash $S/ingest.sh <workdir> <file|dir|youtube-id|url> ...
 ```
 
 Local paths, directories and YouTube sources all land in `src/` and are decode-validated. Downloads are sequential by design. Prefer official/high-bitrate sources; over-collect for diversity. Trap sources that pass every automated filter: sim gameplay (EA FC/PES), fan comps with end-cards mid-file, combo/HUD/QTE overlays, burned-in subtitles, menus and typography. Details and the audit procedure: `reference/ingest.md`.
+
+For a brief that says "use all the clips", set `project.json "cover_sources": true`: the footage producer places one cut per source before it repeats any. Ban a whole unusable file (caption card, off-subject footage, empty gym) with `"exclude_sources": ["<srcid>"]` rather than hunting individual clip ids.
 
 ## 5. Scan
 
