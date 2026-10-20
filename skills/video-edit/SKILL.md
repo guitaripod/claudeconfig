@@ -14,6 +14,7 @@ Deterministic and resumable: every stage reads `project.json`, writes one file, 
 | preset | for | shape |
 |---|---|---|
 | `hype` | beat-locked montage, fast cuts, dense effects | 1920×1080@30, cut to the song |
+| `hype-rapid` | rapid-fire portrait montage | 1080×1920@30, half-beat cuts |
 | `hype-quality` | the genre's slow-mo variant | 1080×1920@60, RIFE retime, rotated |
 | `calm` | footage-led assembly, long holds, no effects | 1920×1080@30, no beat lock |
 
@@ -27,7 +28,7 @@ bash $S/setup.sh <workdir>            # tree + python; prints PY=<workdir>/py
 PY=<workdir>/py                       # use this for scripts that import numpy/librosa
 ```
 
-`setup.sh` reuses the system python when it already has the deps, so repeat edits cost nothing. Workdir on a fast disk with tens of GB free; **never `/tmp`** if it is RAM-backed.
+`setup.sh` reuses the system python when it already has the deps and otherwise a shared cached venv (`~/.cache/video-edit/venv`), so repeat edits cost nothing. Workdir on a fast disk with tens of GB free; **never `/tmp`** if it is RAM-backed.
 
 ## 3. Start the project
 
@@ -95,7 +96,21 @@ QC enforces only what the preset declares (`gates`): structural checks always; b
 
 ## 9. Deliver
 
-`deliver` in the preset says what ship means. `tiktok` (hype): rotated tall-fill vertical + Taildrop + caption — see the `hype-edit` skill. `master`: hand over `out/edit.mp4`.
+`deliver` in the preset says what ship means:
+
+```bash
+python3 $S/deliver.py <workdir> --name <subject-slug>
+```
+
+`master`: `out/edit.mp4` is the deliverable. `tiktok`: writes `out/<slug>_vertical.mp4` — a rotated preset is already portrait, a landscape master is rotated 90° and scaled to the preset's delivery canvas. Taildrop, captions and Telegram are the `hype-edit` skill's business, not the engine's.
+
+## Perfecting and testing
+
+```bash
+bash $S/selftest.sh          # synthetic beat + footage paths, QC must be green
+```
+
+The selftest builds its own fixtures and exercises both producers, a full render, QC, delivery and the preset guard. Run it after touching any stage; a pass means the contracts still hold. Add a case when you add a producer or a preset feature.
 
 ## Several edits at once
 
@@ -112,4 +127,4 @@ QC enforces only what the preset declares (`gates`): structural checks always; b
 
 ## Files
 
-`scripts/`: `setup.sh` `init.py` `extract_audio.py` `ingest.sh` `scenes.py` `colorscan.py` `beat_spine.py` `scene_timeline.py` `assign_clips.py` `render.py` `look.py` `qc.py` `contact_sheet.py` `preset.py` `timeline.py` `effect_plans.py` `restore.py` (optional restoration) `narrate.py` (voice-over; see `video-narration`) `ask.py` (send-only phone reach). `presets/`: direction files. `reference/`: `timeline.md` (schemas + math), `ingest.md`, `ffmpeg.md`, `review.md`.
+`scripts/`: `setup.sh` `init.py` `extract_audio.py` `ingest.sh` `scenes.py` `colorscan.py` `beat_spine.py` `scene_timeline.py` `assign_clips.py` `render.py` `look.py` `qc.py` `contact_sheet.py` `deliver.py` `preset.py` `timeline.py` `effect_plans.py` `selftest.sh` `restore.py` (optional restoration) `narrate.py` (voice-over; see `video-narration`) `ask.py` (send-only phone reach). `presets/`: direction files. `reference/`: `timeline.md` (schemas + math), `ingest.md`, `ffmpeg.md`, `review.md`.
