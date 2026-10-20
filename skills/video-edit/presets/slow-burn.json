@@ -4,7 +4,7 @@
   "canvas": {"w": 1920, "h": 1080, "fps": 30},
   "timeline": "beat",
   "pacing": {
-    "steps": {"low": 16, "build": [8, 4, 4], "peak": 4, "drop": [4, 4, 2, 2]},
+    "steps": {"low": 16, "build": [8, 4, 4], "peak": 4, "drop": [4, 4, 2, 2], "source_gap_s": 6, "dupe_distance": 6},
     "first_cut_min_s": 0.0,
     "halfbeat_window": 0.0,
     "hero_beats": [6, 4],
@@ -15,7 +15,7 @@
   "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.03,
              "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}},
   "grade": {"seed": "random", "base": null, "tech": ""},
-  "scan": {"profile": "generic", "motion_floor": 0.02},
+  "scan": {"profile": "generic", "motion_floor": 0.02, "subject": "auto", "min_face_frac": 0.002},
   "gates": {"beat_offset_max": 2, "density": true, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "master"
 }

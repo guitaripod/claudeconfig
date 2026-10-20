@@ -27,7 +27,7 @@ def features(path):
         f"fps={CFPS},scale={CW}:{CH}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
         capture_output=True).stdout
     a = np.frombuffer(raw, np.uint8); nf = len(a) // (CW * CH * 3)
-    if nf < 1: return (np.zeros(1),) * 6
+    if nf < 1: return (np.zeros(1),) * 6 + (np.zeros((1, 9), np.uint8),)
     a = a[:nf * CW * CH * 3].reshape(nf, CH, CW, 3).astype(np.float32)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]; mx, mn = a.max(3), a.min(3)
     gray = 0.299 * r + 0.587 * g + 0.114 * b
@@ -36,7 +36,10 @@ def features(path):
     sat = ((mx - mn) / (mx + 1.0) > 0.45).mean((1, 2))
     detail = gray.std((1, 2)); bright = (gray > 210).mean((1, 2))
     white = ((mx > 200) & ((mx - mn) / (mx + 1.0) < 0.16)).mean((1, 2))
-    return greencard, pitch, sat, detail, bright, white
+    blocks = gray.reshape(nf, 9, 4, 8, 8).mean((2, 4))
+    bits = blocks > blocks.mean((1, 2), keepdims=True)
+    hashes = np.packbits(bits.reshape(nf, -1), axis=1)
+    return greencard, pitch, sat, detail, bright, white, hashes
 
 
 def bad_frames(profile, gc, pit, sat, det, bri, wht):
@@ -55,12 +58,14 @@ def main():
     by = {}
     for c in clips: by.setdefault(c["src"], []).append(c)
     ng, ngr, bad_masks, sports = 0, 0, {}, PROFILE != "screen"
+    hash_masks = {}
     for path in sorted(glob.glob(f"{ROOT}/src/*.mp4")):
         sid = os.path.splitext(os.path.basename(path))[0]
         if sid not in by: continue
-        gc, pit, sat, det, bri, wht = features(path)
+        gc, pit, sat, det, bri, wht, hashes = features(path)
         bad = bad_frames(PROFILE, gc, pit, sat, det, bri, wht).astype(np.uint8)
         bad_masks[sid] = bad
+        hash_masks[f"hash_{sid}"] = hashes
         def sl(arr, s, e):
             i0, i1 = int(s * CFPS), max(int(e * CFPS), int(s * CFPS) + 1)
             seg = arr[i0:i1] if i1 <= len(arr) else arr[i0:]
@@ -69,8 +74,10 @@ def main():
             c["green"] = round(float((sl(gc, c["start"], c["end"]) > 0.7).mean()), 3) if sports else 0.0
             c["graphic"] = bool(sl(bad, c["start"], c["end"]).mean() > 0.45
                                or (sl(wht, c["start"], c["end"]) > 0.30).mean() > 0.34)
+            mid = min(int((c["start"] + c["end"]) / 2 * CFPS), len(hashes) - 1)
+            c["hash"] = int.from_bytes(hashes[max(mid, 0)].tobytes(), "big")
             ng += c["green"] > 0.25; ngr += c["graphic"]
-    np.savez(f"{ROOT}/badframes.npz", cfps=np.array([CFPS]), **bad_masks)
+    np.savez(f"{ROOT}/badframes.npz", cfps=np.array([CFPS]), **bad_masks, **hash_masks)
     json.dump(scenes, open(f"{ROOT}/scenes.json", "w"), indent=1)
     print(f"profile={PROFILE} | green promo-card clips: {ng} | graphic/bumper clips: {ngr} | badframes.npz saved")
 

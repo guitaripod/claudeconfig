@@ -3,12 +3,12 @@
   "summary": "Recap/year-in-review: chronological 1.5-2s beats, no effects, kodak.",
   "canvas": {"w": 1920, "h": 1080, "fps": 30},
   "timeline": "shots",
-  "pacing": {"target_shot_s": 1.6, "min_shot_s": 1.0, "max_shot_s": 2.5, "order": "chronological"},
+  "pacing": {"target_shot_s": 1.6, "min_shot_s": 1.0, "max_shot_s": 2.5, "order": "chronological", "source_gap_s": 6, "dupe_distance": 6},
   "effects": {"plan": "none", "flash_gain": 0.0, "rgb_shift": 0},
   "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.0,
              "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}},
   "grade": {"seed": "fixed", "base": "kodak", "tech": ""},
-  "scan": {"profile": "generic", "motion_floor": 0.01},
+  "scan": {"profile": "generic", "motion_floor": 0.01, "subject": "auto", "min_face_frac": 0.002},
   "gates": {"beat_offset_max": null, "density": false, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "master"
 }

@@ -16,7 +16,7 @@
              "speed_cycle": {"*": [1.0, 1.5, 1.0, 0.65]},
              "encoder": {"cq": 20, "crf": 18, "maxrate": "50M", "bufsize": "150M"}},
   "grade": {"seed": "fixed", "base": "kodak", "tech": ""},
-  "scan": {"profile": "generic", "motion_floor": 0.008},
+  "scan": {"profile": "generic", "motion_floor": 0.008, "subject": "none", "min_face_frac": 0.0},
   "gates": {"beat_offset_max": 2, "density": true, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "master"
 }

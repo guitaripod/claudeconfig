@@ -20,6 +20,25 @@ producer or a project field beyond the preset; those are called out.
 
 The existing `hype`, `hype-rapid`, `hype-quality` and `calm` are unchanged.
 
+## Subject pass
+
+Run `faces.py` after `colorscan.py`; it annotates every clip with face area, centre
+and sharpness, and writes `faces.npz`. Presets choose:
+
+- `face` — hard filter at `scan.min_face_frac`; used by `lookbook`, `documentary`, `talking-head`.
+- `auto` — filter only when at least a third of usable clips have a face; the rest.
+- `none` — `product`, `broadcast`, `compare`.
+
+It finds **a** face, not a specific person: a stranger in frame still passes, so
+the segment grid is still the identity check. Re-run `faces.py` after `scenes.py`
+if the source set changes.
+
+`pacing.source_gap_s` stops a source reappearing too soon (lookbook 25s, ambient
+20s); without it, two clips from the same continuous shot can land 10s apart.
+`pacing.dupe_distance` rejects a clip whose sampled frame hashes are within N bits
+of a recent shot (72-bit block hash from `colorscan.py`), which catches the same
+moment in two different files; it is off for hype and on for the slow templates.
+
 ## Footage-led
 
 ```bash

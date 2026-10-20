@@ -35,7 +35,9 @@ def on(key): return GATES.get(key) is not None and GATES.get(key) is not False
 
 
 def main():
-    segs = json.load(open(f"{ROOT}/assign.json"))["segments"]
+    A = json.load(open(f"{ROOT}/assign.json"))
+    segs = A["segments"]
+    FACE_GATE = A.get("face_gate", True)
     WANT = sum(s["nf"] for s in segs); VDUR = round(WANT / FPS, 3); rate = f"{FPS}/1"
     d = []
 
@@ -129,6 +131,14 @@ def main():
         floor = others * 0.9
         print(f"[density] drop floor {floor:.2f} (90% of others)")
         rate["drop"] < floor and d.append("density in drops")
+
+    scan = preset.require(P, "scan")
+    if scan.get("subject") in ("face", "auto") and FACE_GATE and any("face" in s for s in segs):
+        floor = float(scan.get("min_face_frac", 0.0))
+        low = [s["i"] for s in segs if s.get("face", 0) < floor]
+        print(f"[subject] below face floor {floor}: {len(low)} {low[:10]}")
+        if GATES.get("subject") and low:
+            d.append(f"{len(low)} segments without a subject")
 
     print("\n" + ("✅ ALL GATES PASS" if not d else f"❌ DEFECTS: {d}"))
     return 1 if d else 0

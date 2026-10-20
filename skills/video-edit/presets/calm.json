@@ -3,7 +3,7 @@
   "summary": "Footage-led assembly: long holds, no beat lock, no effects, warm neutral grade.",
   "canvas": {"w": 1920, "h": 1080, "fps": 30},
   "timeline": "shots",
-  "pacing": {"target_shot_s": 4.0, "min_shot_s": 2.0, "max_shot_s": 8.0, "order": "chronological"},
+  "pacing": {"target_shot_s": 4.0, "min_shot_s": 2.0, "max_shot_s": 8.0, "order": "chronological", "source_gap_s": 10, "dupe_distance": 6},
   "effects": {"plan": "none", "flash_gain": 0.0, "rgb_shift": 0},
   "render": {
     "mode": "cuts",
@@ -13,7 +13,7 @@
     "encoder": {"cq": 21, "crf": 19, "maxrate": "40M", "bufsize": "120M"}
   },
   "grade": {"seed": "fixed", "base": "kodak", "tech": ""},
-  "scan": {"profile": "generic", "motion_floor": 0.01},
+  "scan": {"profile": "generic", "motion_floor": 0.01, "subject": "auto", "min_face_frac": 0.002},
   "gates": {"beat_offset_max": null, "density": false, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "master"
 }

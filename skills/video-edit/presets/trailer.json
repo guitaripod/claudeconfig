@@ -3,12 +3,12 @@
   "summary": "Trailer: hard snaps, title cards, silence ranges, no flashes.",
   "canvas": {"w": 1920, "h": 1080, "fps": 30},
   "timeline": "shots",
-  "pacing": {"target_shot_s": 3.0, "min_shot_s": 1.5, "max_shot_s": 5.0, "order": "motion"},
+  "pacing": {"target_shot_s": 3.0, "min_shot_s": 1.5, "max_shot_s": 5.0, "order": "motion", "source_gap_s": 8, "dupe_distance": 8},
   "effects": {"plan": "trailer", "flash_gain": 0.0, "rgb_shift": 0},
   "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.05,
              "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}},
   "grade": {"seed": "fixed", "base": "bleach", "tech": ""},
-  "scan": {"profile": "generic", "motion_floor": 0.015},
+  "scan": {"profile": "generic", "motion_floor": 0.015, "subject": "auto", "min_face_frac": 0.002},
   "gates": {"beat_offset_max": null, "density": false, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "master"
 }

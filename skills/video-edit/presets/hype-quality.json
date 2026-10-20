@@ -22,7 +22,7 @@
     "encoder": {"cq": 17, "crf": 16, "maxrate": "90M", "bufsize": "180M"}
   },
   "grade": {"seed": "random", "base": null, "tech": ""},
-  "scan": {"profile": "sports", "motion_floor": 0.045},
+  "scan": {"profile": "sports", "motion_floor": 0.045, "subject": "auto", "min_face_frac": 0.001},
   "gates": {"beat_offset_max": 2, "density": true, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "tiktok"
 }

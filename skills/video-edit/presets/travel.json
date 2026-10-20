@@ -3,12 +3,12 @@
   "summary": "Travel/day-in-life: chronological 3-5s holds, sunbleached warm grade, landscape.",
   "canvas": {"w": 1920, "h": 1080, "fps": 30},
   "timeline": "shots",
-  "pacing": {"target_shot_s": 4.0, "min_shot_s": 2.5, "max_shot_s": 6.0, "order": "chronological"},
+  "pacing": {"target_shot_s": 4.0, "min_shot_s": 2.5, "max_shot_s": 6.0, "order": "chronological", "source_gap_s": 12, "dupe_distance": 8},
   "effects": {"plan": "none", "flash_gain": 0.0, "rgb_shift": 0},
   "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.02,
              "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}},
   "grade": {"seed": "fixed", "base": "sunbleach", "tech": ""},
-  "scan": {"profile": "generic", "motion_floor": 0.01},
+  "scan": {"profile": "generic", "motion_floor": 0.01, "subject": "auto", "min_face_frac": 0.002},
   "gates": {"beat_offset_max": null, "density": false, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "master"
 }

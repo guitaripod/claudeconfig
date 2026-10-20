@@ -69,6 +69,10 @@ def load(root):
         p["pacing"] = {**p.get("pacing", {}), **cfg["pacing"]}
     if cfg.get("domain"):
         p["scan"]["profile"] = cfg["domain"]
+    if cfg.get("subject"):
+        p["scan"]["subject"] = cfg["subject"]
+    if cfg.get("min_face_frac") is not None:
+        p["scan"]["min_face_frac"] = float(cfg["min_face_frac"])
     return cfg, p
 
 

@@ -16,7 +16,7 @@
              "speed": {"hero": 0.4, "drop": 0.5, "peak": 0.65, "build": 1.0, "low": 1.0},
              "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}},
   "grade": {"seed": "fixed", "base": "teal_orange", "tech": ""},
-  "scan": {"profile": "sports", "motion_floor": 0.03},
+  "scan": {"profile": "sports", "motion_floor": 0.03, "subject": "none", "min_face_frac": 0.0},
   "gates": {"beat_offset_max": 2, "density": true, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "master"
 }

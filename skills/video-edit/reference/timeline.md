@@ -13,6 +13,7 @@ pairs ───────────compare.py──────────�
                                    │                 │
                      scenes.py ──► scenes.json + motion.npz
                  colorscan.py ──► scenes.json flags + badframes.npz
+                     faces.py ──► scenes.json face scores + faces.npz
               scene_timeline.py ─────────────────────┤
                doc_timeline.py ──────────────────────┴──► timeline.json (cuts, sections, beats, hints)
 
@@ -78,7 +79,9 @@ The direction file. `preset.py` merges the project's canvas and effect intensiti
     "first_cut_min_s": 0.0,
     "halfbeat_window": 1.5,                 // beats before a hero at 0.5-beat steps; 0 = off
     "hero_beats": [3, 2],                   // primary, others
-    "max_cuts": 8000, "min_cut_s": 0.15
+    "max_cuts": 8000, "min_cut_s": 0.15,
+    "source_gap_s": 0.0,                    // don't reuse a source within N seconds
+    "dupe_distance": 0                      // reject clips within N bits of a recent shot (0 = off)
   },
   "effects": {"plan": "aggressive", "flash_gain": 1.0, "rgb_shift": 7},
   "render": {
@@ -92,7 +95,10 @@ The direction file. `preset.py` merges the project's canvas and effect intensiti
     "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}
   },
   "grade": {"seed": "random", "base": null, "tech": ""},
-  "scan": {"profile": "sports", "motion_floor": 0.045},  // sports | generic | screen
+  "scan": {"profile": "sports", "motion_floor": 0.045,
+            "subject": "auto", "min_face_frac": 0.002},  // face | auto | none
+  "subject": "auto",                 // override preset scan.subject: face | auto | none
+  "min_face_frac": 0.002,            // override preset scan.min_face_frac
   "gates": {"beat_offset_max": 2, "density": true, "black": true,
             "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "tiktok",                      // tiktok | master

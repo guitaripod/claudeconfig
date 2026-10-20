@@ -17,7 +17,7 @@ prep() { bash "$HERE/setup.sh" "$1" >/dev/null; }
 generic() { python3 - "$1" <<'PY'
 import json, sys
 p = sys.argv[1] + "/project.json"; c = json.load(open(p))
-c["domain"] = "generic"; c["motion_floor"] = 0.005
+c["domain"] = "generic"; c["motion_floor"] = 0.005; c["subject"] = "none"
 json.dump(c, open(p, "w"), indent=1)
 PY
 }
@@ -63,6 +63,11 @@ PY
 echo "== stills: photo"
 H="$W/photo"; mkdir -p "$H"; prep "$H"
 "$H/py" "$HERE/init.py" "$H" --preset photo --duration 12 --w 320 --h 180 >/dev/null
+python3 - "$H" <<'PY'
+import json, sys
+p = sys.argv[1] + "/project.json"; c = json.load(open(p)); c["subject"] = "none"
+json.dump(c, open(p, "w"), indent=1)
+PY
 bash "$HERE/ingest.sh" "$H" "$F/a.png" "$F/b.png" >/dev/null
 "$H/py" "$HERE/stills.py" "$H" >/dev/null
 "$H/py" "$HERE/scenes.py" "$H" >/dev/null; "$H/py" "$HERE/colorscan.py" "$H" >/dev/null

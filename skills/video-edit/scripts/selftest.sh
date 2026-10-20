@@ -27,6 +27,7 @@ domain() { python3 - "$1" <<'PY'
 import json, sys
 p = sys.argv[1] + "/project.json"
 c = json.load(open(p)); c["domain"] = "generic"; c["motion_floor"] = 0.01
+c["subject"] = "none"
 json.dump(c, open(p, "w"), indent=1)
 PY
 }

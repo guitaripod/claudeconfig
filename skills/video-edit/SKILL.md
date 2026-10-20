@@ -62,7 +62,10 @@ For a brief that says "use all the clips", set `project.json "cover_sources": tr
 ```bash
 $PY $S/scenes.py <workdir>        # single-action clips + motion timelines
 $PY $S/colorscan.py <workdir>     # promo cards / synthetic graphics → badframes
+$PY $S/faces.py <workdir>         # face track + per-clip subject scores → faces.npz
 ```
+
+`faces.py` runs YuNet at 2 fps, records the largest face per frame (area, centre, sharpness) and annotates every clip with `face_max/face_mean/face_cx/face_cy/face_sharp`. Presets opt in with `scan.subject`: `face` is a hard filter, `auto` filters only when at least a third of the usable clips have a face, so scenery and sports footage is not gutted by missed detections. `scan.min_face_frac` is the floor. It finds **a** face, not a specific person — identity is a review call.
 
 `colorscan.py` uses the preset's domain profile (`scan.profile`): sports keys off pitch and broadcast cards, generic only rejects flat bright cards, screen keeps interfaces. Override with `project.json "domain"`.
 
@@ -135,4 +138,4 @@ The core selftest builds its own fixtures and exercises both producers, a full r
 
 ## Files
 
-`scripts/`: `setup.sh` `init.py` `extract_audio.py` `ingest.sh` `scenes.py` `stills.py` `compare.py` `colorscan.py` `beat_spine.py` `scene_timeline.py` `doc_timeline.py` `assign_clips.py` `render.py` `overlays.py` `look.py` `qc.py` `contact_sheet.py` `deliver.py` `preset.py` `timeline.py` `effect_plans.py` `selftest.sh` `restore.py` (optional restoration) `narrate.py` (voice-over; see `video-narration`) `ask.py` (send-only phone reach). `presets/`: direction files. `reference/`: `templates.md` (every direction's producer and inputs), `timeline.md` (schemas + math), `ingest.md`, `ffmpeg.md`, `review.md`.
+`scripts/`: `setup.sh` `init.py` `extract_audio.py` `ingest.sh` `scenes.py` `colorscan.py` `faces.py` `stills.py` `compare.py` `beat_spine.py` `scene_timeline.py` `doc_timeline.py` `assign_clips.py` `render.py` `overlays.py` `look.py` `qc.py` `contact_sheet.py` `deliver.py` `preset.py` `timeline.py` `effect_plans.py` `selftest.sh` `template_selftest.sh` `restore.py` (optional restoration) `narrate.py` (voice-over; see `video-narration`) `ask.py` (send-only phone reach). `presets/`: direction files. `models/`: YuNet face detector. `reference/`: `templates.md` (every direction's producer and inputs), `timeline.md` (schemas + math), `ingest.md`, `ffmpeg.md`, `review.md`.

@@ -30,6 +30,10 @@ $PY scripts/stills.py <workdir> [--duration 8]
 
 Then the normal `scenes.py → scene_timeline.py` path applies. `cover_sources` makes every photo appear once.
 
+## Subject pass
+
+`faces.py` (YuNet at 2 fps) scores every clip for the largest face and writes `faces.npz`; `assign` uses it to pick in-points where the subject is visible and to centre crops on the face. Presets opt in with `scan.subject` (`face` hard, `auto` when enough clips have a face, `none`). It detects presence, not identity.
+
 ## Trap source types that pass every automated filter
 
 - **Sim gameplay** (EA FC / PES): flat lighting, game HUD. Ban the whole source via `exclude_clips`.

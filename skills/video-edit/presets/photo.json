@@ -8,7 +8,7 @@
   "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.0,
              "encoder": {"cq": 21, "crf": 19, "maxrate": "40M", "bufsize": "120M"}},
   "grade": {"seed": "fixed", "base": "kodak", "tech": ""},
-  "scan": {"profile": "generic", "motion_floor": 0.001},
+  "scan": {"profile": "generic", "motion_floor": 0.001, "subject": "auto", "min_face_frac": 0.002},
   "gates": {"beat_offset_max": null, "density": false, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "master"
 }

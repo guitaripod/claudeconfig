@@ -3,12 +3,12 @@
   "summary": "Fashion lookbook: short holds grouped by look, bleach grade, 4:5.",
   "canvas": {"w": 1080, "h": 1350, "fps": 30},
   "timeline": "shots",
-  "pacing": {"target_shot_s": 2.5, "min_shot_s": 1.5, "max_shot_s": 4.0, "order": "motion"},
+  "pacing": {"target_shot_s": 2.5, "min_shot_s": 1.5, "max_shot_s": 4.0, "order": "motion", "source_gap_s": 25, "dupe_distance": 10},
   "effects": {"plan": "none", "flash_gain": 0.0, "rgb_shift": 0},
   "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.0,
              "encoder": {"cq": 20, "crf": 18, "maxrate": "50M", "bufsize": "150M"}},
   "grade": {"seed": "fixed", "base": "bleach", "tech": ""},
-  "scan": {"profile": "generic", "motion_floor": 0.01},
+  "scan": {"profile": "generic", "motion_floor": 0.01, "subject": "face", "min_face_frac": 0.005},
   "gates": {"beat_offset_max": null, "density": false, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
   "deliver": "master"
 }
