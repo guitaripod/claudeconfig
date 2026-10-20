@@ -9,7 +9,7 @@ mkdir -p "$ROOT/src"
 
 ok() {  # returns 0 if file decodes clean (few NAL/errors)
   local f="$1"; [ -f "$f" ] || return 1
-  local e; e=$(ffmpeg -v error -i "$f" -map 0:v:0 -f null - 2>&1 | grep -icE "NAL|error|invalid")
+  local e; e=$(ffmpeg -nostdin -v error -i "$f" -map 0:v:0 -f null - 2>&1 | grep -icE "NAL|error|invalid")
   [ "${e:-99}" -le 5 ]
 }
 
@@ -21,7 +21,7 @@ to_mp4() {  # local path -> src/<stem>.mp4 (remux when it is already a video)
   if [ "${p##*.}" = "mp4" ]; then
     cp -- "$p" "$out"
   else
-    ffmpeg -hide_banner -loglevel error -y -i "$p" -map 0:v:0 -map 0:a? -c copy \
+    ffmpeg -nostdin -hide_banner -loglevel error -y -i "$p" -map 0:v:0 -map 0:a? -c copy \
       -movflags +faststart "$out" || return 1
   fi
 }
