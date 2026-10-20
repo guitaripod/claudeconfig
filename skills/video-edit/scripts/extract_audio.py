@@ -52,6 +52,8 @@ def main():
     ap.add_argument("--keep-tail", action="store_true", help="don't trim trailing silence")
     ap.add_argument("--pitch", type=float, default=1.0,
                     help="pitch ratio, tempo preserved (1.04 = +4%%; anti-Content-ID)")
+    ap.add_argument("--loop", type=int, default=1,
+                    help="repeat the (silence-trimmed) track N times; duration scales with N")
     a = ap.parse_args()
     root = os.path.abspath(a.root)
     ppath = os.path.join(preset.PRESETS, f"{a.preset}.json")
@@ -96,6 +98,22 @@ def main():
         loud = np.where(rms > thr)[0]
         if len(loud):
             end = start + min(end - start, float(tf[loud[-1]]) + 0.4)
+
+    if a.loop > 1:
+        base, looped = f"{root}/song_loop_base.wav", f"{root}/song_loop.wav"
+        seg = max(end - start, 0.1)
+        r = sh(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-ss", f"{start:.6f}", "-t", f"{seg:.6f}", "-i", song,
+                "-vn", "-c:a", "pcm_s24le", base])
+        if r.returncode != 0:
+            sys.exit("could not cut the loop segment:\n" + r.stderr[-500:])
+        r = sh(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-stream_loop", str(a.loop - 1), "-i", base,
+                "-c:a", "pcm_s24le", looped])
+        if r.returncode != 0:
+            sys.exit("could not loop the track:\n" + r.stderr[-500:])
+        song, start, end = looped, 0.0, seg * a.loop
+        print(f"loop x{a.loop} → {seg:.3f}s × {a.loop} = {end:.3f}s")
 
     dur = np.floor((end - start) * a.fps) / a.fps         # frame-aligned
     na, nm = int(round(dur * SR_A)), int(round(dur * 44100))
