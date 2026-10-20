@@ -1,0 +1,25 @@
+{
+  "name": "hype-rapid",
+  "summary": "Rapid-fire variant for portrait reels: half-beat cuts through build/peak/drop, 2-beat hero holds, no rotation.",
+  "canvas": {"w": 1080, "h": 1920, "fps": 30},
+  "timeline": "beat",
+  "pacing": {
+    "steps": {"low": 4, "build": [2, 1, 0.5], "peak": 0.5, "drop": [0.5, 0.5, 0.5, 0.5]},
+    "first_cut_min_s": 0.0,
+    "halfbeat_window": 1.5,
+    "hero_beats": [2, 2],
+    "max_cuts": 8000,
+    "min_cut_s": 0.12
+  },
+  "effects": {"plan": "aggressive", "flash_gain": 0.6, "rgb_shift": 3},
+  "render": {
+    "mode": "cuts",
+    "rotate": false,
+    "interpolate": "none",
+    "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}
+  },
+  "grade": {"seed": "random", "base": null, "tech": ""},
+  "scan": {"profile": "sports", "motion_floor": 0.045},
+  "gates": {"beat_offset_max": 2, "density": true, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
+  "deliver": "tiktok"
+}
