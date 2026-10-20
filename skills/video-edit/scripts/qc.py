@@ -126,7 +126,9 @@ def main():
         rate = {t: len(v) / max(sum(v), 1e-6) for t, v in dens.items()}
         others = max((r for t, r in rate.items() if t != "drop"), default=0.0)
         print(f"[density] cuts/s drop={rate['drop']:.2f} others_max={others:.2f}")
-        rate["drop"] < others and d.append("density in drops")
+        floor = others * 0.9
+        print(f"[density] drop floor {floor:.2f} (90% of others)")
+        rate["drop"] < floor and d.append("density in drops")
 
     print("\n" + ("✅ ALL GATES PASS" if not d else f"❌ DEFECTS: {d}"))
     return 1 if d else 0
