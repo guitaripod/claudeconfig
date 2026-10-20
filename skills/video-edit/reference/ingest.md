@@ -19,6 +19,17 @@ bash $S/ingest.sh <workdir> <source...>
 
 Downloads are **sequential** — parallel yt-dlp on the same output races and silently corrupts files whose headers still probe fine. Every file is decode-validated and retried once.
 
+## Images
+
+`ingest.sh` copies images to `assets/` instead of `src/`. Run `stills.py` to turn each into a Ken Burns clip at the preset canvas:
+
+```bash
+bash scripts/ingest.sh <workdir> stills/
+$PY scripts/stills.py <workdir> [--duration 8]
+```
+
+Then the normal `scenes.py → scene_timeline.py` path applies. `cover_sources` makes every photo appear once.
+
 ## Trap source types that pass every automated filter
 
 - **Sim gameplay** (EA FC / PES): flat lighting, game HUD. Ban the whole source via `exclude_clips`.

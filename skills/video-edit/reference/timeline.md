@@ -5,16 +5,19 @@
 ```
 song ──extract_audio.py──► song_22k_mono.wav (analysis)  master.wav (mux)  project.json
                                   │
-                                  └─ beat_spine.py ──┐
-                                                     ├──► timeline.json (cuts, sections, beats)
+                                  ├─ beat_spine.py ──┐
+                                                     │
 local/YT footage ──ingest.sh──► src/*.mp4             │
-                                   │                  │
+images ──────────ingest.sh──► assets/ ──stills.py──► src/*.mp4
+pairs ───────────compare.py────────────────────────► src/cmp*.mp4
+                                   │                 │
                      scenes.py ──► scenes.json + motion.npz
                  colorscan.py ──► scenes.json flags + badframes.npz
-                     scene_timeline.py ───────────────┘
+              scene_timeline.py ─────────────────────┤
+               doc_timeline.py ──────────────────────┴──► timeline.json (cuts, sections, beats, hints)
 
 timeline + scenes + motion + badframes ──assign_clips.py──► assign.json
-assign ──render.py──► seg/seg_###.mp4 → work/video.mp4 → out/edit.mp4
+assign ──render.py──► seg/seg_###.mp4 → work/video.mp4 → overlays → mux → out/edit.mp4
 out ──qc.py / contact_sheet.py──► gates + visual proof
 ```
 
@@ -48,6 +51,10 @@ Every stage is idempotent and reads `project.json`. Re-run any stage after editi
   "source_crop": "crop=iw:ih*0.92:0:ih*0.04",  // optional pre-framing crop (reel UI)
   "cover_sources": false,            // one cut per source before any repeats
   "exclude_sources": ["<srcid>"],    // ban every clip from these files
+  "overlays": [                      // drawtext post-pass; see reference/templates.md
+    {"text": "Title", "start": 0.0, "end": 2.0, "style": "title"}
+  ],
+  "audio": {"silence": [[10.0, 11.0]], "duck": [[12.0, 14.0, -8]]},
   "flash_gain": 1.0, "rgb_shift": 7, // override preset effect intensities
   "grade": "",                       // legacy; only used where no look resolves
   "narration": {"duck_db": -8.5, "lines": [
@@ -65,7 +72,7 @@ The direction file. `preset.py` merges the project's canvas and effect intensiti
   "name": "hype",
   "summary": "one line for the preset list",
   "canvas": {"w": 1920, "h": 1080, "fps": 30},
-  "timeline": "beat",                       // expected producer: beat | shots
+  "timeline": "beat",                       // beat | shots | doc
   "pacing": {
     "steps": {"low": 8, "build": [4,2,1], "peak": 2, "drop": [1,1,1,2]},
     "first_cut_min_s": 0.0,
@@ -79,7 +86,8 @@ The direction file. `preset.py` merges the project's canvas and effect intensiti
     "rotate": false,                        // 90deg full-bleed portrait
     "interpolate": "none",                  // none | rife
     "base_zoom": 0.0,                       // slow push on every cut; 0 = none
-    "speed": {"hero": 1.0},                 // retime only
+    "speed": {"hero": 1.0},                 // retime/replay by tag
+    "speed_cycle": {"body": [1.0, 1.5]},    // per-shot speed rotation; "*" = any tag
     "tech": "",                             // technical look prefix
     "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}
   },
@@ -111,7 +119,17 @@ The direction file. `preset.py` merges the project's canvas and effect intensiti
 }
 ```
 
-A `shots` timeline has empty beats/downbeats/drops and one `body` section. `timeline.check` asserts the cutlist starts at 0, reaches the duration, has no gaps and no empty cuts.
+A `shots` timeline has empty beats/downbeats/drops and one `body` section. A `doc` timeline has the same tiling plus `src`/`in_tc` hints on its cuts: A-roll cuts pin `in_tc` to the original timeline so the master audio stays in sync, B-roll cuts carry only a source hint. `timeline.check` asserts the cutlist starts at 0, reaches the duration, has no gaps and no empty cuts.
+
+## Producers
+
+| producer | input | writes |
+|---|---|---|
+| `beat_spine.py` | song analysis | beats, sections, drops, beat cutlist, heroes |
+| `scene_timeline.py` | scenes.json | shot lengths; `cover_sources` puts one cut per source first |
+| `doc_timeline.py` | A-roll + SRT | pinned A-roll cuts, B-roll hints, caption/lower-third overlays |
+| `stills.py` | assets/ images | Ken Burns clips, then the shots producer runs |
+| `compare.py` | video pairs | side-by-side clips, then the shots producer runs |
 
 ## Timeline math (why it is frame-exact)
 

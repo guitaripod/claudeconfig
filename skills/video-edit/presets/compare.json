@@ -1,0 +1,14 @@
+{
+  "name": "compare",
+  "summary": "Before/after comparison: side-by-side clips, long holds, no effects.",
+  "canvas": {"w": 1920, "h": 1080, "fps": 30},
+  "timeline": "shots",
+  "pacing": {"target_shot_s": 6.0, "min_shot_s": 4.0, "max_shot_s": 8.0, "order": "chronological"},
+  "effects": {"plan": "none", "flash_gain": 0.0, "rgb_shift": 0},
+  "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.0,
+             "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}},
+  "grade": {"seed": "fixed", "base": "neutral", "tech": ""},
+  "scan": {"profile": "screen", "motion_floor": 0.002},
+  "gates": {"beat_offset_max": null, "density": false, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
+  "deliver": "master"
+}

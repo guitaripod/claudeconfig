@@ -1,0 +1,14 @@
+{
+  "name": "documentary",
+  "summary": "Documentary: A-roll spine pinned to its audio, B-roll over selected chunks, captions and a lower third.",
+  "canvas": {"w": 1920, "h": 1080, "fps": 30},
+  "timeline": "doc",
+  "pacing": {"chunk_s": 8.0, "broll_every": 2},
+  "effects": {"plan": "none", "flash_gain": 0.0, "rgb_shift": 0},
+  "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.0,
+             "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}},
+  "grade": {"seed": "fixed", "base": "kodak", "tech": ""},
+  "scan": {"profile": "generic", "motion_floor": 0.01},
+  "gates": {"beat_offset_max": null, "density": false, "black": true, "freeze": false, "exposure_max": 3, "av_drift": true},
+  "deliver": "master"
+}

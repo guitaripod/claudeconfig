@@ -1,0 +1,21 @@
+{
+  "name": "slow-burn",
+  "summary": "Long-take performance: song-driven but 4-16 beat cuts, sparse moves.",
+  "canvas": {"w": 1920, "h": 1080, "fps": 30},
+  "timeline": "beat",
+  "pacing": {
+    "steps": {"low": 16, "build": [8, 4, 4], "peak": 4, "drop": [4, 4, 2, 2]},
+    "first_cut_min_s": 0.0,
+    "halfbeat_window": 0.0,
+    "hero_beats": [6, 4],
+    "max_cuts": 8000,
+    "min_cut_s": 0.2
+  },
+  "effects": {"plan": "slow", "flash_gain": 0.0, "rgb_shift": 0},
+  "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.03,
+             "encoder": {"cq": 20, "crf": 18, "maxrate": "60M", "bufsize": "180M"}},
+  "grade": {"seed": "random", "base": null, "tech": ""},
+  "scan": {"profile": "generic", "motion_floor": 0.02},
+  "gates": {"beat_offset_max": 2, "density": true, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
+  "deliver": "master"
+}

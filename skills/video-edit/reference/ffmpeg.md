@@ -1,5 +1,17 @@
 # ffmpeg — effects, render knobs, gotchas
 
+## Overlays
+
+`project.json "overlays"` are burned after concat by `overlays.py`: `title`, `lower_third`, `caption`, `score`. Text goes through `textfile=` with `expansion=none`, so apostrophes, colons and `%` are literal; one line per overlay, no wrapping.
+
+## Audio ranges
+
+`project.json "audio"` applies `volume` timelines at mux: `silence: [[a,b]]` mutes, `duck: [[a,b,db]]` lowers. The source WAV is never edited.
+
+## Speed
+
+`render.speed` (by tag) and `render.speed_cycle` (by cut index) change playback speed in `cuts` mode with `setpts` + `fps`; `retime` mode adds interpolation. Speed is per shot, not an intra-shot ramp. Source consumption follows `dur × speed`.
+
 ## Effect recipes
 
 - **Punch zoom:** `scale=w='OW*(1+a*min(t,DUR)/DUR)':...:eval=frame,crop=OW:OH:(in_w-OW)/2:(in_h-OH)/2`

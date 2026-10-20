@@ -11,14 +11,13 @@ Deterministic and resumable: every stage reads `project.json`, writes one file, 
 
 ## 1. Pick the preset — the only real decision
 
-| preset | for | shape |
-|---|---|---|
-| `hype` | beat-locked montage, fast cuts, dense effects | 1920×1080@30, cut to the song |
-| `hype-rapid` | rapid-fire portrait montage | 1080×1920@30, half-beat cuts |
-| `hype-quality` | the genre's slow-mo variant | 1080×1920@60, RIFE retime, rotated |
-| `calm` | footage-led assembly, long holds, no effects | 1920×1080@30, no beat lock |
+| family | presets |
+|---|---|
+| beat-led | `hype`, `hype-rapid`, `hype-quality`, `slow-burn`, `product`, `broadcast` |
+| footage-led | `calm`, `lookbook`, `travel`, `recap`, `ambient-loop`, `trailer`, `photo`, `compare` |
+| spoken | `documentary`, `talking-head` |
 
-Read `presets/<name>.json` before starting; it is the direction, not a suggestion. If the brief does not imply one, state the preset you are using and why in one line ("footage-led, no beat lock → calm"), then proceed — don't stall on a style interview.
+`reference/templates.md` has the producer, inputs and run order for each. Read `presets/<name>.json` before starting; it is the direction, not a suggestion. If the brief does not imply one, state the preset you are using and why in one line ("footage-led, no beat lock → calm"), then proceed — don't stall on a style interview.
 
 ## 2. Set up
 
@@ -54,7 +53,7 @@ $PY $S/init.py <workdir> --preset calm --duration 90
 bash $S/ingest.sh <workdir> <file|dir|youtube-id|url> ...
 ```
 
-Local paths, directories and YouTube sources all land in `src/` and are decode-validated. Downloads are sequential by design. Prefer official/high-bitrate sources; over-collect for diversity. Trap sources that pass every automated filter: sim gameplay (EA FC/PES), fan comps with end-cards mid-file, combo/HUD/QTE overlays, burned-in subtitles, menus and typography. Details and the audit procedure: `reference/ingest.md`.
+Local paths, directories and YouTube sources all land in `src/` and are decode-validated; images land in `assets/` for the photo template (`stills.py`). Downloads are sequential by design. Prefer official/high-bitrate sources; over-collect for diversity. Trap sources that pass every automated filter: sim gameplay (EA FC/PES), fan comps with end-cards mid-file, combo/HUD/QTE overlays, burned-in subtitles, menus and typography. Details and the audit procedure: `reference/ingest.md`.
 
 For a brief that says "use all the clips", set `project.json "cover_sources": true`: the footage producer places one cut per source before it repeats any. Ban a whole unusable file (caption card, off-subject footage, empty gym) with `"exclude_sources": ["<srcid>"]` rather than hunting individual clip ids.
 
@@ -74,7 +73,11 @@ One producer, depending on where the structure comes from:
 ```bash
 $PY $S/beat_spine.py <workdir>       # song: tempo, sections, drops, cutlist, heroes
 $PY $S/scene_timeline.py <workdir>   # footage: shot list at the preset's shot lengths
+$PY $S/doc_timeline.py <workdir> --aroll <srcid> --srt <file>   # spoken: pinned A-roll + B-roll
 ```
+
+`photo` runs `stills.py` after ingest and before `scenes.py`; `compare` runs
+`compare.py` after `init.py` and before `scenes.py`. Both then use the shots path.
 
 Read the printout. Beat producer: BPM, `cv`≈0 (uniform grid), drop time, hero placement, and the density gradient (drops densest). Shots producer: mean/min/max shot length. `timeline.json` tiles the whole duration with no gaps — `timeline.check` enforces it.
 
@@ -112,9 +115,10 @@ python3 $S/deliver.py <workdir> --name <subject-slug>
 
 ```bash
 bash $S/selftest.sh          # synthetic beat + footage paths, QC must be green
+bash $S/template_selftest.sh # product, broadcast, photo, documentary, compare
 ```
 
-The selftest builds its own fixtures and exercises both producers, a full render, QC, delivery and the preset guard. Run it after touching any stage; a pass means the contracts still hold. Add a case when you add a producer or a preset feature.
+The core selftest builds its own fixtures and exercises both producers, a full render, QC, delivery and the preset guard. The template selftest covers overlays, speed/silence, stills, doc captions and compare. Run both after touching any stage; a pass means the contracts still hold.
 
 ## Several edits at once
 
@@ -131,4 +135,4 @@ The selftest builds its own fixtures and exercises both producers, a full render
 
 ## Files
 
-`scripts/`: `setup.sh` `init.py` `extract_audio.py` `ingest.sh` `scenes.py` `colorscan.py` `beat_spine.py` `scene_timeline.py` `assign_clips.py` `render.py` `look.py` `qc.py` `contact_sheet.py` `deliver.py` `preset.py` `timeline.py` `effect_plans.py` `selftest.sh` `restore.py` (optional restoration) `narrate.py` (voice-over; see `video-narration`) `ask.py` (send-only phone reach). `presets/`: direction files. `reference/`: `timeline.md` (schemas + math), `ingest.md`, `ffmpeg.md`, `review.md`.
+`scripts/`: `setup.sh` `init.py` `extract_audio.py` `ingest.sh` `scenes.py` `stills.py` `compare.py` `colorscan.py` `beat_spine.py` `scene_timeline.py` `doc_timeline.py` `assign_clips.py` `render.py` `overlays.py` `look.py` `qc.py` `contact_sheet.py` `deliver.py` `preset.py` `timeline.py` `effect_plans.py` `selftest.sh` `restore.py` (optional restoration) `narrate.py` (voice-over; see `video-narration`) `ask.py` (send-only phone reach). `presets/`: direction files. `reference/`: `templates.md` (every direction's producer and inputs), `timeline.md` (schemas + math), `ingest.md`, `ffmpeg.md`, `review.md`.

@@ -1,0 +1,22 @@
+{
+  "name": "product",
+  "summary": "Product demo: snap/slide transitions, 1.5x and 0.65x shots, text beats, 4:5.",
+  "canvas": {"w": 1080, "h": 1350, "fps": 30},
+  "timeline": "beat",
+  "pacing": {
+    "steps": {"low": 4, "build": [2, 2, 1], "peak": 1, "drop": [1, 1, 0.5, 0.5]},
+    "first_cut_min_s": 0.0,
+    "halfbeat_window": 0.0,
+    "hero_beats": [2, 2],
+    "max_cuts": 8000,
+    "min_cut_s": 0.15
+  },
+  "effects": {"plan": "product", "flash_gain": 0.0, "rgb_shift": 0},
+  "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.06,
+             "speed_cycle": {"*": [1.0, 1.5, 1.0, 0.65]},
+             "encoder": {"cq": 20, "crf": 18, "maxrate": "50M", "bufsize": "150M"}},
+  "grade": {"seed": "fixed", "base": "kodak", "tech": ""},
+  "scan": {"profile": "generic", "motion_floor": 0.008},
+  "gates": {"beat_offset_max": 2, "density": true, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
+  "deliver": "master"
+}

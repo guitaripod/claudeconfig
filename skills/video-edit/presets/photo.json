@@ -1,0 +1,14 @@
+{
+  "name": "photo",
+  "summary": "Photo slideshow: Ken Burns stills, long holds, 4:5.",
+  "canvas": {"w": 1080, "h": 1350, "fps": 30},
+  "timeline": "shots",
+  "pacing": {"target_shot_s": 5.0, "min_shot_s": 4.0, "max_shot_s": 8.0, "order": "chronological"},
+  "effects": {"plan": "none", "flash_gain": 0.0, "rgb_shift": 0},
+  "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.0,
+             "encoder": {"cq": 21, "crf": 19, "maxrate": "40M", "bufsize": "120M"}},
+  "grade": {"seed": "fixed", "base": "kodak", "tech": ""},
+  "scan": {"profile": "generic", "motion_floor": 0.001},
+  "gates": {"beat_offset_max": null, "density": false, "black": true, "freeze": true, "exposure_max": 3, "av_drift": true},
+  "deliver": "master"
+}

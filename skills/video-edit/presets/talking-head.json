@@ -1,0 +1,14 @@
+{
+  "name": "talking-head",
+  "summary": "Talking-head clip: all A-roll, caption overlays, portrait.",
+  "canvas": {"w": 1080, "h": 1920, "fps": 30},
+  "timeline": "doc",
+  "pacing": {"chunk_s": 6.0, "broll_every": 0},
+  "effects": {"plan": "none", "flash_gain": 0.0, "rgb_shift": 0},
+  "render": {"mode": "cuts", "rotate": false, "interpolate": "none", "base_zoom": 0.0,
+             "encoder": {"cq": 20, "crf": 18, "maxrate": "50M", "bufsize": "150M"}},
+  "grade": {"seed": "fixed", "base": "kodak", "tech": ""},
+  "scan": {"profile": "generic", "motion_floor": 0.005},
+  "gates": {"beat_offset_max": null, "density": false, "black": true, "freeze": false, "exposure_max": 3, "av_drift": true},
+  "deliver": "master"
+}
