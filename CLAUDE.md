@@ -11,6 +11,9 @@ Everything here applies to every session on every machine. Machine-specific rule
 - No file headers in Swift files.
 - Surgical and lean, never half-done: edge cases, polish and verification are part of the task. Taking longer is fine; a shortcut that leaves gaps is not.
 
+## Secrets
+- Never print, echo or paste a secret value (API key, token, password, private key) into chat, code, commits or logs; reference the env var instead. Store it in a 1Password Environment and mount it as a live `.env` with the `1password-environments` skill.
+
 ## Git
 - Default branch is `master`, never `main`: `git init -b master`; if a host made `main`, `git branch -m main master`, push `-u`, `gh repo edit --default-branch master`, then delete `main`.
 - NEVER add Co-Authored-By or "Generated with Claude Code" to commits or PRs (enforced by `hooks/guard-bash.sh`).
