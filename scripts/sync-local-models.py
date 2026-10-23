@@ -13,7 +13,7 @@ Per model, llama-swap holds:
   description  the full descriptor, `Family Size · [Uncensored ·] Engine · Quant
                · Speculation · Context`. blackwall's models.toml `name` repeats it.
   metadata.agent
-    style        qwen | muse | nemotron | gptoss, picks the thinking variants
+    style        qwen | muse | nemotron | gptoss | flint, picks the thinking variants
     opencode_id  the id opencode pins in sessions, when it differs from the id
     opencode     false keeps the model out of opencode
     context      overrides the window read from the launch command
@@ -119,6 +119,13 @@ STYLES = {
         "variants": _no_variants,
         "efforts": ["minimal", "low", "medium", "high"],
         "output": 32768,
+        "format": "openai",
+        "qwen_effort": False,
+    },
+    "flint": {
+        "variants": _no_variants,
+        "efforts": [],
+        "output": 65536,
         "format": "openai",
         "qwen_effort": False,
     },
