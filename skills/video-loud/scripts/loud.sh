@@ -150,6 +150,14 @@ build_af() {
 }
 build_af "$LTP"
 
+# Moves the verified temp file to $OUT with the mode a normal write would get
+# (666 minus the umask). mktemp creates 600, which leaves media servers running as
+# another user (Plex) unable to read the result.
+publish_output() {
+  chmod "$(printf '%03o' $((0666 & ~$(umask))))" "$TMP"
+  mv "$TMP" "$OUT"
+}
+
 encode() { # $1 = gain suffix applied after loudnorm/limiter (must not be re-normalized)
   local rc=0
   ffmpeg -hide_banner -nostdin -err_detect ignore_err -y -i "$INPUT" \
@@ -201,7 +209,7 @@ awk -v tp="$TP1" -v c="$CEILING" 'BEGIN{exit !(tp <= c + 0.01)}' || {
   exit 1
 }
 
-mv "$TMP" "$OUT"
+publish_output
 rm -f "$meas"
 trap - EXIT
 echo "after : I=${I1} LUFS  true-peak=${TP1} dBTP"
