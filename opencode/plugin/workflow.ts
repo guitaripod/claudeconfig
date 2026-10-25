@@ -1,5 +1,5 @@
 import { toolDescription, ultracodeNotice } from "../../workflow-runtime/instructions.ts"
-import { formatResult, hasUltracodeKeyword, invocationKey, listWorkflows, RepeatGuard, runWorkflow } from "../../workflow-runtime/runtime.ts"
+import { findWorkflow, formatResult, hasUltracodeKeyword, invocationKey, listWorkflows, RepeatGuard, runWorkflow } from "../../workflow-runtime/runtime.ts"
 import type { AgentRequest, AgentResult, Meta, RunResult, Runner, WorkflowEvent } from "../../workflow-runtime/runtime.ts"
 
 interface ModelRef {
@@ -28,10 +28,23 @@ interface Progress {
   agents: number
 }
 
+interface Pin {
+  name: string
+  args: string | undefined
+  text: string
+  stage: "call" | "relay"
+}
+
 const FALLBACK_AGENT = "general"
 const LIST_ARGUMENT = "list"
 const STOP_ARGUMENT = "stop"
+const TOOL_NAME = "workflow"
+const CODE_MODE_HEADING = "# Code Mode"
+const CODE_MODE_TOOL = "execute"
+const ORCHESTRATION_TOOLS = [TOOL_NAME, "subagent", "question"]
+const TURN_END_EVENTS = new Set(["session.execution.interrupted", "session.execution.succeeded", "session.execution.failed"])
 const INTERRUPTED_EVENT = "session.execution.interrupted"
+const SUCCEEDED_EVENT = "session.execution.succeeded"
 
 const INPUT = {
   type: "object",
@@ -97,9 +110,34 @@ function parseCommand(text: string): { name: string; args: string | undefined } 
   return { name: trimmed.slice(0, space), args: rest || undefined }
 }
 
-/// The message that hands a finished workflow result to the model for relaying.
+/// The user message of the turn that runs a saved workflow for `/workflow <name> [args]`.
+function commandPrompt(name: string, args: string | undefined): string {
+  return args === undefined ? `Run the saved workflow "${name}".` : `Run the saved workflow "${name}" with the arguments: ${args}`
+}
+
+/// The tool input schema for a pinned call: the model can only emit the exact name and args the user typed.
+function pinnedSchema(pin: Pin): object {
+  const properties: Record<string, object> = { name: { const: pin.name } }
+  if (pin.args !== undefined) properties.args = { const: pin.args }
+  return { type: "object", properties, required: Object.keys(properties), additionalProperties: false }
+}
+
+/// The hidden instruction for a pinned turn: call the tool first, then relay what it returned.
+function pinNotice(pin: Pin): string {
+  if (pin.stage === "relay") {
+    return "The workflow tool has finished. Relay its result to the user as is. Do not call any tools."
+  }
+  return `The user ran the command /workflow ${pin.name}. Call the ${TOOL_NAME} tool now, exactly once, with the name and args already fixed in its schema. Do not answer before calling it.`
+}
+
+/// The text that tells the user a pinned turn ended without the tool being called.
+function notRunText(pin: Pin): string {
+  return `The workflow "${pin.name}" did not run: the model answered without calling the ${TOOL_NAME} tool. Tell the user plainly that nothing ran and that /workflow ${pin.name} can be tried again.`
+}
+
+/// The message that hands a reply of the `/workflow` command to the model for relaying.
 function deliveryText(body: string): string {
-  return `The workflow finished. Relay the result below to the user as is, without calling any tools.\n\n${body}`
+  return `Relay the message below to the user as is, without calling any tools.\n\n${body}`
 }
 
 export default {
@@ -109,6 +147,7 @@ export default {
     const flagged = new Set<string>()
     const models = new Map<string, ModelRef>()
     const runs = new Map<string, Set<AbortController>>()
+    const pins = new Map<string, Pin>()
     const guard = new RepeatGuard()
 
     /// Registers a running workflow for a session; its controller aborts with `external` and is dropped by `release`.
@@ -141,15 +180,35 @@ export default {
       return stopped
     }
 
-    /// Aborts a session's workflows whenever the harness reports that the session was interrupted.
-    async function watchInterrupts(): Promise<void> {
+    /// Stops every workflow of a session, also a command whose tool call has not started yet, and returns how many were stopped.
+    async function stopAll(sessionID: string): Promise<number> {
+      const stopped = abortRuns(sessionID)
+      if (pins.get(sessionID)?.stage !== "call") return stopped
+      pins.delete(sessionID)
+      await ctx.session.interrupt({ sessionID, resume: false }).catch(() => undefined)
+      return stopped + 1
+    }
+
+    /// Reacts to turn events: an interrupt aborts the session's workflows, and any turn end settles a pinned command.
+    async function watchTurns(): Promise<void> {
       try {
         for await (const event of ctx.event.subscribe()) {
-          if (event?.type === INTERRUPTED_EVENT && event.data?.sessionID) abortRuns(event.data.sessionID)
+          const sessionID: string | undefined = event?.data?.sessionID
+          if (!sessionID || !TURN_END_EVENTS.has(event.type)) continue
+          if (event.type === INTERRUPTED_EVENT) abortRuns(sessionID)
+          void settlePin(sessionID, event.type === SUCCEEDED_EVENT)
         }
       } catch {
         return
       }
+    }
+
+    /// Drops the pinned command of a session once its turn ended, and says so plainly if the tool was never called.
+    async function settlePin(sessionID: string, succeeded: boolean): Promise<void> {
+      const pin = pins.get(sessionID)
+      if (!pin) return
+      pins.delete(sessionID)
+      if (succeeded && pin.stage === "call") await deliver(sessionID, notRunText(pin))
     }
 
     /// True for sessions this plugin created and for any other session that has a parent.
@@ -277,15 +336,18 @@ export default {
       })
     }
 
-    void watchInterrupts()
+    void watchTurns()
 
     await ctx.tool.transform((tools: any) => {
       tools.add({
-        name: "workflow",
+        name: TOOL_NAME,
         description: toolDescription(listWorkflows(ctx.location.directory)),
         input: INPUT,
         options: { codemode: false },
-        execute: async (input: WorkflowInput, context: ToolContext) => {
+        execute: async (modelInput: WorkflowInput, context: ToolContext) => {
+          const pin = pins.get(context.sessionID)
+          const input: WorkflowInput = pin?.stage === "call" ? { name: pin.name, args: pin.args } : modelInput
+          if (pin?.stage === "call") pin.stage = "relay"
           const hasScript = typeof input.script === "string" && input.script.trim() !== ""
           const hasName = typeof input.name === "string" && input.name.trim() !== ""
           if (hasScript === hasName) {
@@ -318,21 +380,6 @@ export default {
       })
     })
 
-    /// Runs a saved workflow in the background and delivers its result to the session unless the run was stopped.
-    async function runDetached(sessionID: string, name: string, args: string | undefined): Promise<void> {
-      const run = trackRun(sessionID)
-      let body: string
-      try {
-        body = formatResult(await execute(sessionID, { name }, args, run.controller.signal, undefined))
-      } catch (error) {
-        body = `workflow failed: ${error instanceof Error ? error.message : String(error)}`
-      } finally {
-        run.release()
-      }
-      if (run.controller.signal.aborted) return
-      await deliver(sessionID, body)
-    }
-
     /// Hands text to the model of a session so it relays it to the user.
     async function deliver(sessionID: string, body: string): Promise<void> {
       try {
@@ -345,17 +392,22 @@ export default {
     await ctx.command.transform((commands: any) => {
       commands.add({
         name: "workflow",
-        description: "Run a saved workflow in the background: /workflow <name> [args...], /workflow list, /workflow stop",
+        description: "Run a saved workflow in a model turn that can be stopped: /workflow <name> [args...], /workflow list, /workflow stop",
         execute: async ({ sessionID, prompt }: { sessionID: string; prompt: { text?: string } }) => {
           flagged.delete(sessionID)
           guard.reset(sessionID)
           const { name, args } = parseCommand(prompt?.text ?? "")
+          const directory = await sessionDirectory(sessionID)
           if (name === "" || name === LIST_ARGUMENT) {
-            await deliver(sessionID, listText(listWorkflows(await sessionDirectory(sessionID))))
+            await deliver(sessionID, listText(listWorkflows(directory)))
           } else if (name === STOP_ARGUMENT) {
-            await deliver(sessionID, `Stopped ${abortRuns(sessionID)} running workflow(s).`)
+            await deliver(sessionID, `Stopped ${await stopAll(sessionID)} running workflow(s).`)
+          } else if (findWorkflow(name, directory) === undefined) {
+            await deliver(sessionID, `No saved workflow named "${name}".\n\n${listText(listWorkflows(directory))}`)
           } else {
-            void runDetached(sessionID, name, args)
+            const pin: Pin = { name, args, text: commandPrompt(name, args), stage: "call" }
+            pins.set(sessionID, pin)
+            await ctx.session.prompt({ sessionID, text: pin.text })
           }
         },
       })
@@ -364,13 +416,61 @@ export default {
     await ctx.session.hook("prompt", async (event: any) => {
       const sessionID: string = event.sessionID
       if (await isChild(sessionID)) return
+      if (pins.get(sessionID)?.text === event.prompt?.text) return
+      pins.delete(sessionID)
       guard.reset(sessionID)
       if (hasUltracodeKeyword(event.prompt?.text ?? "")) flagged.add(sessionID)
       else flagged.delete(sessionID)
     })
 
+    /// Removes the code-mode instructions, which list every tool and weigh about fourteen thousand tokens, together with the `execute` tool they describe.
+    function dropCodeMode(event: any): void {
+      const kept = event.system.filter((block: any) => !String(block?.text ?? "").startsWith(CODE_MODE_HEADING))
+      if (kept.length === event.system.length) return
+      event.system.splice(0, event.system.length, ...kept)
+      delete event.tools?.[CODE_MODE_TOOL]
+    }
+
+    /// Takes the tools that start more agents or wait for a person away from a sub-agent; code mode stays, because MCP tools are reachable only through it.
+    function trimChild(event: any): void {
+      for (const name of ORCHESTRATION_TOOLS) delete event.tools?.[name]
+    }
+
+    /// Narrows a pinned turn: before the call only the workflow tool with a fixed input, afterwards no tools at all.
+    function applyPin(event: any, pin: Pin): void {
+      dropCodeMode(event)
+      const tools = event.tools ?? {}
+      const tool = tools[TOOL_NAME]
+      for (const key of Object.keys(tools)) delete tools[key]
+      if (pin.stage === "call" && tool) tools[TOOL_NAME] = { ...tool, input: pinnedSchema(pin) }
+      event.system.push({ type: "text", text: pinNotice(pin) })
+    }
+
+    await ctx.session.hook("http.request", async (event: any) => {
+      if (event.kind !== "primary" || pins.get(event.sessionID)?.stage !== "call") return
+      try {
+        const body = JSON.parse(await event.request.clone().text())
+        if (!Array.isArray(body.tools) || body.tools.length === 0) return
+        body.tool_choice = "required"
+        const headers = new Headers(event.request.headers)
+        headers.delete("content-length")
+        event.request = new Request(event.request.url, { method: event.request.method, headers, body: JSON.stringify(body) })
+      } catch {
+        return
+      }
+    })
+
     await ctx.session.hook("context", (event: any) => {
       if (event.model && !children.has(event.sessionID)) models.set(event.sessionID, toModelRef(event.model))
+      if (children.has(event.sessionID)) {
+        trimChild(event)
+        return
+      }
+      const pin = pins.get(event.sessionID)
+      if (pin) {
+        applyPin(event, pin)
+        return
+      }
       if (flagged.has(event.sessionID)) {
         event.system.push({ type: "text", text: ultracodeNotice(listWorkflows(ctx.location.directory)) })
       }

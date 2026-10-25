@@ -5,6 +5,7 @@ import {
 	type AgentRequest,
 	type AgentResult,
 	formatResult,
+	findWorkflow,
 	hasUltracodeKeyword,
 	invocationKey,
 	listWorkflows,
@@ -16,6 +17,7 @@ import {
 
 type AgentSession = Awaited<ReturnType<ExtensionAPI["pi"]["createAgentSession"]>>["session"];
 type SessionSettings = NonNullable<Parameters<ExtensionAPI["pi"]["createAgentSession"]>[0]>["settings"];
+type McpManager = NonNullable<ReturnType<(typeof import("@oh-my-pi/pi-coding-agent/mcp"))["MCPManager"]["instance"]>>;
 type ResolvedModel = NonNullable<ExtensionContext["model"]>;
 type JsonObject = Record<string, unknown>;
 
@@ -39,16 +41,28 @@ interface Invocation {
 	args?: unknown;
 }
 
+type PinStage = "call" | "relay";
+
+/// A command turn in progress: `call` forces the workflow tool with a fixed name and args, `relay` only lets the model repeat a text.
+interface Pin {
+	name: string;
+	args: string | undefined;
+	stage: PinStage;
+}
+
 interface Instance {
 	runs: Set<AbortController>;
+	pins: Map<string, Pin>;
 	tag: string;
 	childCount: number;
 	guard: RepeatGuard;
 }
 
 const NOTICE_TYPE = "ultracode-notice";
-const RESULT_TYPE = "workflow-result";
+const COMMAND_TYPE = "workflow-command";
 const SUBMIT_TOOL = "submit_result";
+const TOOL_NAME = "workflow";
+const CHILD_HIDDEN_TOOLS = [TOOL_NAME, "task", "ask", "irc"];
 const FALLBACK_PARENT_ID = "Main";
 const LIST_WORDS = ["", "list"];
 const STOP_WORD = "stop";
@@ -188,7 +202,30 @@ function failedReply(session: AgentSession): string | undefined {
 	return last.errorMessage ?? "the model request failed";
 }
 
-/// Starts a child session configured like omp's own task subagents, minus extensions so it cannot orchestrate.
+/// The parent session's MCP manager, which the host registers process-wide; undefined when the parent has none or this omp build does not expose the module.
+async function parentMcpManager(): Promise<McpManager | undefined> {
+	try {
+		const mcp = await import("@oh-my-pi/pi-coding-agent/mcp");
+		return mcp.MCPManager.instance();
+	} catch {
+		return undefined;
+	}
+}
+
+/// The parent's live MCP connections as proxy tools, the way omp's own task subagents reach them, so no child starts an MCP server of its own.
+async function parentMcp(pi: ExtensionAPI): Promise<{ manager: McpManager | undefined; tools: unknown[] }> {
+	const manager = await parentMcpManager();
+	return { manager, tools: manager ? pi.pi.createMCPProxyTools(manager) : [] };
+}
+
+/// Hides the tools that start more agents or wait for a person from a child, which cannot answer them, and keeps the shared MCP tools directly callable: rewriting the active set would otherwise unmount them from the `xd://` devices they start on.
+async function trimChild(session: AgentSession, mcpToolNames: string[]): Promise<void> {
+	const kept = session.getActiveToolNames().filter(name => !CHILD_HIDDEN_TOOLS.includes(name));
+	const shared = mcpToolNames.filter(name => session.getToolByName(name) !== undefined && !kept.includes(name));
+	await session.setActiveToolsByName([...kept, ...shared]);
+}
+
+/// Starts a child session configured like omp's own task subagents, minus extensions so it cannot orchestrate, and sharing the parent's MCP connections instead of starting its own.
 async function createChild(
 	pi: ExtensionAPI,
 	instance: Instance,
@@ -197,6 +234,8 @@ async function createChild(
 	customTools: unknown[],
 ) {
 	const sdk = pi.pi;
+	const mcp = await parentMcp(pi);
+	const tools = [...mcp.tools, ...customTools];
 	instance.childCount += 1;
 	const agentId = `wf-${process.pid}-${instance.tag}-${instance.childCount}`;
 	const { session } = await sdk.createAgentSession({
@@ -212,15 +251,22 @@ async function createChild(
 		settings: childSettings(pi),
 		thinkingLevel: pi.getThinkingLevel(),
 		disableExtensionDiscovery: true,
-		enableMCP: false,
+		enableMCP: mcp.manager !== undefined,
+		mcpManager: mcp.manager,
 		enableLsp: false,
 		hasUI: false,
 		skills: [],
 		rules: [],
 		promptTemplates: [],
 		slashCommands: [],
-		customTools: customTools.length > 0 ? (customTools as never) : undefined,
+		customTools: tools.length > 0 ? (tools as never) : undefined,
 	});
+	try {
+		await trimChild(session, mcp.tools.map(tool => (tool as { name: string }).name));
+	} catch (error) {
+		await session.dispose().catch(() => undefined);
+		throw error;
+	}
 	return session;
 }
 
@@ -279,10 +325,18 @@ async function execute(
 	}
 }
 
+/// The input a tool call runs with: the name and args the user typed when a command turn is waiting for its call, else what the model sent.
+function effectiveInput(instance: Instance, sessionId: string, modelInput: ToolInput): ToolInput {
+	const pin = instance.pins.get(sessionId);
+	if (pin?.stage !== "call") return modelInput;
+	pin.stage = "relay";
+	return { name: pin.name, args: pin.args };
+}
+
 function registerWorkflowTool(pi: ExtensionAPI, instance: Instance): void {
 	const z = pi.zod;
 	pi.registerTool({
-		name: "workflow",
+		name: TOOL_NAME,
 		label: "Workflow",
 		loadMode: "essential",
 		description: registeredDescription(),
@@ -293,56 +347,139 @@ function registerWorkflowTool(pi: ExtensionAPI, instance: Instance): void {
 		}),
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			if (isSubagent(ctx)) return textResult(SUBAGENT_REFUSAL, true);
-			const invocation = readInvocation(params as ToolInput);
-			if (typeof invocation === "string") return textResult(invocation, true);
 			const sessionId = ctx.sessionManager.getSessionId();
+			const input = effectiveInput(instance, sessionId, params as ToolInput);
+			const invocation = readInvocation(input);
+			if (typeof invocation === "string") return textResult(invocation, true);
 			const refusal = instance.guard.refusal(sessionId);
 			if (refusal) return textResult(refusal, true);
 			const result = await execute(pi, instance, ctx, invocation, signal, text =>
 				onUpdate?.({ content: [{ type: "text", text }] }),
 			);
-			const text = instance.guard.record(sessionId, invocationKey(params as ToolInput), result.ok, formatResult(result));
+			const text = instance.guard.record(sessionId, invocationKey(input), result.ok, formatResult(result));
 			return { ...textResult(text, !result.ok), details: { agents: result.agents, failed: result.failed } };
 		},
 	});
 }
 
-/// Aborts every running workflow and reports how many there were. A command handler has no abort signal of its own, so this is how a `/workflow` run is interrupted.
+/// Aborts every running workflow and reports how many there were.
 function stopRuns(instance: Instance): string {
 	const count = instance.runs.size;
 	for (const controller of instance.runs) controller.abort();
 	return count === 0 ? "No workflow is running." : `Stopped ${count} running workflow${count === 1 ? "" : "s"}.`;
 }
 
-/// Handles `/workflow`: lists saved workflows, stops running ones, or runs one by name and posts the formatted result into the session.
-async function handleCommand(pi: ExtensionAPI, instance: Instance, ctx: ExtensionContext, raw: string): Promise<void> {
+/// The hidden message of the turn that runs a saved workflow for `/workflow <name> [args]`.
+function commandPrompt(name: string, args: string | undefined): string {
+	const typed = args === undefined ? "" : ` ${args}`;
+	const withArgs = args === undefined ? "" : ` and args ${JSON.stringify(args)}`;
+	return `The user ran the command /workflow ${name}${typed}. Call the ${TOOL_NAME} tool now, exactly once, with name ${JSON.stringify(name)}${withArgs}. Do not answer before calling it. When it returns, relay its result to the user as is.`;
+}
+
+/// The hidden message that hands a reply of the `/workflow` command to the model for relaying.
+function deliveryText(body: string): string {
+	return `Relay the message below to the user as is, without calling any tools.\n\n${body}`;
+}
+
+/// The text that tells the user a command turn ended without the tool being called.
+function notRunText(name: string): string {
+	return `The workflow "${name}" did not run: the model answered without calling the ${TOOL_NAME} tool, so nothing ran. /workflow ${name} can be tried again.`;
+}
+
+/// The tool input schema of a command turn: the model can only emit the exact name and args the user typed.
+function pinnedSchema(pin: Pin): JsonObject {
+	const properties: Record<string, JsonObject> = { name: { const: pin.name } };
+	if (pin.args !== undefined) properties.args = { const: pin.args };
+	return { type: "object", properties, required: Object.keys(properties), additionalProperties: false };
+}
+
+/// The name of a tool entry in a provider request body, in the chat, responses or messages wire format.
+function wireToolName(tool: JsonObject): unknown {
+	return (tool.function as JsonObject | undefined)?.name ?? tool.name;
+}
+
+/// The request body of a command turn: only the workflow tool, forced before it ran and switched off after, with the pinned input schema. Undefined when the body has no workflow tool to force.
+function narrowRequest(payload: unknown, pin: Pin): JsonObject | undefined {
+	if (typeof payload !== "object" || payload === null) return undefined;
+	const body = payload as JsonObject;
+	const tools = Array.isArray(body.tools) ? (body.tools as JsonObject[]) : [];
+	const found = tools.find(tool => wireToolName(tool) === TOOL_NAME);
+	if (!found) return undefined;
+	const entry = structuredClone(found);
+	const pinned = pin.name === "" ? undefined : pinnedSchema(pin);
+	const forced = pin.stage === "call";
+	let choice: unknown = forced ? "required" : "none";
+	if (entry.function) {
+		if (pinned) (entry.function as JsonObject).parameters = pinned;
+	} else if (entry.input_schema) {
+		if (pinned) entry.input_schema = pinned;
+		choice = { type: forced ? "any" : "none" };
+	} else if (pinned) {
+		entry.parameters = pinned;
+	}
+	return { ...body, tools: [entry], tool_choice: choice };
+}
+
+/// Starts a hidden model turn for a command. The bridge shows no custom messages, so the model's reply is how the user hears anything.
+function startTurn(pi: ExtensionAPI, text: string): void {
+	pi.sendMessage({ customType: COMMAND_TYPE, content: text, display: false, attribution: "user" }, { triggerTurn: true });
+}
+
+/// Has the model say `body` to the user in a turn that cannot call tools.
+function deliver(pi: ExtensionAPI, instance: Instance, sessionId: string, body: string): void {
+	instance.pins.set(sessionId, { name: "", args: undefined, stage: "relay" });
+	startTurn(pi, deliveryText(body));
+}
+
+/// Handles `/workflow`: lists saved workflows, stops running ones, or starts a model turn that calls the workflow tool for a saved name, so the harness's own stop reaches the run.
+function handleCommand(pi: ExtensionAPI, instance: Instance, ctx: ExtensionContext, raw: string): void {
+	const sessionId = ctx.sessionManager.getSessionId();
 	const { name, args } = parseCommandArgs(raw);
-	if (LIST_WORDS.includes(name.toLowerCase())) {
-		pi.sendMessage({ customType: RESULT_TYPE, content: savedListText(ctx.cwd), display: true });
-		return;
+	instance.guard.reset(sessionId);
+	if (LIST_WORDS.includes(name.toLowerCase())) return deliver(pi, instance, sessionId, savedListText(ctx.cwd));
+	if (name.toLowerCase() === STOP_WORD) return deliver(pi, instance, sessionId, stopRuns(instance));
+	if (findWorkflow(name, ctx.cwd) === undefined) {
+		return deliver(pi, instance, sessionId, `No saved workflow named "${name}".\n\n${savedListText(ctx.cwd)}`);
 	}
-	if (name.toLowerCase() === STOP_WORD) {
-		pi.sendMessage({ customType: RESULT_TYPE, content: stopRuns(instance), display: true });
-		return;
-	}
-	const result = await execute(pi, instance, ctx, { name, args }, undefined, undefined);
-	pi.sendMessage({ customType: RESULT_TYPE, content: formatResult(result), display: true });
+	instance.pins.set(sessionId, { name, args, stage: "call" });
+	startTurn(pi, commandPrompt(name, args));
+}
+
+/// True when the model finished its last reply on its own, as opposed to the user stopping it or the request failing.
+function endedNormally(messages: readonly unknown[]): boolean {
+	const last = [...messages].reverse().find(message => (message as { role?: string }).role === "assistant") as
+		| { stopReason?: string }
+		| undefined;
+	return last?.stopReason === "stop";
+}
+
+/// Says plainly, through a tool-less model turn, that a command turn ended with the tool never called.
+function reportNotRun(pi: ExtensionAPI, instance: Instance, sessionId: string, pin: Pin): void {
+	deliver(pi, instance, sessionId, notRunText(pin.name));
 }
 
 export default function workflowExtension(pi: ExtensionAPI): void {
-	const instance: Instance = { runs: new Set(), tag: randomUUID().slice(0, 8), childCount: 0, guard: new RepeatGuard() };
+	const instance: Instance = {
+		runs: new Set(),
+		pins: new Map(),
+		tag: randomUUID().slice(0, 8),
+		childCount: 0,
+		guard: new RepeatGuard(),
+	};
 	registerWorkflowTool(pi, instance);
 
 	pi.registerCommand("workflow", {
 		description: "Run a saved multi-agent workflow: /workflow <name> [args], /workflow list, or /workflow stop",
 		handler: async (args, ctx) => {
-			await handleCommand(pi, instance, ctx, args);
+			handleCommand(pi, instance, ctx, args);
 		},
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
 		if (isSubagent(ctx)) return;
-		instance.guard.reset(ctx.sessionManager.getSessionId());
+		const sessionId = ctx.sessionManager.getSessionId();
+		instance.pins.delete(sessionId);
+		instance.guard.reset(sessionId);
 		if (!hasUltracodeKeyword(event.prompt)) return;
 		return {
 			message: {
@@ -354,7 +491,23 @@ export default function workflowExtension(pi: ExtensionAPI): void {
 		};
 	});
 
+	pi.on("before_provider_request", async (event, ctx) => {
+		if (isSubagent(ctx)) return undefined;
+		const pin = instance.pins.get(ctx.sessionManager.getSessionId());
+		return pin ? narrowRequest(event.payload, pin) : undefined;
+	});
+
+	pi.on("agent_end", async (event, ctx) => {
+		if (isSubagent(ctx)) return;
+		const sessionId = ctx.sessionManager.getSessionId();
+		const pin = instance.pins.get(sessionId);
+		if (!pin) return;
+		if (pin.stage === "call" && endedNormally(event.messages)) reportNotRun(pi, instance, sessionId, pin);
+		else instance.pins.delete(sessionId);
+	});
+
 	pi.on("session_shutdown", async () => {
 		for (const controller of instance.runs) controller.abort();
+		instance.pins.clear();
 	});
 }
