@@ -23,6 +23,15 @@ Every store, product-page and marketing screenshot of any device type (iPhone, i
 ## Midgar operations vault (macbook)
 `~/.config/midgar/` (chmod 600, never in git): `credentials.env` (ASC API key/issuer, RevenueCat v2 secret keys per project, signing paths), `signing/` (distribution p12 + password, provisioning profiles, AICredits deploy key), `OPERATIONS.md` (a pointer file plus the vault-only facts: account identifiers kept out of git and where secret material sits). The knowledge lives in the Midgar monorepo: for any store, revenue or release work read `~/Dev/midgar/AGENTS.md` and the relevant runbook in `~/Dev/midgar/ops/runbooks/` first (App Store Connect, RevenueCat, mako, release-CI mechanics), with dated history in `~/Dev/midgar/ops/journal/2026.jsonl`; open `OPERATIONS.md` only for the vault-only facts and keep the runbooks accurate afterwards.
 
+## Every release ships a current store set
+A release is not ready until its store set matches the build, on every device type and locale it ships. Stale art is how Tailscode 1.79 found its iPhone Duo set still telling the old story in light mode with a 14.39 clock. Per release:
+- **Read the funnel first** (App Store Discovery & Engagement + App Downloads Standard via `asc analytics`, split by device and source type). Mac search impressions are mostly noise. Judge the iPhone tap-through and view-to-download rates, and write the baseline and targets into the app's `docs/marketing-<version>.md`.
+- **Panels for every device class:** iPhone 6.9", iPad 13", **iPhone Duo** (ten per locale across its four sizes, from a build linked against the iOS 27.1 SDK; `iphone-duo` skill), Mac, plus Watch/TV/Vision where shipped. Every locale gets captions; masters are reshot whenever the UI they show changed.
+- **Preview:** plain footage whose first frame is already the product, never a wallpaper or launch screen. Set the poster frame.
+- **Header and Search Results creative (iOS 27):** these are what search shows, so they change when the story does.
+- **Fact-check every claim** in captions, description, promo and notes against the build's source before staging. Check the privacy claims ("no analytics", "no account") against what the app actually sends and against its App Privacy label.
+- **Stage it in `store/`**: `store/metadata`, `store/shots/<device>/<locale>/`, and previews in `store/previews/<train>/`. `midgar ship` refuses to submit while a set is stale, missing or remote-only (`--allow-stale-shots` overrides it on purpose).
+
 ## What's New: rich, every release, every platform
 List everything a user actually gets since the last release that reached *that* store. A version that shipped Mac-only or was skipped folds its work into the next one's notes: walk `git log` back to the previous release commit for that platform, never just the headline feature or last commit. Write en-US concrete and user-facing (features, fixes, what changed on screen; no "bug fixes and improvements"), translate into every locale the listing already carries, then read the notes back from the store. Same rule for TestFlight what-to-test, GitHub release notes and changelogs.
 
