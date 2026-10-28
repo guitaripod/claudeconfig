@@ -18,7 +18,9 @@ Per model, llama-swap holds:
     opencode     false keeps the model out of opencode
     context      overrides the window read from the launch command
     vision       false for a text-only model
-    efforts      omp effort levels, [] for none
+    efforts      omp effort levels, [] for none; "none" here means the timer
+                 can switch thinking off and is implied by requiresEffort, so
+                 omp's schema never sees it
 
 Run with --check to see what would change without writing.
 """
@@ -91,6 +93,8 @@ def _nemotron_variants() -> dict:
 def _no_variants() -> dict:
     return {}
 
+
+OMP_EFFORTS = ("minimal", "low", "medium", "high", "xhigh", "max")
 
 STYLES = {
     "qwen": {
@@ -234,8 +238,9 @@ def _omp_overrides(models: dict[str, dict]) -> dict:
     for model_id, meta in models.items():
         profile = meta["style"]
         entry = {"name": meta["name"], "reasoning": True}
-        if meta["efforts"]:
-            entry["thinking"] = {"mode": "effort", "efforts": meta["efforts"], "requiresEffort": False}
+        efforts = [level for level in meta["efforts"] if level in OMP_EFFORTS]
+        if efforts:
+            entry["thinking"] = {"mode": "effort", "efforts": efforts, "requiresEffort": False}
         entry["contextWindow"] = meta["context"]
         entry["maxTokens"] = profile["output"]
         entry["input"] = ["text", "image"] if meta["vision"] else ["text"]
