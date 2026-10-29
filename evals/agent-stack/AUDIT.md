@@ -63,7 +63,7 @@ No task flipped at any step. The 0.98 on T06 is one hidden semrange test that ev
 | `claude-code-guide` | **keep**: it already behaves as a lookup tool | Called like a tool, returns one answer, keeps documentation dumps out of context | 3 spawns, $0.66 in 90 days |
 | `claude` (FleetView default) | **keep**, watch | Needed by FleetView. With `bulk` available the eval never used it. With `bulk` denied it was the escape hatch | Deny it only if `delegation-report` shows it replacing `general-purpose` |
 | workflows `flyr`, `hinta-best`, `kaytetty-best`, `verdict` | **keep** as tools | Parallel fan-out over independent sources. The main agent calls them and gets one answer back, the article's "subagent as a tool, not a hand-off". All pin `model: 'haiku'` | |
-| workflow `wwdc` | **fold into a skill** (proposed, not yet evaluated) | A search, read and synthesize chain over a static knowledge base. The main loop can grep `topics.json` and fetch READMEs with parallel tool calls | Needs its own small eval first |
+| workflow `wwdc` | **folded into the `wwdc` skill** | A search, read and synthesize chain over a static knowledge base. The main loop fetches the indexes and READMEs with parallel tool calls | Same score (3/3), 11 s against 63 s median, $0.15 against $0.19 (follow-up below) |
 | `delegate` CLI | **keep** as a tool | User-invoked and verifier-gated. Tiers are a human decision | |
 | `delegate-midrun.sh` hook | **narrow** | The read-streak nudge ("hand reading to `Explore`/`general-purpose`") is gone. It now suggests `bulk` only after edits to 6 files | |
 | `delegate-check.sh`, `guard-bash.sh`, brevity hooks | **keep** | Harness-level quality and write gates are where the article puts hard limits | |
@@ -89,24 +89,42 @@ No task flipped at any step. The 0.98 on T06 is one hidden semrange test that ev
 
 ## Migration plan, by priority
 
-1. **Done in this change** (all eval-backed):
-   - deny `Explore`, `general-purpose`, `Plan` and `statusline-setup`;
-   - drop the `Explore` and `general-purpose` overrides from `agents/`;
-   - rewrite the CLAUDE.md autonomy section for one loop, keeping `bulk`, workflows and `fork` for parallel work;
-   - narrow `delegate-midrun.sh`.
-2. **2026-11-12: check production.** Run `delegation-report --before-after 2026-10-29 --days 14`.
+1. **Done:** deny `Explore`, `general-purpose`, `Plan` and `statusline-setup`, drop the `Explore` and `general-purpose` overrides from `agents/`, rewrite the CLAUDE.md autonomy section for one loop, narrow `delegate-midrun.sh`.
+2. **Open, 2026-11-12:** run `delegation-report --before-after 2026-10-29 --days 14`.
    - Expected: the `general-purpose` line (about $29 a day) moves into main-loop spend at roughly 20% less for the same work.
    - Watch for `fork` or `claude` spawns climbing to replace it, and for longer wall time on large parallel builds.
    - If `claude` absorbs the old `general-purpose` traffic on Sonnet, deny it too.
-3. **Turn production sessions into eval tasks.** Build tasks from real sessions, as the article suggests recording timestamps for. Three of these ten tasks had to be rebuilt at session scale before any delegation happened, and real hand-offs come about 1,100 lines into long sessions. Add an Opus pass too: `settings.json` now defaults the main model to Opus, and this eval ran Sonnet.
-4. **Fold the `wwdc` workflow into a skill** with a lookup script over `guitaripod/wwdc-sessions`, behind a 3-task eval.
-5. **Fix the skill listing.** Scope the RevenueCat (25 skills, about 130 MCP tools) and asc (25 skills) plugins to the app repos through project `enabledPlugins`, so the global listing fits with every description. Run a skill-routing eval first: ASC and revenue questions also come from `~/agentapi-workdir`, and the `app-store` skill tells agents to read `asc-cli-usage` and `asc-workflow`.
-6. **Progressive disclosure for big skills.** Split `r-roms` into an index plus per-platform files, or a lookup over `r-roms-site/`. Move the reference halves of the 16–24 KB skills into files that load on demand.
-7. **Harness-neutral wording.** Reword CLAUDE.md's agent-type names for opencode, or give opencode its own `AGENTS.md` delegation line.
+3. **Done for Opus, dropped for replays.** The Opus pass is in the follow-up below. Production replays are dropped: the sessions worth replaying live in private repos, and this eval ships in a public one. The step 2 check covers production instead.
+4. **Done:** the `wwdc` workflow became the `wwdc` skill. opencode's `/wwdc` now loads that skill, so one procedure serves both harnesses.
+5. **Evaluated and rejected: raising the skill listing budget.** `skillListingBudgetFraction: 0.02` shows every description (40 blank down to 0) for +4.5k tokens per request. On the routing suite it changed nothing and cost 12% more: the asc skills route on name alone, and `revenuecat-troubleshoot` never loads either way. Scoping the plugins per project is also rejected: the RevenueCat MCP ran 21 times in 90 days, 7 of them from `~/agentapi-workdir`.
+6. **Done for `r-roms`, declined for the rest.**
+   - `r-roms` went from a 77 KB SKILL.md to a 5.5 KB index plus nine category files under `references/`, with all 470 links kept. `settings.json` now allows Read, Grep and Glob in the skill directories; without that, default permission mode blocked the skill from reading its own files.
+   - The 16–24 KB skills stay whole. They load only when used, at 4–6k tokens, and nothing showed them doing harm.
+7. **Done:** one CLAUDE.md sentence names the `workflow` tool as the fan-out in opencode and omp, which have no `bulk` or `fork`.
+
+## Follow-up, 2026-10-30
+
+Every run in this pass uses the folded live config, or a variant one change away from it. `baseline` is now an explicit variant that restores the pre-fold files (CLAUDE.md, the `Explore` and `general-purpose` agents, the old hook, no denies), so the comparison can be reproduced after the fold.
+
+| suite | variants | score | $ per pass | wall s | verdict |
+|---|---|---:|---:|---:|---|
+| Opus main loop: T03, T04, T06, T10 × 3 | pre-fold → live | 3.97 → 3.98 | 7.83 → 7.55 | 1443 → 1574 | fold holds on Opus |
+| routing: 4 prompts for skills that had no listed description × 3 | live → `skillListingBudgetFraction: 0.02` | 4.00 → 4.00, skill hits unchanged | 0.60 → 0.67 | 111 → 106 | rejected |
+| wwdc: 3 knowledge-base questions × 3 | workflow → skill | 3.00 → 3.00 | 0.57 → 0.46 | 178 → 32 | folded |
+
+- **Opus barely delegates.** On T06 the pre-fold rules spawned no subagents at all; Opus ran it in one loop. Both variants fanned T03 out to `bulk`. One pre-fold T06 run lost its OAuth session mid-run and is excluded as `infra_error`.
+  - Cause: a token refresh had replaced one variant's credentials symlink with a private copy.
+  - Fix: `run.py` now moves the newer token back to `~/.claude/.credentials.json` after each run and restores the link.
+- **Routing failures are not about descriptions.** `revenuecat-troubleshoot` was never loaded even with its description in the listing; the model answered from what it knew.
+- **The wwdc skill is about 5× faster than the workflow.** The workflow's search, read and synthesize hand-offs took about 60 s. The skill's parallel fetches in the main loop took about 11 s.
+- **r-roms split checked.** A Haiku probe in default permission mode loaded `r-roms`, read only `references/sony.md`, and returned the PS2 route and Minerva mirror. Before the new Read, Grep and Glob allow rules, that read was denied.
+- **Cleanup.**
+  - The eval moved off the 8 GB tmpfs. Run workdirs and variant configs were deleted after grading; results and logs stay in `~/.cache/agent-stack-eval` (5 MB).
+  - Raw rows stay out of the repo because they carry local paths and session ids.
 
 ## Limits
 
-- **Model.** Sonnet only, as the main model; Opus was not evaluated.
+- **Model.** The full ten-task sequence ran on Sonnet. Opus covered only the four tasks most prone to delegation, in the follow-up.
 - **Task size.** Single-prompt headless tasks are smaller than production sessions. T03 and T06 were scaled up after the first baseline showed no delegation on smaller versions; those runs are kept in `baseline-retired-small.jsonl` locally.
 - **Ceiling.** Eight tasks sit at 1.0, so the eval detects regressions well and improvements poorly.
 - **Memory.** Auto-memory is not loaded in eval runs.
