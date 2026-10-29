@@ -7,11 +7,12 @@ Single source of truth for global Claude Code (and shared opencode) configuratio
 - `CLAUDE.md` — global instructions, kept short: only what applies to every session on every machine
 - `settings.json` — preferences, hooks, enabled plugins, marketplaces, statusline
 - `statusline-command.sh` — statusline renderer
-- `hooks/` — `brevity.sh` + `brevity-midrun.sh` (answer length), `delegate-midrun.sh` (nudges the main session to hand read streaks and multi-file edits to Haiku), `delegate-check.sh` (SubagentStop: sends back delegates that used no tools or never checked their edits, logs every stop for `delegation-report`), `guard-bash.sh` (blocks Co-Authored-By trailers and opencode-serve restarts)
+- `hooks/` — `brevity.sh` + `brevity-midrun.sh` (answer length), `delegate-midrun.sh` (after edits to 6 files, suggests fanning remaining mechanical edits out to `bulk`), `delegate-check.sh` (SubagentStop: sends back delegates that used no tools or never checked their edits, logs every stop for `delegation-report`), `guard-bash.sh` (blocks Co-Authored-By trailers and opencode-serve restarts)
 - `skills/` — custom user skills (procedures that load on demand: `ios-dev`, `app-store`, `kontu`, …)
 - `workflows/` — Claude Code workflow scripts
 - `workflow-runtime/`: runs the same workflow scripts in opencode and omp. Every `agent()` call is a child session on the calling session's model, 8 at a time (`WORKFLOW_CONCURRENCY`). `opencode/plugin/workflow.ts` and `omp/extensions/workflow.ts` expose it as a `workflow` tool, a `/workflow <name> [args]` command (`list`, `stop`) and an `ultracode` prompt keyword that tells the model to write a script and call the tool. Tests: `cd workflow-runtime && bun test`
-- `agents/`: subagent definitions that pin Haiku and effort (`Explore` and `general-purpose` override the built-ins, `bulk` for mechanical work), since subagents otherwise inherit the session's effort
+- `agents/`: `bulk` (Haiku, medium effort) for parallel mechanical fan-out with a checker. The main loop does everything else itself: `settings.json` denies `Explore`, `general-purpose`, `Plan` and `statusline-setup`, following the agent-stack eval
+- `evals/agent-stack/`: ten-task end-to-end eval of the whole stack and the fold decisions it backs (`AUDIT.md`); rerun it before changing agents, hooks, skills or CLAUDE.md
 - `opencode/plugin/`, `opencode/command/` — opencode 2 equivalents of the hooks, workflows and skills (plugins default-export `{ id, setup }`), linked into `~/.config/opencode/`
 - `delegate/config.yml` — shared `delegate` CLI config (tiers, classes), linked to `~/.config/delegate/config.yml`; `~/.config/delegate/host.yml` stays a real per-machine file
 - `scripts/` — `link.sh` (symlinks), `sync.sh` (cross-machine pull), `brevity-report.py`, `delegation-report.py` (main vs delegated spend by model; linked as `~/.local/bin/delegation-report`), `memory-lint.py` (checks auto-memory folders; linked as `~/.local/bin/memory-lint`)

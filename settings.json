@@ -11,7 +11,12 @@
       "Bash(echo $PATH)",
       "Bash(grep:*)"
     ],
-    "deny": [],
+    "deny": [
+      "Agent(Explore)",
+      "Agent(general-purpose)",
+      "Agent(Plan)",
+      "Agent(statusline-setup)"
+    ],
     "defaultMode": "default"
   },
   "model": "sonnet",
