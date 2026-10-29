@@ -27,6 +27,8 @@ python3 lib/compare.py baseline fold-gp
 
 Runs never touch the live config: each variant is built from scratch under `$EVAL_HOME/cfg/`, auto-memory writes go to a copy of `~/claudememory/global`, `delegate-check.sh` logs to `$EVAL_HOME/xdg`, and transcripts stay out of `~/.claude/projects`, so `delegation-report` is unaffected.
 
+Every variant links `.credentials.json` to `~/.claude/.credentials.json`. A token refresh during a run replaces that link with a file; `run.py` moves the newer token home after each run and relinks, so no copy of the token stays under `EVAL_HOME`. Two invocations running past a token lifetime can still race on the refresh; a run that fails that way is marked `infra_error`.
+
 `EVAL_HOME` defaults to `~/.cache/agent-stack-eval`. Keep it off tmpfs: runs keep their workdirs (build trees, a 25 MB log, a ripgrep checkout) for regrading.
 
 ## Degradation rule

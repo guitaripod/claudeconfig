@@ -1,0 +1,24 @@
+{
+  "id": "R04-route-rc-troubleshoot",
+  "suite": "routing",
+  "prompt": "A user bought my RevenueCat subscription on iOS, the purchase succeeded, but the entitlement isn't active in the app. How do I debug this? Explain only; don't run anything.",
+  "probe": "skill-routing",
+  "timeout_s": 300,
+  "budget_usd": 2,
+  "expect_skill": [
+    "revenuecat:revenuecat-troubleshoot",
+    "revenuecat:revenuecat-entitlements-gate",
+    "revenuecat:revenuecat-store-state"
+  ],
+  "disallowed_tools": [
+    "Bash",
+    "Edit",
+    "Write",
+    "NotebookEdit",
+    "mcp__plugin_revenuecat_RevenueCat",
+    "mcp__1password",
+    "mcp__nalka",
+    "mcp__claude_ai_Google_Drive",
+    "mcp__claude_ai_Claude_Docs"
+  ]
+}

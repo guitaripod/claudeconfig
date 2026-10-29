@@ -1,1 +1,1 @@
-The live stack as of 2026-10-26: CLAUDE.md with Haiku-by-default delegation, agents/ (Explore, general-purpose, bulk), delegate-midrun and delegate-check hooks, all skills, plugins and MCPs.
+The stack as of 2026-10-26, before the fold: CLAUDE.md with Haiku-by-default delegation, agents/ Explore, general-purpose and bulk, the read-streak delegate-midrun nudge, and no Agent denies. Files here restore that state on top of the live config.

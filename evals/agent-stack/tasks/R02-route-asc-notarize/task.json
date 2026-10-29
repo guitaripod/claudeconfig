@@ -1,0 +1,22 @@
+{
+  "id": "R02-route-asc-notarize",
+  "suite": "routing",
+  "prompt": "How do I notarize my macOS app build with the asc CLI? Give the commands, but don't run anything.",
+  "probe": "skill-routing",
+  "timeout_s": 300,
+  "budget_usd": 2,
+  "expect_skill": [
+    "asc:asc-notarization"
+  ],
+  "disallowed_tools": [
+    "Bash",
+    "Edit",
+    "Write",
+    "NotebookEdit",
+    "mcp__plugin_revenuecat_RevenueCat",
+    "mcp__1password",
+    "mcp__nalka",
+    "mcp__claude_ai_Google_Drive",
+    "mcp__claude_ai_Claude_Docs"
+  ]
+}

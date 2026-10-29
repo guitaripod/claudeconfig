@@ -5,8 +5,10 @@ A variant directory under variants/ may hold:
   CLAUDE.md          replaces the user instructions
   hooks/*.sh         replace or add hook scripts
   agents/*.md        replace or add subagent definitions
-  delete.txt         relative paths to drop from the built config (e.g. agents/bulk.md)
+  skills/<name>/     replace or add a skill; workflows/*.js replace or add a workflow
+  delete.txt         relative paths to drop from the built config (e.g. agents/bulk.md, skills/r-roms)
   settings.patch.json  deep-merged into settings.json; lists are concatenated
+  settings.override.json  merged the same way, except lists replace instead of concatenating
 """
 
 import json
@@ -21,12 +23,12 @@ HERE = Path(__file__).resolve().parent.parent
 VARIANTS = HERE / "variants"
 
 
-def deep_merge(base, patch):
-    """Merge patch into base: dicts recurse, lists concatenate without duplicates, scalars replace."""
+def deep_merge(base, patch, replace_lists=False):
+    """Merge patch into base: dicts recurse, lists concatenate without duplicates (or replace), scalars replace."""
     for key, value in patch.items():
         if isinstance(value, dict) and isinstance(base.get(key), dict):
-            deep_merge(base[key], value)
-        elif isinstance(value, list) and isinstance(base.get(key), list):
+            deep_merge(base[key], value, replace_lists)
+        elif isinstance(value, list) and isinstance(base.get(key), list) and not replace_lists:
             base[key] = base[key] + [item for item in value if item not in base[key]]
         else:
             base[key] = value
@@ -49,7 +51,9 @@ def seed_live(cfg):
     shutil.copytree(LIVE / "hooks", cfg / "hooks")
     shutil.copytree(LIVE / "agents", cfg / "agents")
     for name in ("skills", "workflows"):
-        (cfg / name).symlink_to(LIVE / name)
+        (cfg / name).mkdir()
+        for entry in sorted((LIVE / name).iterdir()):
+            (cfg / name / entry.name).symlink_to(entry)
     (cfg / "plugins").symlink_to(LIVE_DOT / "plugins")
     (cfg / "rules").mkdir()
     for rule in sorted((LIVE_DOT / "rules").glob("*.md")):
@@ -68,14 +72,28 @@ def apply_variant(cfg, settings, name):
     src = VARIANTS / name
     if (src / "CLAUDE.md").exists():
         shutil.copy2(src / "CLAUDE.md", cfg / "CLAUDE.md")
-    for sub in ("hooks", "agents"):
+    for sub in ("hooks", "agents", "workflows"):
         for path in sorted((src / sub).glob("*")) if (src / sub).is_dir() else []:
-            shutil.copy2(path, cfg / sub / path.name)
+            target = cfg / sub / path.name
+            if target.is_symlink():
+                target.unlink()
+            shutil.copy2(path, target)
+    for path in sorted((src / "skills").iterdir()) if (src / "skills").is_dir() else []:
+        target = cfg / "skills" / path.name
+        if target.is_symlink():
+            target.unlink()
+        elif target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(path, target)
     if (src / "delete.txt").exists():
         for rel in (src / "delete.txt").read_text().split():
             target = cfg / rel
             if target.is_file() or target.is_symlink():
                 target.unlink()
+            elif target.is_dir():
+                shutil.rmtree(target)
+    if (src / "settings.override.json").exists():
+        deep_merge(settings, json.loads((src / "settings.override.json").read_text()), replace_lists=True)
     if (src / "settings.patch.json").exists():
         deep_merge(settings, json.loads((src / "settings.patch.json").read_text()))
 

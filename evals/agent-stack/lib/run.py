@@ -34,10 +34,13 @@ PRICING = load_pricing()
 
 
 def task_ids(selector):
-    """Resolve 'all' or a comma list of id prefixes to task directory names."""
+    """Resolve 'all' (the core suite), 'suite:<name>', or a comma list of id prefixes to task directory names."""
     names = sorted(p.name for p in TASKS.iterdir() if (p / "task.json").exists())
+    suites = {n: json.loads((TASKS / n / "task.json").read_text()).get("suite", "core") for n in names}
     if selector == "all":
-        return names
+        return [n for n in names if suites[n] == "core"]
+    if selector.startswith("suite:"):
+        return [n for n in names if suites[n] == selector.split(":", 1)[1]]
     wanted = selector.split(",")
     return [n for n in names if any(n == w or n.startswith(w + "-") for w in wanted)]
 
@@ -97,6 +100,33 @@ def infra_failure(result, stdout):
     return None
 
 
+CREDENTIALS_LOCK = threading.Lock()
+
+
+def reconcile_credentials(cfg):
+    """Keep one credentials file: a token refresh in cfg replaces the symlink with a file, so move the newer one home and relink."""
+    real = Path.home() / ".claude" / ".credentials.json"
+    local = Path(cfg) / ".credentials.json"
+    with CREDENTIALS_LOCK:
+        if local.is_symlink() or not local.exists():
+            return
+        if local.stat().st_mtime > real.stat().st_mtime:
+            tmp = real.with_name(real.name + ".eval-tmp")
+            shutil.copy2(local, tmp)
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, real)
+        local.unlink()
+        local.symlink_to(real)
+
+
+def expected_skill_hit(expected, loaded):
+    """True when any expected skill (a name or a list of names) was loaded, None when the task expects none."""
+    if not expected:
+        return None
+    names = [expected] if isinstance(expected, str) else expected
+    return any(name in loaded for name in names)
+
+
 def run_one(args, cfg, task_id, trial):
     """Set up a fresh workdir, run claude -p on the task, grade it, and return the result row."""
     if STOP.is_set():
@@ -130,6 +160,8 @@ def run_one(args, cfg, task_id, trial):
     ]
     if args.effort:
         cmd += ["--effort", args.effort]
+    if task.get("disallowed_tools"):
+        cmd += ["--disallowedTools", ",".join(task["disallowed_tools"])]
     started = time.time()
     timed_out = False
     try:
@@ -141,6 +173,7 @@ def run_one(args, cfg, task_id, trial):
         stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
         stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
     wall = time.time() - started
+    reconcile_credentials(cfg)
     (run_dir / "stdout.json").write_text(stdout)
     (run_dir / "stderr.txt").write_text(stderr)
 
@@ -198,7 +231,7 @@ def run_one(args, cfg, task_id, trial):
         "workflows": profile["workflows"],
         "tools_main": profile["tools"],
         "expect_skill": task.get("expect_skill"),
-        "skill_hit": (task.get("expect_skill") in profile["skills"]) if task.get("expect_skill") else None,
+        "skill_hit": expected_skill_hit(task.get("expect_skill"), profile["skills"]),
         "session_id": session_id,
     }
     return row

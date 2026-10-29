@@ -1,0 +1,21 @@
+{
+  "id": "W01-wwdc-evaluations",
+  "suite": "wwdc",
+  "prompt": "Using my WWDC sessions knowledge base: which WWDC26 sessions cover the new Evaluations framework? List each with its session number.",
+  "probe": "skill-vs-workflow",
+  "timeout_s": 600,
+  "budget_usd": 3,
+  "expect_skill": [
+    "wwdc"
+  ],
+  "disallowed_tools": [
+    "Edit",
+    "Write",
+    "NotebookEdit",
+    "mcp__plugin_revenuecat_RevenueCat",
+    "mcp__1password",
+    "mcp__nalka",
+    "mcp__claude_ai_Google_Drive",
+    "mcp__claude_ai_Claude_Docs"
+  ]
+}
