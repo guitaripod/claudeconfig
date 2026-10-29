@@ -1,0 +1,7 @@
+{
+  "id": "T05-log-triage",
+  "prompt": "billing-api went down at 14:32:07; logs are in logs/; find the root cause; reply with the line number in logs/app.log (1-based, as grep -n counts) of the earliest line showing the root cause, and one sentence on what happened.",
+  "probe": "context",
+  "timeout_s": 900,
+  "budget_usd": 6
+}

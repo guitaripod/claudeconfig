@@ -1,0 +1,245 @@
+# Synthetic llama-swap config for the T09 eval. Ids, codenames and paths are invented.
+healthCheckTimeout: 300
+logLevel: info
+startPort: 5800
+
+x-defaults: &defaults
+  ttl: 900
+  checkEndpoint: /health
+
+x-agents:
+  qwen: &agent_qwen
+    style: qwen
+  muse: &agent_muse
+    style: muse
+  nemotron: &agent_nemotron
+    style: nemotron
+  gptoss: &agent_gptoss
+    style: gptoss
+
+macros:
+  serve: "llama-server --port ${PORT} --host 127.0.0.1 --jinja --flash-attn on --no-mmap"
+  gguf: "/srv/gguf"
+
+models:
+  # dense Qwen-style family
+  ember-14b:
+    <<: *defaults
+    name: "Ember"
+    description: "Ember 14B · llama.cpp · Q6_K · MTP-2 · 64k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/ember-14b-Q6_K.gguf
+        -c 65536
+        --draft-max 2
+    metadata:
+      agent: *agent_qwen
+
+  # uncensored sibling, served from the legacy opencode id
+  corvid-27b:
+    <<: *defaults
+    name: "Corvid Unchained"
+    description: "Corvid 27B · Uncensored · llama.cpp · Q8_0 · MTP-3 · 128k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/corvid-27b-abl-Q8_0.gguf
+        -c 131072
+        --draft-max 3
+    metadata:
+      agent:
+        style: qwen
+        opencode_id: corvid-27b-legacy
+
+  lumen-35b:
+    <<: *defaults
+    name: "Lumen"
+    description: "Lumen 35B · llama.cpp · Q4_K_M · No spec · 128k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/lumen-35b-Q4_K_M.gguf
+        -c 131072
+    metadata:
+      agent: *agent_muse
+
+  tidewell-70b:
+    <<: *defaults
+    name: Tidewell
+    description: >-
+      Tidewell 70B · llama.cpp · Q4_K_M
+      · EAGLE-3 · 32k
+    cmd: |
+      ${serve}
+        -m ${gguf}/tidewell-70b-Q4_K_M.gguf
+        -c 32768
+    metadata:
+      agent: *agent_nemotron
+
+  garnet-8b:
+    <<: *defaults
+    name: "Garnet"
+    description: "Garnet 8B · llama.cpp · Q8_0 · No spec · 262k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/garnet-8b-Q8_0.gguf
+        -c 262144
+    metadata:
+      agent: *agent_gptoss
+
+  # quant differs from the blackwall entry
+  sable-32b:
+    <<: *defaults
+    name: "Sable"
+    description: "Sable 32B · llama.cpp · Q6_K · MTP-2 · 64k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/sable-32b-Q6_K.gguf
+        -c 65536
+        --draft-max 2
+    metadata:
+      agent: *agent_qwen
+
+  # trailing space inside the quotes, equal after trimming
+  quill-9b:
+    <<: *defaults
+    name: "Quill"
+    description: "Quill 9B · llama.cpp · Q8_0 · No spec · 32k "
+    cmd: |
+      ${serve}
+        -m ${gguf}/quill-9b-Q8_0.gguf
+        -c 32768
+    metadata:
+      agent: *agent_qwen
+
+  fennec-4b:
+    <<: *defaults
+    name: "Fennec"
+    description: "Fennec 4B · llama.cpp · Q8_0 · No spec · 32k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/fennec-4b-Q8_0.gguf
+        -c 32768
+    metadata:
+      agent:
+        style: qwen
+        vision: false
+
+  # present in llama-swap only, so it is absent from models.toml
+  ordo-6b:
+    <<: *defaults
+    name: "Ordo"
+    description: "Ordo 6B · llama.cpp · Q6_K · No spec · 32k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/ordo-6b-Q6_K.gguf
+        -c 32768
+    metadata:
+      agent: *agent_muse
+
+  # no metadata at all
+  marl-8b:
+    <<: *defaults
+    name: "Marl"
+    description: "Marl 8B · llama.cpp · Q8_0 · No spec · 32k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/marl-8b-Q8_0.gguf
+        -c 32768
+
+  # metadata without an agent mapping
+  hollow-22b:
+    <<: *defaults
+    name: "Hollow"
+    description: "Hollow 22B · llama.cpp · Q4_K_M · No spec · 64k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/hollow-22b-Q4_K_M.gguf
+        -c 65536
+    metadata:
+      owner: lab-east
+      tags: [dense, long-context]
+
+  # agent mapping under a misspelled key
+  brisk-7b:
+    <<: *defaults
+    name: "Brisk"
+    description: "Brisk 7B · llama.cpp · Q8_0 · No spec · 32k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/brisk-7b-Q8_0.gguf
+        -c 32768
+    metadata:
+      agnet:
+        style: qwen
+
+  # agent mapping only exists in a comment
+  nettle-3b:
+    <<: *defaults
+    name: "Nettle"
+    description: "Nettle 3B · llama.cpp · Q8_0 · No spec · 32k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/nettle-3b-Q8_0.gguf
+        -c 32768
+    # metadata:
+    #   agent:
+    #     style: qwen
+
+  # separator differs from the blackwall entry
+  coral-12b:
+    <<: *defaults
+    name: "Coral"
+    description: "Coral 12B · llama.cpp · Q5_K_M · EAGLE-3 · 96k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/coral-12b-Q5_K_M.gguf
+        -c 98304
+    metadata:
+      agent: *agent_qwen
+
+  # omitted from opencode, still in the omp picker
+  vesper-30b:
+    <<: *defaults
+    name: "Vesper"
+    description: "Vesper 30B · llama.cpp · Q8_0 · No spec · 128k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/vesper-30b-Q8_0.gguf
+        -c 131072
+    metadata:
+      agent:
+        <<: *agent_muse
+        opencode: false
+
+  dune-16b:
+    <<: *defaults
+    name: "Dune Unchained"
+    description: "Dune 16B · Uncensored · llama.cpp · Q8_0 · No spec · 64k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/dune-16b-abl-Q8_0.gguf
+        -c 65536
+    metadata:
+      agent: *agent_qwen
+
+  pylon-2b:
+    <<: *defaults
+    name: "Pylon"
+    description: "Pylon 2B · llama.cpp · Q8_0 · No spec · 16k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/pylon-2b-Q8_0.gguf
+        -c 16384
+    metadata:
+      agent: *agent_nemotron
+
+  aster-14b:
+    <<: *defaults
+    name: "Aster"
+    description: "Aster 14B · llama.cpp · Q4_K_M · MTP-2 · 64k"
+    cmd: |
+      ${serve}
+        -m ${gguf}/aster-14b-Q4_K_M.gguf
+        -c 65536
+        --draft-max 2
+    metadata:
+      agent: *agent_qwen

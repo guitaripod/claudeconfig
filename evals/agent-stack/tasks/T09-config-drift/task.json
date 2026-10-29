@@ -1,0 +1,7 @@
+{
+  "id": "T09-config-drift",
+  "prompt": "Two model config files are in config/ under the working directory: config/llama-swap.yaml (llama-swap; models are keyed by id under `models:`) and config/models.toml (blackwall; one `[[models]]` table per id, with an `id` field). Audit them with these definitions.\n\n- pickerless: a llama-swap model with no `agent` key directly under its `metadata` mapping, after resolving YAML anchors, aliases and merge keys. Such a model appears in no model picker. A model whose agent mapping sets `opencode: false` still has an agent mapping, so it is not pickerless.\n- drift: a model id present in both files, where the llama-swap `description` and the models.toml `name` differ after trimming leading and trailing whitespace. Ids present in only one file are not drift.\n\nReply with exactly two lines and nothing after them. List ids alphabetically, comma-separated. Write `none` for an empty list.\npickerless: <ids>\ndrift: <ids>",
+  "probe": "read-reason",
+  "timeout_s": 600,
+  "budget_usd": 4
+}

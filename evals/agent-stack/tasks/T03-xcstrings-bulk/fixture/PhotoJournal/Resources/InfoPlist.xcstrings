@@ -1,0 +1,758 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSCameraUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal uses the camera to take photos for your journal entries."
+          }
+        }
+      }
+    },
+    "NSFaceIDUsageDescription": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يستخدم PhotoJournal Face ID لفتح ألبوماتك الخاصة."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal използва Face ID, за да отключва личните ви албуми."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal utilitza Face ID per desbloquejar els teus àlbums privats."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal používá Face ID k odemknutí vašich soukromých alb."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal bruger Face ID til at låse dine private albummer op."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal nutzt Face ID, um deine privaten Alben zu entsperren."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Το PhotoJournal χρησιμοποιεί το Face ID για να ξεκλειδώνει τα ιδιωτικά άλμπουμ σου."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal uses Face ID to unlock your private albums."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal uses Face ID to unlock your private albums."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal uses Face ID to unlock your private albums."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal uses Face ID to unlock your private albums."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal usa Face ID para desbloquear tus álbumes privados."
+          }
+        },
+        "es-MX": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal usa Face ID para desbloquear tus álbumes privados."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal käyttää Face ID:tä yksityisten albumiesi lukituksen avaamiseen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal utilise Face ID pour déverrouiller vos albums privés."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal utilise Face ID pour déverrouiller vos albums privés."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal משתמש ב-Face ID כדי לבטל את נעילת האלבומים הפרטיים שלך."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal आपके निजी एल्बम अनलॉक करने के लिए Face ID का उपयोग करता है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal koristi Face ID za otključavanje vaših privatnih albuma."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A PhotoJournal a Face ID-t használja a privát albumaid feloldásához."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal menggunakan Face ID untuk membuka kunci album pribadi Anda."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal usa Face ID per sbloccare i tuoi album privati."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal は Face ID を使って、非公開のアルバムをロック解除します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal은 Face ID를 사용해 비공개 앨범의 잠금을 해제합니다."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal menggunakan Face ID untuk membuka kunci album peribadi anda."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal bruker Face ID til å låse opp de private albumene dine."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal gebruikt Face ID om je privéalbums te ontgrendelen."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal używa Face ID, aby odblokować Twoje prywatne albumy."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O PhotoJournal usa o Face ID para desbloquear seus álbuns privados."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O PhotoJournal utiliza o Face ID para desbloquear os seus álbuns privados."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal folosește Face ID pentru a debloca albumele tale private."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal использует Face ID, чтобы открывать ваши личные альбомы."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal používa Face ID na odomknutie vašich súkromných albumov."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal använder Face ID för att låsa upp dina privata album."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal ใช้ Face ID เพื่อปลดล็อกอัลบั้มส่วนตัวของคุณ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal, özel albümlerinin kilidini açmak için Face ID kullanır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal використовує Face ID, щоб відкривати ваші приватні альбоми."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal sử dụng Face ID để mở khóa các album riêng tư của bạn."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal 使用 Face ID 解锁你的私密相册。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal 使用 Face ID 解鎖你的私人相簿。"
+          }
+        }
+      }
+    },
+    "NSLocationWhenInUseUsageDescription": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يضيف PhotoJournal مكان التقاط كل صورة إلى يومياتك."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal добавя мястото, където е заснета всяка снимка, към дневника ви."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal afegeix al teu diari el lloc on es va fer cada foto."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal přidává do vašeho deníku místo, kde byla každá fotka pořízena."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal tilføjer det sted, hvor hvert foto blev taget, til din dagbog."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal fügt deinem Tagebuch den Ort hinzu, an dem jedes Foto aufgenommen wurde."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Το PhotoJournal προσθέτει στο ημερολόγιό σου το μέρος όπου τραβήχτηκε κάθε φωτογραφία."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal adds the place where each photo was taken to your journal."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal adds the place where each photo was taken to your journal."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal adds the place where each photo was taken to your journal."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal adds the place where each photo was taken to your journal."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal añade a tu diario el lugar donde se tomó cada foto."
+          }
+        },
+        "es-MX": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal añade a tu diario el lugar donde se tomó cada foto."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal lisää päiväkirjaasi paikan, jossa kukin kuva otettiin."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal ajoute à votre journal le lieu où chaque photo a été prise."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal ajoute à votre journal l’endroit où chaque photo a été prise."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal מוסיף ליומן שלך את המקום שבו צולמה כל תמונה."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal आपकी जर्नल में हर फ़ोटो लिए जाने की जगह जोड़ता है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal u vaš dnevnik dodaje mjesto na kojem je svaka fotografija snimljena."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A PhotoJournal hozzáadja a naplóhoz, hol készült az egyes fényképek."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal menambahkan lokasi tempat setiap foto diambil ke jurnal Anda."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal aggiunge al tuo diario il luogo in cui è stata scattata ogni foto."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal は、各写真を撮影した場所をジャーナルに追加します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal은 각 사진을 찍은 장소를 저널에 추가합니다."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal menambah tempat setiap foto diambil ke dalam jurnal anda."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal legger til stedet der hvert bilde ble tatt i dagboken din."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal voegt de plek waar elke foto is gemaakt toe aan je dagboek."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal dodaje do Twojego dziennika miejsce, w którym wykonano każde zdjęcie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O PhotoJournal adiciona ao seu diário o local onde cada foto foi tirada."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O PhotoJournal adiciona ao seu diário o local onde cada fotografia foi tirada."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal adaugă în jurnalul tău locul în care a fost făcută fiecare fotografie."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal добавляет в ваш дневник место, где был сделан каждый снимок."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal pridáva do vášho denníka miesto, kde bola každá fotka urobená."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal lägger till platsen där varje foto togs i din dagbok."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal เพิ่มสถานที่ที่แต่ละภาพถ่ายไว้ลงในเจอร์นัลของคุณ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal, çekilen her fotoğrafın konumunu günlüğünüze ekler."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal додає до вашого журналу місце, де було зроблено кожне фото."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal thêm vào nhật ký của bạn địa điểm chụp từng ảnh."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal 会将每张照片的拍摄地点添加到你的日记中。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal 會將每張照片的拍攝地點加入你的日記中。"
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يستخدم PhotoJournal الميكروفون لتسجيل الملاحظات الصوتية لإدخالاتك."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal използва микрофона, за да записва гласови бележки към записите ви."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal utilitza el micròfon per gravar notes de veu per a les teves entrades."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal používá mikrofon k nahrávání hlasových poznámek k vašim záznamům."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal bruger mikrofonen til at optage stemmenoter til dine indlæg."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal nutzt das Mikrofon, um Sprachnotizen zu deinen Einträgen aufzunehmen."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Το PhotoJournal χρησιμοποιεί το μικρόφωνο για να ηχογραφεί φωνητικές σημειώσεις για τις καταχωρίσεις σου."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal uses the microphone to record voice notes for your entries."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal uses the microphone to record voice notes for your entries."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal uses the microphone to record voice notes for your entries."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal uses the microphone to record voice notes for your entries."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal usa el micrófono para grabar notas de voz en tus entradas."
+          }
+        },
+        "es-MX": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal usa el micrófono para grabar notas de voz en tus entradas."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal käyttää mikrofonia äänimuistiinpanojen tallentamiseen merkintöihisi."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal utilise le micro pour enregistrer des notes vocales dans vos entrées."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal utilise le microphone pour enregistrer des notes vocales dans vos entrées."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal משתמש במיקרופון כדי להקליט הערות קוליות לרשומות שלך."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal आपकी प्रविष्टियों के लिए वॉइस नोट रिकॉर्ड करने के लिए माइक्रोफ़ोन का उपयोग करता है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal koristi mikrofon za snimanje glasovnih bilješki uz vaše unose."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A PhotoJournal a mikrofont használja, hogy hangjegyzeteket rögzítsen a bejegyzéseidhez."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal menggunakan mikrofon untuk merekam catatan suara untuk entri Anda."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal usa il microfono per registrare note vocali nelle tue voci."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal は、エントリーに添える音声メモを録音するためにマイクを使用します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal은 항목에 덧붙일 음성 메모를 녹음하기 위해 마이크를 사용합니다."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal menggunakan mikrofon untuk merakam nota suara bagi entri anda."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal bruker mikrofonen til å ta opp talenotater til oppføringene dine."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal gebruikt de microfoon om spraaknotities bij je items op te nemen."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal używa mikrofonu, aby nagrywać notatki głosowe do Twoich wpisów."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O PhotoJournal usa o microfone para gravar notas de voz nas suas entradas."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O PhotoJournal utiliza o microfone para gravar notas de voz nas suas entradas."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal folosește microfonul pentru a înregistra note vocale la intrările tale."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal использует микрофон, чтобы записывать голосовые заметки к вашим записям."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal používa mikrofón na nahrávanie hlasových poznámok k vašim záznamom."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal använder mikrofonen för att spela in röstanteckningar till dina inlägg."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal ใช้ไมโครโฟนเพื่อบันทึกโน้ตเสียงสำหรับรายการของคุณ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal, girişlerin için sesli notlar kaydetmek amacıyla mikrofonu kullanır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal використовує мікрофон, щоб записувати голосові нотатки до ваших записів."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal sử dụng micrô để ghi âm ghi chú thoại cho các mục nhật ký của bạn."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal 使用麦克风为你的日记条目录制语音备注。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal 使用麥克風為你的日記項目錄製語音備註。"
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PhotoJournal needs access to your photo library so you can add photos to your journal."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

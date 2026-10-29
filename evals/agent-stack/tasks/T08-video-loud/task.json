@@ -1,0 +1,8 @@
+{
+  "id": "T08-video-loud",
+  "prompt": "Make clip.mp4's audio as loud as possible without clipping.",
+  "probe": "skill-routing",
+  "timeout_s": 600,
+  "budget_usd": 4,
+  "expect_skill": "video-loud"
+}

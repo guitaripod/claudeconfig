@@ -1,0 +1,7 @@
+{
+  "id": "T06-parallel-build",
+  "prompt": "toolbox/ has four stubbed components, each with a SPEC.md; implement all four to spec; they don't depend on each other; run the tests.",
+  "probe": "parallel",
+  "timeout_s": 2400,
+  "budget_usd": 12
+}

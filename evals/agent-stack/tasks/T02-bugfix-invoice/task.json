@@ -1,0 +1,7 @@
+{
+  "id": "T02-bugfix-invoice",
+  "prompt": "customers report invoice totals that are sometimes off by a cent. fix it so totals follow the README rules. all tests must pass. don't edit the existing tests.",
+  "probe": "general-purpose",
+  "timeout_s": 900,
+  "budget_usd": 6
+}

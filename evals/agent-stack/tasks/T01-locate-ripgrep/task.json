@@ -1,0 +1,7 @@
+{
+  "id": "T01-locate-ripgrep",
+  "prompt": "This is a ripgrep 14.1.1 checkout. Answer three questions by reading the code. Don't guess.\n\n1. Which function compares a file's size against the --max-filesize limit before the walker queues the file?\n2. With --max-columns set, which function writes the placeholder that replaces a line over the limit?\n3. With -z / --search-zip, which function decides whether a path is run through an external decompressor?\n\nGive each file path relative to the repo root. End the reply with exactly these three lines and nothing after them:\n1. <relative/path.rs>: <identifier>\n2. <relative/path.rs>: <identifier>\n3. <relative/path.rs>: <identifier>",
+  "probe": "explore",
+  "timeout_s": 900,
+  "budget_usd": 6
+}

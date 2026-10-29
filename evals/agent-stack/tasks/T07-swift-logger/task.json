@@ -1,0 +1,8 @@
+{
+  "id": "T07-swift-logger",
+  "prompt": "This is the core package of my PhotoJournal app. Add my standard diagnostics logging and route the existing diagnostics through it. It has to keep building here on Linux and on Apple platforms.",
+  "probe": "skill-routing",
+  "timeout_s": 1200,
+  "budget_usd": 6,
+  "expect_skill": "ios-dev"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "T10-crosslayer-authors",
+  "prompt": "shelf is a small stdlib-only Python book catalogue (models, storage, serializers, api, search, cli). Change: books can have several authors. Replace `author: str` with `authors: list[str]` everywhere.\n\n- models: Book.authors, list[str], same field order otherwise.\n- storage: add a new migration to the `migrations` list, don't edit the existing one. data/legacy.db is schema v1. Any earlier-version DB must open and migrate in place: no rows lost, row order kept, each old author becomes a one-element list.\n- serializers: always emit `authors`, never `author`. Accept the legacy `author` key on input as a one-element list.\n- api: GET /books?author=X returns books where any author equals X, case-insensitively. PATCH /books/<id> can set authors.\n- search: the index finds a book by any of its authors.\n- cli: `add` takes repeatable `--author`.\n\nKeep the public names and response shapes (Repository, book_to_dict, book_from_dict, Api.handle, SearchIndex, cli.main). Update the existing tests to the new shape, then run `python3 -m pytest -q` and make sure it passes.",
+  "probe": "long-chain",
+  "timeout_s": 1500,
+  "budget_usd": 8
+}

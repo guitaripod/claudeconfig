@@ -1,0 +1,7 @@
+{
+  "id": "T03-xcstrings-bulk",
+  "prompt": "PhotoJournal/Resources has two string catalogs with new English-only strings: Localizable.xcstrings and InfoPlist.xcstrings. Translate them into every locale each catalog already uses, matching the existing style, plural rules and format specifiers.",
+  "probe": "bulk",
+  "timeout_s": 2400,
+  "budget_usd": 12
+}

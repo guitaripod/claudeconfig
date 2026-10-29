@@ -1,0 +1,110 @@
+# Blackwall models.toml (synthetic fixture for the T09 eval)
+
+[[models]]
+id = "tidewell-70b"
+name = "Tidewell 70B · llama.cpp · Q4_K_M · EAGLE-3 · 32k"
+hf_id = "synthetic-lab/tidewell-70b-GGUF"
+quantization = "Q4_K_M"
+
+[[models]]
+id = "aster-14b"
+name = "Aster 14B · llama.cpp · Q4_K_M · MTP-2 · 64k"
+hf_id = "synthetic-lab/aster-14b-GGUF"
+quantization = "Q4_K_M"
+
+[[models]]
+id = "brisk-7b"
+name = "Brisk 7B · llama.cpp · Q8_0 · No spec · 32k"
+hf_id = "synthetic-lab/brisk-7b-GGUF"
+quantization = "Q8_0"
+
+[[models]]
+id = "coral-12b"
+name = "Coral 12B - llama.cpp · Q5_K_M · EAGLE-3 · 96k"
+hf_id = "synthetic-lab/coral-12b-GGUF"
+quantization = "Q5_K_M"
+
+[[models]]
+id = "corvid-27b"
+name = "Corvid 27B · Uncensored · llama.cpp · Q8_0 · MTP-3 · 131k"
+hf_id = "synthetic-lab/corvid-27b-abl-GGUF"
+quantization = "Q8_0"
+
+[[models]]
+id = "dune-16b"
+name = "Dune 16B · Uncensored · llama.cpp · Q8_0 · No spec · 64k"
+hf_id = "synthetic-lab/dune-16b-abl-GGUF"
+quantization = "Q8_0"
+
+[[models]]
+id = "ember-14b"
+name = "Ember 14B · llama.cpp · Q6_K · MTP-2 · 64k"
+hf_id = "synthetic-lab/ember-14b-GGUF"
+quantization = "Q6_K"
+
+[[models]]
+id = "fennec-4b"
+name = "Fennec 4B · llama.cpp · Q8_0 · No spec · 32k"
+hf_id = "synthetic-lab/fennec-4b-GGUF"
+quantization = "Q8_0"
+
+[[models]]
+id = "garnet-8b"
+name = "Garnet 8B · llama.cpp · Q8_0 · No spec · 262k"
+hf_id = "synthetic-lab/garnet-8b-GGUF"
+quantization = "Q8_0"
+
+[[models]]
+id = "hollow-22b"
+name = "Hollow 22B · llama.cpp · Q4_K_M · No spec · 64k"
+hf_id = "synthetic-lab/hollow-22b-GGUF"
+quantization = "Q4_K_M"
+
+# retired entries stay so the leaderboard keeps its history
+[[models]]
+id = "kiln-retired-4b"
+name = "Kiln 4B · llama.cpp · Q8_0 · No spec · 16k"
+hf_id = "synthetic-lab/kiln-4b-GGUF"
+quantization = "Q8_0"
+
+[[models]]
+id = "lumen-35b"
+name = "Lumen 35B · llama.cpp · Q4_K_M · No spec · 128k"
+hf_id = "synthetic-lab/lumen-35b-GGUF"
+quantization = "Q4_K_M"
+
+[[models]]
+id = "marl-8b"
+name = "Marl 8B · llama.cpp · Q8_0 · No spec · 32k"
+hf_id = "synthetic-lab/marl-8b-GGUF"
+quantization = "Q8_0"
+
+[[models]]
+id = "nettle-3b"
+name = "Nettle 3B · llama.cpp · Q8_0 · No spec · 32k"
+hf_id = "synthetic-lab/nettle-3b-GGUF"
+quantization = "Q8_0"
+
+[[models]]
+id = "pylon-2b"
+name = "Pylon 2B · llama.cpp · Q8_0 · No spec · 16k"
+hf_id = "synthetic-lab/pylon-2b-GGUF"
+quantization = "Q8_0"
+
+[[models]]
+id = "quill-9b"
+name = "Quill 9B · llama.cpp · Q8_0 · No spec · 32k"
+hf_id = "synthetic-lab/quill-9b-GGUF"
+quantization = "Q8_0"
+
+[[models]]
+id = "sable-32b"
+name = "Sable 32B · llama.cpp · Q5_K_M · MTP-2 · 64k"
+hf_id = "synthetic-lab/sable-32b-GGUF"
+quantization = "Q5_K_M"
+
+[[models]]
+id = "vesper-30b"
+name = "Vesper 30B · llama.cpp · Q8_0 · No spec · 128k"
+hf_id = "synthetic-lab/vesper-30b-GGUF"
+quantization = "Q8_0"
