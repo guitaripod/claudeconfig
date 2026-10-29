@@ -1,0 +1,111 @@
+# r/ROMs Megathread: Microsoft
+
+### /Microsoft/microsoft-xbox — Microsoft Xbox
+- Microsoft - Xbox: Minerva Redump https://minerva-archive.org/browse/Redump/Microsoft%20-%20Xbox/
+- Microsoft Xbox - # - Redump.org: IA https://archive.org/download/microsoft_xbox_numberssymbols
+- Microsoft Xbox - A - Redump.org: IA https://archive.org/download/microsoft_xbox_a
+- Microsoft Xbox - B - Redump.org: IA https://archive.org/download/microsoft_xbox_b
+- Microsoft Xbox - C (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox_c_part1
+- Microsoft Xbox - C (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox_c_part2
+- Microsoft Xbox - D (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox_d_part1
+- Microsoft Xbox - D (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox_d_part2
+- Microsoft Xbox - E - Redump.org: IA https://archive.org/download/microsoft_xbox_e
+- Microsoft Xbox - F - Redump.org: IA https://archive.org/download/microsoft_xbox_f
+- Microsoft Xbox - G - Redump.org: IA https://archive.org/download/microsoft_xbox_g
+- Microsoft Xbox - H - Redump.org: IA https://archive.org/download/microsoft_xbox_h
+- Microsoft Xbox - I - Redump.org: IA https://archive.org/download/microsoft_xbox_i
+- Microsoft Xbox - J - Redump.org: IA https://archive.org/download/microsoft_xbox_j
+- Microsoft Xbox - K - Redump.org: IA https://archive.org/download/microsoft_xbox_k
+- Microsoft Xbox - L - Redump.org: IA https://archive.org/download/microsoft_xbox_l
+- Microsoft Xbox - M (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox_m_part1
+- Microsoft Xbox - M (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox_m_part2
+- Microsoft Xbox - N (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox_n_part1
+- Microsoft Xbox - N (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox_n_part2
+- Microsoft Xbox - O (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox_o_part1
+- Microsoft Xbox - O (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox_o_part2
+- Microsoft Xbox - P - Redump.org: IA https://archive.org/download/microsoft_xbox_p
+- Microsoft Xbox - Q - Redump.org: IA https://archive.org/download/microsoft_xbox_q
+- Microsoft Xbox - R - Redump.org: IA https://archive.org/download/microsoft_xbox_r
+- Microsoft Xbox - S (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox_s_part1
+- Microsoft Xbox - S (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox_s_part2
+- Microsoft Xbox - T (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox_t_part1
+- Microsoft Xbox - T (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox_t_part2
+- Microsoft Xbox - U - Redump.org: IA https://archive.org/download/microsoft_xbox_u
+- Microsoft Xbox - V - Redump.org: IA https://archive.org/download/microsoft_xbox_v
+- Microsoft Xbox - W - Redump.org: IA https://archive.org/download/microsoft_xbox_w
+- Microsoft Xbox - X - Redump.org: IA https://archive.org/download/microsoft_xbox_x
+- Microsoft Xbox - Y - Redump.org: IA https://archive.org/download/microsoft_xbox_y
+- Microsoft Xbox - Z - Redump.org: IA https://archive.org/download/microsoft_xbox_z
+
+### /Microsoft/microsoft-xbox360 — Microsoft Xbox 360
+- Microsoft - Xbox 360: Minerva Redump https://minerva-archive.org/browse/Redump/Microsoft%20-%20Xbox%20360/
+- Microsoft Xbox 360 - # - Redump.org: IA https://archive.org/download/microsoft_xbox360_numberssymbols
+- Microsoft Xbox 360 - A (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox360_a_part1
+- Microsoft Xbox 360 - A (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox360_a_part2
+- Microsoft Xbox 360 - B (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox360_b_part1
+- Microsoft Xbox 360 - B (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox360_b_part2
+- Microsoft Xbox 360 - C (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox360_c_part1
+- Microsoft Xbox 360 - C (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox360_c_part2
+- Microsoft Xbox 360 - D (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox360_d_part1
+- Microsoft Xbox 360 - D (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox360_d_part2
+- Microsoft Xbox 360 - D (Part 3) - Redump.org: IA https://archive.org/download/microsoft_xbox360_d_part3
+- Microsoft Xbox 360 - E - Redump.org: IA https://archive.org/download/microsoft_xbox360_e
+- Microsoft Xbox 360 - F (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox360_f_part1
+- Microsoft Xbox 360 - F (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox360_f_part2
+- Microsoft Xbox 360 - G - Redump.org: IA https://archive.org/download/microsoft_xbox360_g
+- Microsoft Xbox 360 - H - Redump.org: IA https://archive.org/download/microsoft_xbox360_h
+- Microsoft Xbox 360 - I - Redump.org: IA https://archive.org/download/microsoft_xbox360_i
+- Microsoft Xbox 360 - J - Redump.org: IA https://archive.org/download/microsoft_xbox360_j
+- Microsoft Xbox 360 - K - Redump.org: IA https://archive.org/download/microsoft_xbox360_k
+- Microsoft Xbox 360 - L - Redump.org: IA https://archive.org/download/microsoft_xbox360_l
+- Microsoft Xbox 360 - M (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox360_m_part1
+- Microsoft Xbox 360 - M (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox360_m_part2
+- Microsoft Xbox 360 - N (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox360_n_part1
+- Microsoft Xbox 360 - N (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox360_n_part2
+- Microsoft Xbox 360 - O - Redump.org: IA https://archive.org/download/microsoft_xbox360_o
+- Microsoft Xbox 360 - P - Redump.org: IA https://archive.org/download/microsoft_xbox360_p
+- Microsoft Xbox 360 - Q - Redump.org: IA https://archive.org/download/microsoft_xbox360_q
+- Microsoft Xbox 360 - R - Redump.org: IA https://archive.org/download/microsoft_xbox360_r
+- Microsoft Xbox 360 - S (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox360_s_part1
+- Microsoft Xbox 360 - S (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox360_s_part2
+- Microsoft Xbox 360 - T (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox360_t_part1
+- Microsoft Xbox 360 - T (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox360_t_part2
+- Microsoft Xbox 360 - U - Redump.org: IA https://archive.org/download/microsoft_xbox360_u
+- Microsoft Xbox 360 - V - Redump.org: IA https://archive.org/download/microsoft_xbox360_v
+- Microsoft Xbox 360 - W - Redump.org: IA https://archive.org/download/microsoft_xbox360_w
+- Microsoft Xbox 360 - X (Part 1) - Redump.org: IA https://archive.org/download/microsoft_xbox360_x_part1
+- Microsoft Xbox 360 - X (Part 2) - Redump.org: IA https://archive.org/download/microsoft_xbox360_x_part2
+- Microsoft Xbox 360 - Y - Redump.org: IA https://archive.org/download/microsoft_xbox360_y
+- Microsoft Xbox 360 - Z - Redump.org: IA https://archive.org/download/microsoft_xbox360_z
+- Unofficial - Microsoft - Xbox 360 (Title Updates): Minerva No-Intro https://minerva-archive.org/browse/No-Intro/Unofficial%20-%20Microsoft%20-%20Xbox%20360%20(Title%20Updates)/
+- Microsoft - Xbox 360 (Digital): Minerva No-Intro https://minerva-archive.org/browse/No-Intro/Microsoft%20-%20Xbox%20360%20(Digital)/
+- Microsoft Xbox 360 - Title Updates - No-Intro: IA https://archive.org/download/microsoft_xbox360_title-updates
+- Microsoft Xbox 360 - Digital (Part 1): IA https://archive.org/download/microsoft_xbox360_digital_part1
+- Microsoft Xbox 360 - Digital (Part 2): IA https://archive.org/download/microsoft_xbox360_digital_part2
+- Microsoft Xbox 360 - Digital (Part 3): IA https://archive.org/download/microsoft_xbox360_digital_part3
+- Microsoft Xbox 360 - Digital (Part 4): IA https://archive.org/download/microsoft_xbox360_digital_part4
+- Microsoft Xbox 360 - Digital (Part 5): IA https://archive.org/download/microsoft_xbox360_digital_part5
+- Microsoft Xbox 360 - Digital (Part 6): IA https://archive.org/download/microsoft_xbox360_digital_part6
+- Microsoft Xbox 360 - Digital (Part 7): IA https://archive.org/download/microsoft_xbox360_digital_part7
+- Xbox 360 Games (# - D) (Other): IA https://archive.org/download/XBOX_360_1_OTHER
+- Xbox 360 Games (# - D): IA https://archive.org/download/XBOX_360_1
+- Xbox 360 Games (D - H): IA https://archive.org/download/XBOX_360_2
+- Xbox 360 Games (H - M): IA https://archive.org/download/XBOX_360_3
+- Xbox 360 Games (M - P): IA https://archive.org/download/XBOX_360_4
+- Xbox 360 Games (P - T): IA https://archive.org/download/XBOX_360_5
+- Xbox 360 Games (T - Z): IA https://archive.org/download/XBOX_360_6
+- Xbox 360 DLC Part 1: IA https://archive.org/download/XBOX_360_DLC_1
+- Xbox 360 DLC Part 2: IA https://archive.org/download/XBOX_360_DLC_2
+- Xbox 360 DLC Part 3: IA https://archive.org/download/XBOX_360_DLC_3
+- Xbox 360 DLC Part 4: IA https://archive.org/download/XBOX_360_DLC_4
+- Xbox 360 DLC Part 5: IA https://archive.org/download/XBOX_360_DLC_5
+- Xbox 360 DLC Part 6: IA https://archive.org/download/XBOX_360_DLC_6
+- Xbox 360 XBLIG Part 1: IA https://archive.org/download/XBOX_360_XBLIG_1
+- Xbox 360 XBLIG Part 2: IA https://archive.org/download/XBOX_360_XBLIG_2
+- Xbox 360 XBLIG Part 3: IA https://archive.org/download/XBOX_360_XBLIG_3
+- Xbox 360 XBLIG Part 4: IA https://archive.org/download/XBOX_360_XBLIG_4
+- Xbox 360 XBLA: IA https://archive.org/download/XBOX_360_XBLA
+- Xbox 360 XBLA DLC: IA https://archive.org/download/XBOX_360_XBLA_DLC
+- Rock Band DLC Complete Collection Xbox 360 by Americo: Minerva https://minerva-archive.org/browse/Internet%20Archive/mdashk/rock-band-dlc-complete-collection-xbox-360-by-americo/ | IA https://archive.org/download/rock-band-dlc-complete-collection-xbox-360-by-americo
+
+---

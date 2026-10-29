@@ -9,7 +9,13 @@
   "permissions": {
     "allow": [
       "Bash(echo $PATH)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Read(~/.claude/skills/**)",
+      "Read(~/claudeconfig/skills/**)",
+      "Grep(~/.claude/skills/**)",
+      "Grep(~/claudeconfig/skills/**)",
+      "Glob(~/.claude/skills/**)",
+      "Glob(~/claudeconfig/skills/**)"
     ],
     "deny": [
       "Agent(Explore)",
