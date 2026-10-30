@@ -25,7 +25,7 @@
     ],
     "defaultMode": "default"
   },
-  "model": "sonnet",
+  "model": "opus",
   "availableModels": [
     "opus",
     "sonnet",
