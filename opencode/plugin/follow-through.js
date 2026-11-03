@@ -14,7 +14,7 @@ const RELAY_PREFIX = "Relay the message below"
 
 function log(line) {
   try {
-    appendFileSync("/tmp/opencode-follow-through.log", `${new Date().toISOString()} ${line}\n`)
+    appendFileSync(process.env.OPENCODE_FOLLOW_THROUGH_LOG ?? "/tmp/opencode-follow-through.log", `${new Date().toISOString()} ${line}\n`)
   } catch {}
 }
 

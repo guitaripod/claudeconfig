@@ -7,6 +7,7 @@ import { verdict as ompVerdict } from "../../omp/extensions/follow-through.ts"
 import { verdict as opencodeVerdict } from "../plugin/follow-through.js"
 
 const HOOK = join(import.meta.dir, "../../hooks/follow-through.sh")
+process.env.OPENCODE_FOLLOW_THROUGH_LOG = join(mkdtempSync(join(tmpdir(), "ft-log-")), "follow-through.log")
 
 const OFFERS = [
   "Fixed and tested. The two local commits still need your go-ahead to push.",
