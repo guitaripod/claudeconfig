@@ -13,9 +13,7 @@
       "Read(~/.claude/skills/**)",
       "Read(~/claudeconfig/skills/**)",
       "Grep(~/.claude/skills/**)",
-      "Grep(~/claudeconfig/skills/**)",
-      "Glob(~/.claude/skills/**)",
-      "Glob(~/claudeconfig/skills/**)"
+      "Grep(~/claudeconfig/skills/**)"
     ],
     "deny": [
       "Agent(Explore)",
