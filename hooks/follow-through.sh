@@ -23,7 +23,7 @@ fi
 [ -n "$text" ] || exit 0
 
 OFFER_RE='\b(want me to|would you like me to|do you want me to|shall i|should i (go ahead|start|proceed|push|commit|do|run|apply|add|fix|install|deploy|ship|build|make|delete|remove|merge|open|publish|re-?arm|resume|continue)|say the word|say (if|when|whether) you|say "?(resume|go|yes|continue|the word)|tell me (if|when|whether) you(.d)? (want|like|prefer)|let me know if|if you(.d| would)? (like|want|prefer),? (i|i.ll|i can|i could)|ready (to|for me to) (proceed|continue|start|go|implement|build|commit|push)|(continue|proceed)\?|need your go-?ahead|with your (ok|go-?ahead)|your call:)'
-STALL_RE='^(let me (?!know)|now,? (let me|i.ll|i will)\b|next,? (i.ll|let me)\b|i.ll now\b|i will now\b)[^?]*$'
+STALL_RE='^(let me|now,? (let me|i.ll|i will)|next,? (i.ll|let me)|i.ll now|i will now)\b[^?]*$'
 
 tail_text=$(printf '%s' "$text" | tail -c 400)
 last_line=$(printf '%s\n' "$text" | sed '/^[[:space:]]*$/d' | tail -n 1)
@@ -33,7 +33,7 @@ kind=""
 if printf '%s' "$tail_text" | grep -qiE "$OFFER_RE"; then
   kind=offer
   reason="You ended the turn offering work instead of doing it. If it is reversible and follows from my request, do it now and report the result. Keep the question and stop again only if it is a real decision (spending money, prices, a public post or release, deleting my data), needs my hands (sudo, a locked device, a login), or I asked you to wait, plan or only answer."
-elif [ "${#last_line}" -le 300 ] && { printf '%s' "$last_line" | grep -qE ':[[:space:]]*$' || printf '%s' "$last_sentence" | grep -qiP "$STALL_RE"; }; then
+elif [ "${#last_line}" -le 300 ] && { printf '%s' "$last_line" | grep -qE ':[[:space:]]*$' || { printf '%s' "$last_sentence" | grep -qiE "$STALL_RE" && ! printf '%s' "$last_sentence" | grep -qiE '^let me know\b'; }; }; then
   kind=stall
   reason="You announced a next step and stopped before doing it. Do that step now, then finish the task."
 fi
