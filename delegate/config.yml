@@ -8,7 +8,7 @@ tiers:
     label: local
     chain:
       - runner: omp
-        model: llama-swap/qwen38-nvfp4
+        model: llama-swap/pennyroyal
         thinking: low
         health: http://127.0.0.1:8081/v1/models
         settings:
