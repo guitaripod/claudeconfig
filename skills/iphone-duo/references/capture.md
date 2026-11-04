@@ -45,6 +45,8 @@ scripts/capture.py --udid <udid> --bundle-id <id> --out <dir> \
 ## Lessons from five apps
 
 - Run long captures in the background: a tool call dies at 10 minutes, a full matrix takes longer. Redirect the output to a log and poll it.
+- `--screen` and `--env` split on commas, so a launch value with a comma in it (a German question for a live model) fails with `expected KEY=VALUE` and, behind a `grep`, looks like a skipped locale. Export it as `SIMCTL_CHILD_<KEY>` in the environment of `capture.py` instead; `simctl launch` passes it through. (2026-11-04 App of the Dead)
+- A full-bleed scroll view centred on `frameLayoutGuide` slides under the sidebar in the book pose: `UISplitViewController` lets the secondary column run under the primary and reports the overlap as a horizontal safe-area inset. Pin the scroll view's leading and trailing edges to `safeAreaLayoutGuide` and keep only the backdrop full-bleed. Flat inner landscape hid it; only the book-pose cell showed it. (2026-11-04 App of the Dead path map)
 - Give every parallel agent its own simulator and pass its udid to duoctl (`-d`); the default only works when one Duo is booted.
 - `xcodebuild test` leaves the simulator shut down; boot it again before the next capture.
 - `xcode-select` may point at Xcode 27.0, which never adapts the app: build with `DEVELOPER_DIR=$HOME/xcode-27.1/Xcode.app/Contents/Developer`.
