@@ -7,9 +7,11 @@ llama-swap entry carries a `metadata.agent` block, so adding a model is one edit
 there followed by this script, and a deleted model cannot linger in a picker.
 
 Per model, llama-swap holds:
-  name         the codename shown in every picker: one or two words, at most 16
-               characters, Title Case, taken from the descriptor (Bolt, Super,
-               Pennyroyal). Engine, quant and context never go in it.
+  name         the codename shown in every picker, in gpulens and in llama-swap's
+               own UI, so every entry has one, in a picker or not: one or two
+               words, at most 16 characters, Title Case, taken from the
+               descriptor (Bolt, Super, Pennyroyal). Engine, quant and context
+               never go in it.
   description  the full descriptor, `Family Size · [Uncensored ·] Engine · Quant
                · Speculation · Context`. blackwall's models.toml `name` repeats it.
   metadata.agent
@@ -162,13 +164,34 @@ def _launcher_sources(cmd: str) -> list[str]:
     return sources
 
 
+def _is_codename(name: str) -> bool:
+    return 1 <= len(name.split()) <= 2 and len(name) <= NAME_LIMIT and "·" not in name
+
+
 def _check_name(model_id: str, name: str) -> None:
     """Refuse a picker name that breaks the codename rule."""
-    if not 1 <= len(name.split()) <= 2 or len(name) > NAME_LIMIT or "·" in name:
+    if not _is_codename(name):
         raise SystemExit(
             f"{model_id}: name {name!r} must be a one or two word codename of at most "
             f"{NAME_LIMIT} characters; put the full descriptor in `description`"
         )
+
+
+def _naming_warnings(config_path: Path) -> list[str]:
+    """Codename problems in every llama-swap entry, including those outside the pickers, which gpulens and llama-swap's UI still show."""
+    config = yaml.safe_load(config_path.read_text())
+    warnings = []
+    names = {}
+    for model_id, entry in (config.get("models") or {}).items():
+        name = entry.get("name") or ""
+        if not _is_codename(name):
+            warnings.append(f"{model_id}: name {name!r} is not a one or two word codename of at most {NAME_LIMIT} characters")
+        if not entry.get("description"):
+            warnings.append(f"{model_id}: missing `description` (the full descriptor)")
+        if name in names:
+            warnings.append(f"{model_id}: name {name!r} is already used by {names[name]}")
+        names.setdefault(name, model_id)
+    return warnings
 
 
 def _discover(config_path: Path) -> dict[str, dict]:
@@ -302,7 +325,7 @@ def main() -> int:
 
     models = _discover(args.config)
     print("agent models:", ", ".join(f"{meta['name']} ({mid})" for mid, meta in models.items()))
-    for line in _blackwall_drift(models):
+    for line in _naming_warnings(args.config) + _blackwall_drift(models):
         print("warning:", line, file=sys.stderr)
 
     changed = False
