@@ -30,9 +30,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--app", required=True)
     parser.add_argument("--app-t0", type=float, default=0.0)
     parser.add_argument("--app-speed", type=float, default=1.0)
-    parser.add_argument("--exposure", type=float, default=0.92)
+    parser.add_argument("--exposure", type=float, default=1.0, help="UI white relative to the scene's bright tones around the phone")
+    parser.add_argument("--saturation", type=float, default=0.88)
+    parser.add_argument("--reflection", type=float, default=0.18)
+    parser.add_argument("--plate-width", type=int, default=768, help="native width of the generated clip")
     parser.add_argument("--lift", type=float, default=0.025, help="UI black lifted to this fraction of white")
-    parser.add_argument("--spill", type=float, default=0.18, help="strength of the screen's glow on fingers and face")
+    parser.add_argument("--spill", type=float, default=0.34, help="strength of the screen's glow on fingers and face")
     parser.add_argument("--hold-at", type=float, default=None, help="play the app from --app-t0 for this many seconds, then hold")
     parser.add_argument("--blush", type=float, default=0.8, help="saturation kept in red skin tones (1 = untouched)")
     parser.add_argument("--grain", type=float, default=3.0, help="sensor grain over the whole frame, screen included (0 = none)")
@@ -216,19 +219,58 @@ def plate_light(frame: np.ndarray, inside: np.ndarray) -> tuple[np.ndarray, np.n
     return shade, cv2.GaussianBlur(spec.astype(np.float32), (0, 0), 1.5)
 
 
-def seat_screen(warped: np.ndarray, inside: np.ndarray, shade: np.ndarray, spec: np.ndarray, room: np.ndarray,
-                args: argparse.Namespace) -> np.ndarray:
-    """Make the app look filmed on that phone: camera softness, white balance to the room, exposure and black level,
-    the plate's shading and reflections, and a dark rim where the glass meets the bezel."""
-    screen = cv2.GaussianBlur(warped, (0, 0), 0.6).astype(np.float32)
-    gains = (room / max(float(room.mean()), 1.0)) ** 0.35
-    screen = screen * gains * args.exposure
-    screen = screen * (1 - args.lift) + 255 * args.lift
+def seat_screen(warped: np.ndarray, inside: np.ndarray, quad: np.ndarray, frame: np.ndarray, shade: np.ndarray,
+                spec: np.ndarray, room: np.ndarray, args: argparse.Namespace) -> np.ndarray:
+    """Make the app look filmed on that phone.
+
+    - Same camera: resample the screen down to the generated plate's own resolution and back, so it is exactly as
+      soft as everything else, then lift its blacks.
+    - Same exposure: scale the UI's whites to the brightness of the scene around the phone, not to full white.
+    - Same light: white-balance toward the room, take some saturation out, apply the plate's shading and
+      reflections, and lay a soft, blurred, mirrored reflection of the surroundings across the glass that moves
+      with the phone.
+    - Same object: a dark rim where the glass meets the bezel and a faint highlight along the top edge.
+    """
+    small = cv2.resize(warped, (args.plate_width, round(H * args.plate_width / W)), interpolation=cv2.INTER_AREA)
+    screen = cv2.resize(small, (W, H), interpolation=cv2.INTER_LANCZOS4).astype(np.float32)
+    gray = luma(screen)[..., None]
+    screen = gray + (screen - gray) * args.saturation
+    gains = (room / max(float(room.mean()), 1.0)) ** 0.6
+    screen *= gains
+    ring = cv2.dilate(inside, np.ones((301, 301), np.uint8)) - cv2.dilate(inside, np.ones((41, 41), np.uint8))
+    scene = luma(frame.astype(np.float32))[ring > 0]
+    target = np.clip(np.percentile(scene, 85) * args.exposure, 120, 228) if scene.size else 200.0
+    screen = screen * (target / 255) * (1 - args.lift) + target * args.lift
     screen *= shade[..., None] ** 0.9
     screen = 255 - (255 - screen) * (255 - np.clip(spec, 0, 255)[..., None]) / 255
+    screen = reflect(screen, frame, inside, quad, args.reflection)
     distance = cv2.distanceTransform(inside, cv2.DIST_L2, 3)
-    rim = 1 - 0.2 * np.clip(1 - distance / 3.5, 0, 1)
-    return screen * rim[..., None]
+    rim = 1 - 0.22 * np.clip(1 - distance / 3.5, 0, 1)
+    screen *= rim[..., None]
+    tl, tr = quad[0], quad[1]
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    edge = tr - tl
+    to_top = np.abs((xx - tl[0]) * edge[1] - (yy - tl[1]) * edge[0]) / (np.linalg.norm(edge) + 1e-6)
+    lip = np.clip(1 - to_top / 2.5, 0, 1) * inside * 0.1
+    return screen * (1 - lip[..., None]) + 255 * lip[..., None]
+
+
+def reflect(screen: np.ndarray, frame: np.ndarray, inside: np.ndarray, quad: np.ndarray, strength: float) -> np.ndarray:
+    """Glass reflection: the scene around the phone, mirrored and heavily blurred, in a soft diagonal band whose
+    position follows the phone's centre, so it slides across the glass as she moves, plus a faint white sheen at
+    the band's core so the glass reads even when the room around it is dark."""
+    if strength <= 0:
+        return screen
+    env = cv2.GaussianBlur(cv2.flip(frame, 1), (0, 0), 45).astype(np.float32)
+    cx, cy = quad.mean(axis=0)
+    height = float(np.linalg.norm(quad[3] - quad[0])) + 1e-6
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    phase = ((xx - cx) * 0.55 + (yy - cy)) / height + (cx - W / 2) / W * 0.8
+    band = np.exp(-((phase + 0.18) / 0.22) ** 2) + 0.35 * np.clip(-(yy - cy) / height + 0.1, 0, 1)
+    alpha = (band * strength * inside)[..., None]
+    sheen = (np.exp(-((phase + 0.18) / 0.12) ** 2) * strength * 0.45 * inside)[..., None]
+    lit = 255 - (255 - screen) * (255 - env * alpha) / 255
+    return lit * (1 - sheen) + 255 * sheen
 
 
 def screen_light(base: np.ndarray, screen: np.ndarray, inside: np.ndarray, removed: np.ndarray, strength: float) -> np.ndarray:
@@ -239,7 +281,8 @@ def screen_light(base: np.ndarray, screen: np.ndarray, inside: np.ndarray, remov
         return base
     tint = pixels.mean(axis=0)
     tint = tint / max(float(tint.max()), 1.0)
-    glow = cv2.GaussianBlur(luma(screen) * inside, (0, 0), 40) / 255 * strength
+    source = luma(screen) * inside
+    glow = (cv2.GaussianBlur(source, (0, 0), 12) * 0.6 + cv2.GaussianBlur(source, (0, 0), 45)) / 255 * strength
     outside = (1 - inside)[..., None]
     lit = base + (removed[..., None] * 0.8 + glow[..., None] * 255) * tint * outside
     return np.clip(lit, 0, 255)
@@ -303,7 +346,7 @@ def main() -> None:
         clean, removed = despill(calm_reds(frame, args.blush), near)
         clean = neutralise_bezel(clean, cv2.dilate(inside, np.ones((31, 31), np.uint8)))
         room = clean[(near - inside) > 0].reshape(-1, 3).mean(axis=0)
-        lit = seat_screen(warped, inside, shade, spec, room, args)
+        lit = seat_screen(warped, inside, quad, clean, shade, spec, room, args)
         scene = screen_light(clean, lit, inside, removed, args.spill)
         out = scene * (1 - matte) + lit * matte
         if args.grain:
