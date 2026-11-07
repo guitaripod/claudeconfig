@@ -1,6 +1,6 @@
 ---
 name: app-short
-description: Make TikTok / Reels / Shorts videos about Marcus's apps - Saga, the recurring AI-generated Nordic presenter (Flux 3 klein stills animated by LTX-2.5, Tailscode's local video lane), holds a phone whose green screen is replaced with the real app recording, then real app footage in a sharp `frames` bezel over the same footage blurred into the app's palette, short text cards and a locally generated instrumental bed (ACE-Step 1.5) with cuts on the beat. Use for "TikTok for <app>", "short-form content", "Reels", "Shorts", "app promo clips", "marketing video". Not for launch films (keynote-video) or footage hype edits (hype-edit).
+description: Make TikTok / Reels / Shorts videos about Marcus's apps - his two AI-generated presenters (a redhead for App of the Dead, a blonde for Master of Flags) (Flux 3 klein stills animated by LTX-2.5, Tailscode's local video lane), holds a phone whose green screen is replaced with the real app recording, then real app footage in a sharp `frames` bezel over the same footage blurred into the app's palette, short text cards and a locally generated instrumental bed (ACE-Step 1.5) with cuts on the beat. Use for "TikTok for <app>", "short-form content", "Reels", "Shorts", "app promo clips", "marketing video". Not for launch films (keynote-video) or footage hype edits (hype-edit).
 ---
 
 # App shorts
@@ -14,12 +14,14 @@ Scripts (all in `scripts/`):
 
 The first batch (App of the Dead, Master of Flags, 2026-11-07) has its specs in each app's `marketing/shorts/` in the monorepo; copy one as the starting point.
 
-## Saga, the presenter
+## The presenters
 
-Marcus's standing direction (2026-11-07): a beautiful Nordic blonde woman appears in all the marketing, made to look real.
-- Her canonical look is `cast/saga.jpg` (25, platinum-blonde waves, light blue eyes, freckles). Every new scene cites it as `<ref_image_0>` with `--ref-mp 2.0`, which keeps her face from scene to scene.
-- Prompts that worked are in `cast/prompts/` (`portrait`, `scene-*`, `motion-*`).
-- Keep her tasteful and clearly adult. She's the hook, not the content, and she never speaks or poses as a customer giving a testimonial.
+Marcus's standing direction (2026-11-07): a beautiful Nordic woman appears in all the marketing, made to look real. He generated the two faces himself; use these, one per app, so each account has one recognisable face:
+- `cast/redhead.jpg`: copper-red hair, blue-green eyes. She fronts **App of the Dead** (candlelit, museum and lake scenes).
+- `cast/blonde.jpg`: honey-blonde with platinum highlights, blue-green eyes. She fronts **Master of Flags** (travel scenes: train, airport).
+- `cast/saga.jpg` (the first presenter, platinum waves and freckles) is retired; keep it only for reference.
+
+Every scene cites the app's face as `<ref_image_0>` with `--ref-mp 2.0`. The scene prompt names her hair and eyes ("same face, same blue-green eyes, same long copper-red hair in soft layers"). It also asks for "her complexion and makeup as in <ref_image_0>: smooth even skin, defined lashes, softly sculpted cheeks, glossy rose lips, no redness" and a "soft, relaxed, closed-lip half-smile like in <ref_image_0>, eyes relaxed ... no raised eyebrows, no wide eyes". Without those lines klein drifts to a goofy wide-eyed grin and blotchy skin that no longer looks like his models. The prompts that worked are in `cast/prompts/` (`red-*`, `blonde-*`; the older `scene-*` ones are Saga's). Keep them tasteful and clearly adult. They're the hook, not the content, and never speak or pose as customers giving testimonials.
 
 What makes her read as real:
 - Candid iPhone-photo wording ("candid vertical photo taken on an iPhone, natural and unretouched, slight phone-camera noise").
@@ -30,7 +32,7 @@ What makes her read as real:
 - "Tiny natural handheld sway", and nothing fast.
 
 Recipe:
-1. **Still.** `comfy.py klein --prompt-file scene.txt --ref cast/saga.jpg --ref-mp 2.0 --width 1152 --height 2048 --steps 28 --seeds 1,2,3 --prefix shorts/scene-x` (about 30 s each). She holds an iPhone toward the camera, close (about 40 cm), with the screen a flat chroma-key green and her fingers only on the sides. Pick by face fidelity, hands and phone size.
+1. **Still.** `comfy.py klein --prompt-file scene.txt --ref cast/<redhead|blonde>.jpg --ref-mp 2.0 --width 1152 --height 2048 --steps 28 --seeds 1,2,3 --prefix shorts/scene-x` (about 30 s each). She holds an iPhone toward the camera, close (about 40 cm), with the screen a flat chroma-key green and her fingers only on the sides. Pick by face fidelity, hands and phone size.
 2. **Clip.** `comfy.py i2v --image first.png --prompt-file motion.txt --width 768 --height 1344 --seconds 5 --seeds 1 --prefix shorts/clip-x` (about 70 s on a free card, ~72 GB VRAM peak). llama-keepwarm unloads Bolt by itself once ComfyUI has work, but check `nvidia-smi` for anything else (an SGLang or vLLM model of 70 GB leaves no room; llama-swap TTLs free it in 10 minutes). Make a 2 fps strip and reject clips where the green flickers, the hands morph or the face drifts.
 3. **Screen.** `screen.py --clip clip.mp4 --app take.mp4 --app-t0 4.3 [--hold-at 1.2 | --still] --out broll.mp4 --debug /path/prefix`.
    - The key takes only bright, saturated green, so green sofas and forests stay.
@@ -42,11 +44,11 @@ Recipe:
    - The 2026-11 research is behind these choices. Commercial planar trackers (Mocha Pro $1495 on Linux; Resolve Fusion; Blender's Plane Track) solve geometry only. CoTracker3 is non-commercial. AI editors (Wan VACE or Animate, Runway Aleph, Kling) and AI-UGC SaaS (Arcads, Creatify) re-synthesise the screen, so the UI text garbles. If a relight pass is ever added, mask the screen out of it and put the UI back on top.
 4. **Spec.** Her shot is a segment `{"broll": "<broll.mp4>", "beats": 6}` (full frame, no phone layer). She opens every video, followed by the framed-phone segments.
 
-**Disclosure (not optional):** TikTok's Community Guidelines (effective 2026-09-24) require creators to label AI-generated content showing realistic people. Unlabeled posts may be removed, restricted or labeled by TikTok. Every post with Saga goes up with TikTok's "AI-generated content" toggle on, and the delivery message says so. Never strip provenance or try to beat detection.
+**Disclosure (not optional):** TikTok's Community Guidelines (effective 2026-09-24) require creators to label AI-generated content showing realistic people. Unlabeled posts may be removed, restricted or labeled by TikTok. Every post with a presenter goes up with TikTok's "AI-generated content" toggle on, and the delivery message says so. Never strip provenance or try to beat detection.
 
 ## Non-cringe rules
 
-- The app stays the hero. Its footage is real and sharp (inside her phone, and in the bezel segments). The only generated parts are Saga and her surroundings, the music and the type.
+- The app stays the hero. Its footage is real and sharp (inside her phone, and in the bezel segments). The only generated parts are the presenter and her surroundings, the music and the type.
 - One idea per video, 10-20 s. The hook is a question or a fact the footage answers, in the first second. No "wait for it", fake stats ("only 1% get this"), emoji in the video, or voice-over.
 - Every claim on a card or in a caption must match the live listing and the app as recorded.
   - Price and version: `https://itunes.apple.com/search?term=<app>&entity=software`.
@@ -71,7 +73,7 @@ Recipe:
 3. **Spec.**
    - Segments cut the takes. Lengths in `beats` land every cut on a detected beat of the bed; `dur` gives seconds instead.
    - `{"freeze": true, "beats": 6}` holds the previous frame.
-   - `{"broll": ..., "beats": n}` is a full-frame Saga shot.
+   - `{"broll": ..., "beats": n}` is a full-frame presenter shot.
    - Texts span segments (`from`/`to`, optional `delay`). A card is a `label` + `title`, or `{"countdown": 3, "y": 1150}` for a ring on a dark disc.
    - Style files hold the palette, fonts and device placement per app:
    ```json
