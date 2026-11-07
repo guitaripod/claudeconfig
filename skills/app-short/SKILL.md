@@ -32,12 +32,14 @@ What makes her read as real:
 Recipe:
 1. **Still.** `comfy.py klein --prompt-file scene.txt --ref cast/saga.jpg --ref-mp 2.0 --width 1152 --height 2048 --steps 28 --seeds 1,2,3 --prefix shorts/scene-x` (about 30 s each). She holds an iPhone toward the camera, close (about 40 cm), with the screen a flat chroma-key green and her fingers only on the sides. Pick by face fidelity, hands and phone size.
 2. **Clip.** `comfy.py i2v --image first.png --prompt-file motion.txt --width 768 --height 1344 --seconds 5 --seeds 1 --prefix shorts/clip-x` (about 70 s on a free card, ~72 GB VRAM peak). llama-keepwarm unloads Bolt by itself once ComfyUI has work, but check `nvidia-smi` for anything else (an SGLang or vLLM model of 70 GB leaves no room; llama-swap TTLs free it in 10 minutes). Make a 2 fps strip and reject clips where the green flickers, the hands morph or the face drifts.
-3. **Screen.** `screen.py --clip clip.mp4 --app take.mp4 --app-t0 4.5 [--still] --out broll.mp4 --debug /path/prefix`.
+3. **Screen.** `screen.py --clip clip.mp4 --app take.mp4 --app-t0 4.3 [--hold-at 1.2 | --still] --out broll.mp4 --debug /path/prefix`.
    - The key takes only bright, saturated green, so green sofas and forests stay.
-   - The corners are fitted and smoothed, and the app is warped in at full resolution behind her fingers and the Dynamic Island.
-   - Spill and the green-lit bezel are neutralised.
-   - `--still` holds one app frame, so a quiz question isn't answered in her hands.
+   - Geometry: a line is fitted to each straight edge of the keyed screen and the corners are their intersections. Never fit a polygon to the blob: the rounded corners skew the quad and the UI ends up tilted against the phone. That was the "obviously fake" look of 2026-11-07.
+   - Light: the green plate's own shading and reflections (luma over its median, and the rise of min(R,B)) are multiplied and screen-blended onto the app. On top come a white balance to the room, exposure and black lift, camera softness, a dark rim where the glass meets the bezel, sensor grain over everything, and sub-frame motion blur when the phone moves. The green spill on the fingers comes back in the app's colour as screen light.
+   - Let the app play (`--hold-at` seconds, then hold before any answer). A frozen screen reads as fake; `--still` is the fallback.
+   - Reds and magentas on her skin are calmed (`--blush`).
    - Check the `--debug` frames zoomed in at the screen edge.
+   - The 2026-11 research is behind these choices. Commercial planar trackers (Mocha Pro $1495 on Linux; Resolve Fusion; Blender's Plane Track) solve geometry only. CoTracker3 is non-commercial. AI editors (Wan VACE or Animate, Runway Aleph, Kling) and AI-UGC SaaS (Arcads, Creatify) re-synthesise the screen, so the UI text garbles. If a relight pass is ever added, mask the screen out of it and put the UI back on top.
 4. **Spec.** Her shot is a segment `{"broll": "<broll.mp4>", "beats": 6}` (full frame, no phone layer). She opens every video, followed by the framed-phone segments.
 
 **Disclosure (not optional):** TikTok's Community Guidelines (effective 2026-09-24) require creators to label AI-generated content showing realistic people. Unlabeled posts may be removed, restricted or labeled by TikTok. Every post with Saga goes up with TikTok's "AI-generated content" toggle on, and the delivery message says so. Never strip provenance or try to beat detection.
