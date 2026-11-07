@@ -14,7 +14,6 @@ neutralised. The app footage stays at full resolution, so the screen is the shar
 """
 
 import argparse
-import itertools
 import subprocess
 import sys
 
@@ -308,11 +307,9 @@ def main() -> None:
     args = parse_args()
     clip_cmd = ["ffmpeg", "-v", "error", "-i", args.clip, "-vf", f"fps={FPS},scale={W}:{H}:flags=lanczos",
                 "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]
-    frames = list(reader(clip_cmd, (W, H)))
-    alphas = [green_alpha(f) for f in frames]
     quads, previous = [], None
-    for alpha in alphas:
-        region = screen_region(alpha, previous)
+    for frame in reader(clip_cmd, (W, H)):
+        region = screen_region(green_alpha(frame), previous)
         quad = fit_quad(region) if region is not None else None
         quads.append(quad)
         previous = quad if quad is not None else previous
@@ -321,7 +318,7 @@ def main() -> None:
     aw, ah = app_size(args.app)
     app_cmd = ["ffmpeg", "-v", "error", "-i", args.app, "-vf",
                f"fps=60,trim=start={args.app_t0:.4f},setpts=(PTS-STARTPTS)/{args.app_speed},fps={FPS},"
-               f"tpad=stop_mode=clone:stop=-1", "-frames:v", str(len(frames)), "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]
+               f"tpad=stop_mode=clone:stop=-1", "-frames:v", str(len(corners)), "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]
     app_frames = reader(app_cmd, (aw, ah))
     hold = 0 if args.still else (round(args.hold_at * FPS) if args.hold_at is not None else None)
     source = np.array([[0, 0], [aw, 0], [aw, ah], [0, ah]], np.float32)
@@ -332,7 +329,8 @@ def main() -> None:
     assert enc.stdin is not None
     app = None
     rng = np.random.default_rng(7)
-    for i, (frame, alpha) in enumerate(zip(frames, alphas)):
+    for i, frame in enumerate(reader(clip_cmd, (W, H))):
+        alpha = green_alpha(frame)
         if app is None or hold is None or i <= hold:
             app = next(app_frames, app)
         quad = corners[i]
@@ -353,7 +351,7 @@ def main() -> None:
             out += rng.normal(0, args.grain, (H, W, 1)).astype(np.float32)
         out = np.clip(out, 0, 255).astype(np.uint8)
         enc.stdin.write(out.tobytes())
-        if args.debug and i in (0, len(frames) // 2, len(frames) - 1):
+        if args.debug and i in (0, len(corners) // 2, len(corners) - 1):
             cv2.imwrite(f"{args.debug}_{i:03d}.png", cv2.cvtColor(out, cv2.COLOR_RGB2BGR))
     enc.stdin.close()
     if enc.wait() != 0:

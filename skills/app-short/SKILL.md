@@ -41,6 +41,7 @@ Recipe:
    - Let the app play (`--hold-at` seconds, then hold before any answer). A frozen screen reads as fake; `--still` is the fallback.
    - Reds and magentas on her skin are calmed (`--blush`).
    - Check the `--debug` frames zoomed in at the screen edge.
+   - Run composites one at a time, each under `systemd-run --user --scope -p MemoryMax=8G`. Six in parallel caused a global OOM on 2026-11-07 that killed claude-bridge (the session) and Steam's web helper. `screen.py` now streams the clip twice instead of holding it in RAM.
    - The 2026-11 research is behind these choices. Commercial planar trackers (Mocha Pro $1495 on Linux; Resolve Fusion; Blender's Plane Track) solve geometry only. CoTracker3 is non-commercial. AI editors (Wan VACE or Animate, Runway Aleph, Kling) and AI-UGC SaaS (Arcads, Creatify) re-synthesise the screen, so the UI text garbles. If a relight pass is ever added, mask the screen out of it and put the UI back on top.
 4. **Spec.** Her shot is a segment `{"broll": "<broll.mp4>", "beats": 6}` (full frame, no phone layer). She opens every video, followed by the framed-phone segments.
 
