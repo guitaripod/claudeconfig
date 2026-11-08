@@ -107,14 +107,19 @@ be running.
 
 ## 3. Levers, in the order they paid off
 
+The first question for any game with frame generation is whether it presents uncapped into the
+non-VRR TV. FF7 Rebirth (~187 fps) and Ragnarök (FG on, vsync off) did: forcing FIFO turned that
+into a locked 144 before any CPU lever mattered. Results per game live in the per-game memories
+(`spiderman-remastered-linux-perf`, `game-perf-round2-2026-11-08`).
+
 | Lever | How | Measured on Spider-Man |
 |---|---|---|
 | Thread placement | `/home/marcus/.local/bin/game-cores` in the launch chain (dotfiles `scripts/game-cores.py`). All threads go on P-cores. Helper threads and helper processes go on E-cores: streaming, audio, shader compiles, Wine plumbing, overlays, crash reporter, Proton's steam.exe. The default thread regex was tuned on Spider-Man (it names `NxStorage`). For a new game, read the hot thread names in `diagnose.py` and set `GAME_CORES_HELPERS` if the game's helpers are named differently. | all cores ~102 → P-only ~111 → game-cores ~114 fps, better 1% lows |
-| vkd3d descriptor heap (DX12 only) | `VKD3D_CONFIG=descriptor_heap` (vkd3d-proton 3.1 in GE-Proton11-12; default-on in later builds, opt out with `no_descriptor_heap`) | 119 → 127 fps avg over 6 launches each. Check characters for skinned-mesh corruption in a full-res crop (`shot NAME --crop 1500x1000+X+Y`); one 615.x report of this in another game |
-| Newest DLSS model (DLSS games only) | `DXVK_NVAPI_DRS_SETTINGS=ngx_dlss_sr_override=on,ngx_dlss_sr_override_render_preset_selection=render_preset_latest,ngx_dlss_rr_override=on,ngx_dlss_fg_override=on` with `PROTON_DLSS_UPGRADE=1`. GE's default keeps the game's own preset (Spider-Man: CNN preset E) | preset K, no fps cost while CPU-bound. Turns idle GPU into image quality |
+| vkd3d descriptor heap (DX12 only) | `VKD3D_CONFIG=descriptor_heap` (vkd3d-proton 3.1 in GE-Proton11-12; default-on in later builds, opt out with `no_descriptor_heap`) | 119 → 127 fps avg over 6 launches each. Check characters for skinned-mesh corruption in a full-res crop (`shot NAME --crop 1500x1000+X+Y`); one 615.x report of this in another game. Game-specific: FF7 Rebirth no change, Uncharted 99 → 80 fps. Games with their own PSO cache (FF7 Rebirth "Preparing shaders", Uncharted "Building Shaders", ~10 min) rebuild it on every toggle, so test it last and switch back before restoring |
+| Newest DLSS model (DLSS games only) | `DXVK_NVAPI_DRS_SETTINGS=ngx_dlss_sr_override=on,ngx_dlss_sr_override_render_preset_selection=render_preset_latest,ngx_dlss_rr_override=on,ngx_dlss_fg_override=on` with `PROTON_DLSS_UPGRADE=1`. GE's default keeps the game's own preset (Spider-Man: CNN preset E, Witcher 3: CNN preset A). Add `ngx_dlss_rr_override_render_preset_selection=render_preset_latest` for ray reconstruction. `ngx_dlss_sr_mode=dlaa\|quality\|balanced\|performance` forces the mode, even DLAA in a DLSS 2 game that lacks it (Uncharted: DLAA K 95 fps vs native TAA 99.5); a mode change is his image call, so measure and report | preset K, no fps cost while CPU-bound. "Latest" resolves per mode: M for Performance, K for Quality and DLAA |
 | DLSS Frame Generation + vsync (DLSS-G games only) | Enable FG in the game. Spider-Man's registry has `FrameGen=2` (1 is FSR FG). For DX12, force FIFO with `VKD3D_SWAPCHAIN_PRESENT_MODE=FIFO`, because games grey out their own vsync with FG | uncapped ~200 fps juddered on the non-VRR C5. Locked: 144.0 fps, 1% low 130, jitter 0.35 ms (vs ~120 / ~85 without FG) |
 | CPU-cost settings | crowd/traffic density, LOD, RT object range | his call; report numbers only |
-| Not worth it | `force_static_cbv` (noise, one hitchy run); DLSS upscaling on a CPU-bound game (no fps); SMT-off pinning (0,2,…,14: no better); RT reflections when CPU-bound (more CPU work) | |
+| Not worth it | `force_static_cbv` (noise, one hitchy run); DLSS upscaling on a CPU-bound game (no fps); SMT-off pinning (0,2,…,14: no better); RT reflections when CPU-bound (more CPU work); helper threads on E-cores in UE4 (FF7 Rebirth 1% lows 102 → 85: its streaming threads matter); an engine fps cap under FIFO (no change); custom `WINE_CPU_TOPOLOGY` for Uncharted (8 cores 75 fps, 8P+8E 101: protonfixes' 16-CPU limit already lands on CPUs 0-15, the P-cores) | |
 
 Check DLSS state with `PROTON_DLSS_INDICATOR=1`: bottom-left shows preset and version, and the
 top `DLSSG` line shows `2x` when FG runs. Take it out again before the final options.
@@ -170,3 +175,16 @@ top `DLSSG` line shows `2x` when FG runs. Take it out again before the final opt
   prefix's wineserver.
   - This matters: Marcus once launched the game through Steam seconds after a bench run ended.
   - A killed Wine game leaves `explorer.exe` and other prefix processes holding VRAM, so make sure `stop` reports nothing left alive.
+- `prebake` starts 28 `fossilize_replay` workers when the desk looks idle, which is exactly when a
+  bench runs, and they cut fps by 80%. Run `prebake pause --for 3h` before the first `start`; it
+  resumes by itself.
+- A game the rig starts outside a Steam launch gets its environment from the Steam client, which
+  includes `LC_ALL=C`, so Wine cannot resolve non-ASCII paths: Ragnarök failed to open
+  `Saved Games\God of War Ragnarök` ("Path not found", then first-run setup with no saves). Real
+  Steam launches are fine. For such a game, skip the rig and verify the levers with one real launch.
+- Back up the game's own settings and save folders before the first `start` (`cp -a --reflink=auto`
+  to `/mnt/nvme8tb/gameperf-backup/`), and diff and restore them afterwards: the rig's SDR display,
+  first-run prompts (telemetry, GPU-changed dialogs, gift notices) and autosaves all write there.
+- Proton or protonfixes may already set a CPU topology (`WINE_CPU_TOPOLOGY` in `/proc/PID/environ`;
+  Uncharted gets `16:0-15`). `PROTON_CPU_TOPOLOGY` loses to protonfixes, set `WINE_CPU_TOPOLOGY`
+  to override.

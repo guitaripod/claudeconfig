@@ -131,8 +131,15 @@ def bench_running() -> bool:
 
 
 def game_running() -> bool:
-    """True while any Steam-launched game (its reaper) is alive."""
-    return subprocess.run(["pgrep", "-f", "reaper SteamLaunch"], capture_output=True).returncode == 0
+    """True while any Steam-launched game (its reaper) is alive, judged by argv so a shell quoting the words never counts."""
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        try:
+            argv = open(f"/proc/{pid}/cmdline", "rb").read().split(b"\0")
+        except OSError:
+            continue
+        if len(argv) > 1 and argv[0].endswith(b"/reaper") and argv[1] == b"SteamLaunch":
+            return True
+    return False
 
 
 def stop_steam(timeout: int = 90) -> None:
