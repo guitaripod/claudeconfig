@@ -43,8 +43,9 @@ def install_dir(appid: str) -> str:
 
 
 def compat_data(appid: str) -> str:
-    """The Proton prefix root (the directory holding pfx/) for appid."""
-    for lib in library_paths():
+    """The Proton prefix root (the directory holding pfx/) for appid, preferring the game's own library as Steam does."""
+    home, _ = app_manifest(appid)
+    for lib in [home] + [l for l in library_paths() if l != home]:
         path = os.path.join(lib, "steamapps", "compatdata", appid)
         if os.path.isdir(os.path.join(path, "pfx")):
             return path
@@ -214,7 +215,7 @@ def main() -> None:
         return
     cmd, rest = args[0], args[1:]
     if cmd == "info" and len(rest) == 1:
-        lib, fields = app_manifest(rest[0])
+        _, fields = app_manifest(rest[0])
         print(f"name: {fields.get('name')}\ninstall: {install_dir(rest[0])}\nprefix: {compat_data(rest[0])}\nproton: {proton_script(rest[0])}")
         print(f"launch options: {get_launch_options(rest[0])}")
     elif cmd == "get" and len(rest) == 1:
