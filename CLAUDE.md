@@ -19,6 +19,7 @@ Everything here applies to every session on every machine. Machine-specific rule
 - Default branch is `master`, never `main`: `git init -b master`; if a host made `main`, `git branch -m main master`, push `-u`, `gh repo edit --default-branch master`, then delete `main`.
 - NEVER add Co-Authored-By or "Generated with Claude Code" to commits or PRs (enforced by `hooks/guard-bash.sh`).
 - Commit finished, verified work yourself as atomic commits (one logical change each) in the repo's message style and the imperative mood ("Fix…", "Add…", "Remove…"), never bundling my unrelated in-flight changes, then push. Pushing my own repos needs no ask; opening a PR on someone else's repo does, and releases follow the `app-store` skill.
+- Never commit or push memory in `~/claudememory` by hand: its 15-minute sync folds each day's writes into one amended commit, and a hand commit breaks the fold. Run `~/claudememory/scripts/sync.sh` to publish now.
 - License: GPL-3.0 for every new repo (`gh api /licenses/gpl-3.0 -q .body > LICENSE`), never MIT unless I ask.
 
 ## Autonomy
