@@ -59,7 +59,7 @@ All four links are created by `scripts/link.sh`. `~/.config/delegate/host.yml` (
 
 ## lightpanda
 
-Headless browser (no rendering: no screenshots or PDFs) exposed as the `lightpanda` MCP in all harnesses: opencode (`opencode.json`), omp (`omp/mcp.json`), Claude Code (user scope in the machine-local `~/.claude.json`; `link.sh` registers it when missing). `link.sh` installs the pinned `LIGHTPANDA_VERSION` into `~/.cargo/bin` (the opencode service PATH has no `~/.local/bin`).
+Headless browser (no rendering: no screenshots or PDFs) exposed as the `lightpanda` MCP in all harnesses: opencode (`opencode.json`), omp (`omp/mcp.json`), Claude Code (user scope in the machine-local `~/.claude.json`; `link.sh` registers it when missing). `scripts/update-lightpanda.sh` installs the latest release into `~/.cargo/bin` (the opencode service PATH has no `~/.local/bin`): checksum-verified, smoke-tested, then renamed over the old binary so running MCP servers keep theirs. `link.sh` runs it and installs a daily job (systemd `lightpanda-update.timer`, launchd `com.guitaripod.lightpanda-update`); running servers pick up a new release when their harness restarts.
 
 ## Machines
 

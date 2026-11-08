@@ -111,16 +111,74 @@ for shim in flyr hinta-best kaytetty-best; do
     link_abs "$REPO_DIR/opencode/command/$shim.md" "$HOME/.omp/agent/commands/$shim.md"
 done
 
-LIGHTPANDA_VERSION="1.0.0"
-
 ensure_lightpanda() {
-    if [ "$("$HOME/.cargo/bin/lightpanda" version 2>/dev/null)" = "$LIGHTPANDA_VERSION" ]; then
-        echo "  ok   lightpanda $LIGHTPANDA_VERSION"
-        return
-    fi
-    curl -fsSL https://pkg.lightpanda.io/install.sh | LIGHTPANDA_DIR="$HOME/.cargo/bin" bash -s "$LIGHTPANDA_VERSION" >/dev/null \
-        && echo "  inst lightpanda $LIGHTPANDA_VERSION" \
-        || echo "  WARN: lightpanda install failed"
+    "$REPO_DIR/scripts/update-lightpanda.sh" | sed 's/^/  /' || echo "  WARN: lightpanda update failed"
+}
+
+install_lightpanda_systemd_timer() {
+    command -v systemctl >/dev/null || { echo "  skip lightpanda-update timer (no systemd)"; return; }
+    local unit_dir="$HOME/.config/systemd/user"
+    mkdir -p "$unit_dir"
+    cat > "$unit_dir/lightpanda-update.service" <<UNIT
+[Unit]
+Description=Install the latest Lightpanda release
+StartLimitIntervalSec=6h
+StartLimitBurst=6
+
+[Service]
+Type=oneshot
+ExecStart=$REPO_DIR/scripts/update-lightpanda.sh
+Restart=on-failure
+RestartSec=30min
+Nice=10
+UNIT
+    cat > "$unit_dir/lightpanda-update.timer" <<UNIT
+[Unit]
+Description=Daily Lightpanda update
+
+[Timer]
+OnCalendar=*-*-* 05:17:00
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+    systemctl --user daemon-reload
+    systemctl --user enable --now lightpanda-update.timer >/dev/null 2>&1
+    echo "  timer lightpanda-update.timer ($(systemctl --user is-active lightpanda-update.timer))"
+}
+
+install_lightpanda_launchd_agent() {
+    local label="com.guitaripod.lightpanda-update"
+    local plist="$HOME/Library/LaunchAgents/$label.plist"
+    mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
+    cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>$label</string>
+    <key>ProgramArguments</key>
+    <array><string>/bin/bash</string><string>$REPO_DIR/scripts/update-lightpanda.sh</string></array>
+    <key>StartCalendarInterval</key>
+    <dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>17</integer></dict>
+    <key>RunAtLoad</key><true/>
+    <key>StandardOutPath</key><string>$HOME/Library/Logs/lightpanda-update.log</string>
+    <key>StandardErrorPath</key><string>$HOME/Library/Logs/lightpanda-update.log</string>
+</dict>
+</plist>
+PLIST
+    launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$plist"
+    echo "  agent $label (daily 05:17)"
+}
+
+install_lightpanda_updater() {
+    case "$(uname -s)" in
+        Linux) install_lightpanda_systemd_timer ;;
+        Darwin) install_lightpanda_launchd_agent ;;
+    esac
 }
 
 register_lightpanda_mcp() {
@@ -134,6 +192,7 @@ register_lightpanda_mcp() {
 
 echo "=== Ensuring lightpanda (headless browser MCP) ==="
 ensure_lightpanda
+install_lightpanda_updater
 register_lightpanda_mcp
 
 BIN_DIR="$HOME/.local/bin"
