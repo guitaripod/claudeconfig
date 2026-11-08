@@ -199,6 +199,9 @@ top `DLSSG` line shows `2x` when FG runs. Take it out again before the final opt
 - SCSKiller rewarms a game's shader cache after it runs (`scskiller_warm.exe`, ~2.6 cores for
   half an hour), so a bench of one game slows the next. Check `pgrep -af scskiller_warm` with the
   usual load checks.
+- In nested gamescope (`rpd-gamescope`) the pointer is only locked when the game hides its cursor;
+  a game that keeps it visible (Dawnwalker) lets the mouse wander to other monitors on camera
+  moves. Add `--force-grab-cursor` to the gamescope args.
 - Some menus ignore XTest keys (Expedition 33's main menu never took focus); when two tries
   fail, skip the game rather than fight it.
 - Proton or protonfixes may already set a CPU topology (`WINE_CPU_TOPOLOGY` in `/proc/PID/environ`;
