@@ -37,14 +37,41 @@ def app_manifest(appid: str) -> tuple[str, dict[str, str]]:
     raise SystemExit(f"appid {appid} is not installed in any Steam library")
 
 
+def _steamlib():
+    """The steam-add-game skill's binary VDF helpers, which own shortcuts.vdf."""
+    here = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "steam-add-game", "scripts")
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import steamlib
+    return steamlib
+
+
+def shortcut(appid: str) -> dict[str, str | int] | None:
+    """The non-Steam shortcut with this appid (lower-cased keys, quotes stripped), or None for a Steam game."""
+    lib = _steamlib()
+    tree, _, _ = lib.load_shortcuts()
+    for _, (_, entry) in lib.entries(tree).items():
+        if str(lib.entry_appid(entry)) == str(appid):
+            return {k.lower(): (v.strip('"') if isinstance(v, str) else v) for k, (_, v) in entry.items()}
+    return None
+
+
 def install_dir(appid: str) -> str:
+    """The game's folder: the Steam install dir, or a shortcut's start dir."""
+    entry = shortcut(appid) if not _is_installed(appid) else None
+    if entry:
+        return str(entry["startdir"]).rstrip("/")
     lib, fields = app_manifest(appid)
     return os.path.join(lib, "steamapps", "common", fields["installdir"])
 
 
+def _is_installed(appid: str) -> bool:
+    return any(os.path.exists(os.path.join(lib, "steamapps", f"appmanifest_{appid}.acf")) for lib in library_paths())
+
+
 def compat_data(appid: str) -> str:
     """The Proton prefix root (the directory holding pfx/) for appid, preferring the game's own library as Steam does."""
-    home, _ = app_manifest(appid)
+    home = app_manifest(appid)[0] if _is_installed(appid) else os.path.realpath(STEAM_ROOT)
     for lib in [home] + [l for l in library_paths() if l != home]:
         path = os.path.join(lib, "steamapps", "compatdata", appid)
         if os.path.isdir(os.path.join(path, "pfx")):
@@ -109,6 +136,8 @@ def _unescape(value: str) -> str:
 
 
 def get_launch_options(appid: str) -> str:
+    if not _is_installed(appid) and (entry := shortcut(appid)):
+        return str(entry.get("launchoptions", ""))
     text = open(localconfig(), encoding="utf-8").read()
     start, end = _app_block(text, appid)
     m = re.search(r'\n\t{6}"LaunchOptions"\t\t"((?:[^"\\]|\\.)*)"', text[start:end])
@@ -188,8 +217,38 @@ def _write_atomic(path: str, text: str) -> None:
     os.replace(tmp, path)
 
 
+def _set_shortcut_options(appid: str, options: str) -> str:
+    """Writes a non-Steam shortcut's LaunchOptions into shortcuts.vdf with Steam stopped; returns the backup path."""
+    if re.search(r"[\x00-\x1f]", options):
+        raise SystemExit("launch options contain control characters (newline/tab); refusing")
+    lib = _steamlib()
+    if shortcut(appid) is None:
+        raise SystemExit(f"no Steam game or shortcut with appid {appid}")
+    stop_steam()
+    try:
+        tree, _, path = lib.load_shortcuts()
+        for _, (_, entry) in lib.entries(tree).items():
+            if str(lib.entry_appid(entry)) == str(appid):
+                key = next((k for k in entry if k.lower() == "launchoptions"), "LaunchOptions")
+                entry[key] = ("str", options)
+        backup = lib.backup(path, f"gameperf-{appid}-{time.strftime('%Y%m%d-%H%M%S')}")
+        data = lib.serialize_binary_vdf(tree)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".shortcuts-")
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        shutil.copymode(path, tmp)
+        os.replace(tmp, path)
+    finally:
+        start_steam()
+    if get_launch_options(appid) != options:
+        raise SystemExit("launch options did not read back as written")
+    return backup
+
+
 def set_launch_options(appid: str, options: str) -> str:
-    """Stops Steam, writes the options (backing up localconfig.vdf), starts Steam; returns the backup path."""
+    """Stops Steam, writes the options (backing up localconfig.vdf or shortcuts.vdf), starts Steam; returns the backup path."""
+    if not _is_installed(appid):
+        return _set_shortcut_options(appid, options)
     path = localconfig()
     _with_options(open(path, encoding="utf-8").read(), appid, options)
     stop_steam()
@@ -205,10 +264,11 @@ def set_launch_options(appid: str, options: str) -> str:
 
 
 def restore_backup(backup: str) -> None:
-    """Puts a localconfig.vdf backup back with Steam stopped, then starts Steam."""
+    """Puts a localconfig.vdf or shortcuts.vdf backup back with Steam stopped, then starts Steam."""
+    target = _steamlib().shortcuts_path() if os.path.basename(backup).startswith("shortcuts.vdf") else localconfig()
     stop_steam()
     try:
-        shutil.copy2(backup, localconfig())
+        shutil.copy2(backup, target)
     finally:
         start_steam()
 
@@ -222,15 +282,20 @@ def main() -> None:
         return
     cmd, rest = args[0], args[1:]
     if cmd == "info" and len(rest) == 1:
-        _, fields = app_manifest(rest[0])
-        print(f"name: {fields.get('name')}\ninstall: {install_dir(rest[0])}\nprefix: {compat_data(rest[0])}\nproton: {proton_script(rest[0])}")
-        print(f"launch options: {get_launch_options(rest[0])}")
+        appid = rest[0]
+        name = app_manifest(appid)[1].get("name") if _is_installed(appid) else (shortcut(appid) or {}).get("appname")
+        if name is None:
+            raise SystemExit(f"no Steam game or shortcut with appid {appid}")
+        kind = "steam" if _is_installed(appid) else f"shortcut, exe {(shortcut(appid) or {}).get('exe')}"
+        print(f"name: {name} ({kind})\ninstall: {install_dir(appid)}\nprefix: {compat_data(appid)}\nproton: {proton_script(appid)}")
+        print(f"launch options: {get_launch_options(appid)}")
     elif cmd == "get" and len(rest) == 1:
         print(get_launch_options(rest[0]))
     elif cmd == "set" and len(rest) == 2:
         print("backup:", set_launch_options(rest[0], rest[1]))
     elif cmd == "backups" and len(rest) == 1:
-        print("\n".join(sorted(glob.glob(localconfig() + ".bak-*"))))
+        found = glob.glob(localconfig() + ".bak-*") + glob.glob(_steamlib().shortcuts_path() + ".bak-*")
+        print("\n".join(sorted(found)))
     elif cmd == "restore" and len(rest) == 1:
         restore_backup(rest[0])
         print("restored", rest[0])

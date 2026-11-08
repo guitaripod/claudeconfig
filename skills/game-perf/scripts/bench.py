@@ -90,6 +90,11 @@ def _drop_null_sink() -> None:
             subprocess.run(["pactl", "unload-module", line.split()[0]], capture_output=True)
 
 
+def _game_id(appid: str) -> int:
+    """SteamGameId as Steam sets it: the appid for a Steam game, the 64-bit shortcut id for a non-Steam shortcut."""
+    return int(appid) if steamtools._is_installed(appid) else (int(appid) << 32) | 0x02000000
+
+
 def cmd_exes(a) -> None:
     root = steamtools.install_dir(a.appid)
     hits = [(os.path.getsize(p), os.path.relpath(p, root)) for p in glob.glob(os.path.join(root, "**", "*.exe"), recursive=True)
@@ -122,12 +127,12 @@ def cmd_start(a) -> None:
                           f"log_duration={a.log_seconds}\nlog_interval=0\ntoggle_logging=Shift_L+F2\noutput_folder={logdir}\n")
     launcher = {"game-cores": [os.path.expanduser("~/.local/bin/game-cores")], "taskset": ["taskset", "-c", "0-15"], "none": []}[a.launcher]
     env = [f"GAMEPERF_BENCH={label}", f"STEAM_COMPAT_DATA_PATH={compat}", f"STEAM_COMPAT_CLIENT_INSTALL_PATH={steamtools.STEAM_ROOT}",
-           f"SteamAppId={a.appid}", f"SteamGameId={a.appid}", f"PULSE_SINK={NULL_SINK}",
+           f"SteamAppId={a.appid}", f"SteamGameId={_game_id(a.appid)}", f"PULSE_SINK={NULL_SINK}",
            "MANGOHUD=1", f"MANGOHUD_CONFIGFILE={conf}", *a.env]
     cmd = ["/usr/bin/gamescope", "--backend", "headless", "-W", str(a.width), "-H", str(a.height), "-r", str(a.refresh), "--",
            "env", *env, *launcher, proton, "waitforexitandrun", exe, *a.args.split()]
     log = open(os.path.join(logdir, "gamescope.log"), "w")
-    gs = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
+    gs = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True, cwd=steamtools.install_dir(a.appid),
                           preexec_fn=lambda: signal.pthread_sigmask(signal.SIG_SETMASK, []))
     state = {"appid": a.appid, "label": label, "logdir": logdir, "gamescope_pid": gs.pid, "gamescope_start": _start_time(gs.pid),
              "socket": "", "display": "", "launcher": a.launcher, "exe": os.path.basename(exe), "compat": compat, "proton": proton}

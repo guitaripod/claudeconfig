@@ -185,6 +185,22 @@ top `DLSSG` line shows `2x` when FG runs. Take it out again before the final opt
 - Back up the game's own settings and save folders before the first `start` (`cp -a --reflink=auto`
   to `/mnt/nvme8tb/gameperf-backup/`), and diff and restore them afterwards: the rig's SDR display,
   first-run prompts (telemetry, GPU-changed dialogs, gift notices) and autosaves all write there.
+- Non-Steam shortcuts work everywhere: `steamtools.py info|get|set APPID` and `bench.py` take the
+  shortcut's 32-bit appid (`steamtools.py info` on it, or `steam_shortcut.py list` from the
+  `steam-add-game` skill). `set` writes `shortcuts.vdf` (backup `shortcuts.vdf.bak-gameperf-*`).
+  Many shortcuts run inside `rpd-gamescope` (nested gamescope sized to the live display), which the
+  headless rig matches closely. Their saves often sit under a Steam emulator id
+  (`Documents/<game>/76561197960271872`); back them up like any other.
+- GE-Proton10-34's vkd3d-proton has no `VKD3D_SWAPCHAIN_PRESENT_MODE` (and no descriptor heap):
+  Ghost of Tsushima's frame generation ran uncapped at 158 fps there. Move such a game to
+  GE-Proton11-12 (`steamlib.set_compat_tool(APPID, "GE-Proton11-12-x86_64", apply=True)` with Steam
+  stopped). A bench run with `--proton` upgrades the prefix to 11.0, so either switch the game for
+  good or do not bench it on the newer Proton.
+- SCSKiller rewarms a game's shader cache after it runs (`scskiller_warm.exe`, ~2.6 cores for
+  half an hour), so a bench of one game slows the next. Check `pgrep -af scskiller_warm` with the
+  usual load checks.
+- Some menus ignore XTest keys (Expedition 33's main menu never took focus); when two tries
+  fail, skip the game rather than fight it.
 - Proton or protonfixes may already set a CPU topology (`WINE_CPU_TOPOLOGY` in `/proc/PID/environ`;
   Uncharted gets `16:0-15`). `PROTON_CPU_TOPOLOGY` loses to protonfixes, set `WINE_CPU_TOPOLOGY`
   to override.
