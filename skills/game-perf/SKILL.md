@@ -86,6 +86,8 @@ be running.
   (MangoHud CSVs, gamescope.log), session state in `bench.json`.
 - Key names are single characters or `Return Escape space Tab BackSpace Up Down Left Right
   Shift_L Control_L Alt_L F1 F2 F10 F11`. Anything else is rejected. Screenshot after each step.
+- Games drop input sent before a menu is interactive: a `Return` sent during the splash was
+  silently lost and the run measured the main menu. Wait until a screenshot shows the menu, then send keys.
 - Get to a repeatable scene: load the latest save ("Continue"), then turn the camera a fixed
   amount with `mouse:` so it looks down a busy street. The same keys land in nearly the same view
   after every launch, but his saves move, so verify with a screenshot every run.
