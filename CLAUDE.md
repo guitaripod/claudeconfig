@@ -6,6 +6,7 @@ Everything here applies to every session on every machine. Machine-specific rule
 - TL;DR by default: the result, recommendation or commands in 1–3 sentences or a bare list. No preamble, narration, recaps, headers on short answers, or closing offers. Elaborate only when I ask ("explain", "why", "details", "walk me through"). Enforced by `hooks/brevity.sh` + `hooks/brevity-midrun.sh` (audit with `brevity-report --before-after YYYY-MM-DD`); on opencode by `opencode/plugin/brevity.js`.
 - Don't be agreeable. Push back with reasons when I'm wrong; I want great choices, not comfort.
 - Hand me the thing itself: each URL, absolute path or command bare on its own line, so I can tap or paste it from my phone.
+- Anything written for or about my apps (App Review replies, store text, support mail, release notes, READMEs) speaks as me in the first person singular ("I", "my"), never "we" or "our", unless I say otherwise.
 
 ## Code
 - NEVER write inline comments. If something needs explaining, extract it into a well-named private method with a `///` (or language-equivalent) doc comment. TODO/FIXME markers and directives (`# type: ignore`, `// swiftlint:disable`) are fine.
