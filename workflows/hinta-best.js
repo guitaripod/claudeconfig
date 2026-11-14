@@ -50,6 +50,10 @@ const SCOPE_SCHEMA = {
       type: ['string', 'null'],
       description: "PRODUCT mode only: the exact string to search Finnish retailers, e.g. 'rtx 5090' or 'samsung 990 pro 2tb'. null in category mode.",
     },
+    broadQuery: {
+      type: ['string', 'null'],
+      description: "PRODUCT mode only: searchQuery without its capacity/size/colour token, e.g. 'iphone duo' for 'iphone duo 512gb', 'samsung 990 pro' for 'samsung 990 pro 2tb'. null in category mode or when there is nothing to drop.",
+    },
     candidates: {
       type: 'array',
       description: 'CATEGORY mode only: 5-8 concrete best-in-class models. Empty in product mode.',
@@ -65,7 +69,7 @@ const SCOPE_SCHEMA = {
       },
     },
   },
-  required: ['mode', 'category', 'interpretation', 'budgetEur', 'minInches', 'maxInches', 'searchQuery', 'candidates'],
+  required: ['mode', 'category', 'interpretation', 'budgetEur', 'minInches', 'maxInches', 'searchQuery', 'broadQuery', 'candidates'],
 }
 
 phase('Scope')
@@ -78,8 +82,8 @@ Request: "${query}"
 First run \`date +%F\` (Bash) for today's date; electronics move fast so treat training knowledge as possibly stale.
 
 Decide the MODE:
-- 'product' — the request already names ONE specific product/model the user has chosen (e.g. "rtx 5090", "samsung 990 pro 2TB", "sony wh-1000xm5", "lg c4 65"). We will run one retailer search and rank the variants/retailers of THAT product. Set 'searchQuery' to the exact string a Finnish shop would match (short: brand + line + model + defining size, e.g. "rtx 5090", "samsung 990 pro 2tb"). Leave 'candidates' empty.
-- 'category' — an open "what's best" question (e.g. "best 4TB SSD", "a good OLED under 2000", "wireless gaming mouse"). Use WebSearch to find the CURRENT best-in-class picks as of today (RTINGS, Tom's Hardware, TechPowerUp, Wirecutter, etc.), then set 'candidates' to 5-8 concrete, currently-buyable models spanning tiers (>=1 flagship, 1-2 value, 1 budget). Each 'model' must be an EXACT searchable name including the defining size/capacity ("WD Black SN850X 4TB", "LG OLED65C4"), never vague. Leave 'searchQuery' null.
+- 'product' — the request already names ONE specific product/model the user has chosen (e.g. "rtx 5090", "samsung 990 pro 2TB", "sony wh-1000xm5", "lg c4 65"). We will run one retailer search and rank the variants/retailers of THAT product. Set 'searchQuery' to the exact string a Finnish shop would match (short: brand + line + model + defining size, e.g. "rtx 5090", "samsung 990 pro 2tb"), and 'broadQuery' to the same string without its capacity/size/colour token ("samsung 990 pro"), or null if there is none: Finnish shops write capacities as "512 Gt" / "2 Tt", so a "512gb" query alone misses their listings. Leave 'candidates' empty.
+- 'category' — an open "what's best" question (e.g. "best 4TB SSD", "a good OLED under 2000", "wireless gaming mouse"). Use WebSearch to find the CURRENT best-in-class picks as of today (RTINGS, Tom's Hardware, TechPowerUp, Wirecutter, etc.), then set 'candidates' to 5-8 concrete, currently-buyable models spanning tiers (>=1 flagship, 1-2 value, 1 budget). Each 'model' must be an EXACT searchable name including the defining size/capacity ("WD Black SN850X 4TB", "LG OLED65C4"), never vague. Leave 'searchQuery' and 'broadQuery' null.
 
 For both: respect hard constraints (budget, screen size, form factor, must-haves) and set budgetEur / minInches / maxInches (inches only for screens, else null). 'category' = normalized name, 'interpretation' = one sentence.`,
   { label: 'scope', phase: 'Scope', schema: SCOPE_SCHEMA, model: 'haiku', effort: 'high' }
@@ -97,6 +101,8 @@ phase('Price')
 
 if (scope.mode === 'product') {
   const q = (scope.searchQuery || scope.category || query).replace(/"/g, '\\"')
+  const broad = (scope.broadQuery || '').replace(/"/g, '\\"').trim()
+  const queries = broad && broad.toLowerCase() !== q.toLowerCase() ? [q, broad] : [q]
   log(`Pricing variants of "${q}" across Finnish retailers…`)
 
   const PRODUCT_SCHEMA = {
@@ -110,7 +116,7 @@ if (scope.mode === 'product') {
           properties: {
             name: { type: 'string', description: 'the group/product name as listed (e.g. the specific board-partner card)' },
             cheapestPriceEur: { type: 'number' },
-            inStock: { type: 'boolean' },
+            inStock: { type: ['boolean', 'null'], description: 'null when the shop exposes no stock data' },
             retailer: { type: 'string' },
             url: { type: 'string' },
             retailerCount: { type: 'integer' },
@@ -124,19 +130,19 @@ if (scope.mode === 'product') {
   }
 
   const res = await agent(
-    `Run EXACTLY this command (searches Finnish electronics retailers and groups the same product across them) and parse its JSON stdout:
+    `Run EXACTLY ${queries.length > 1 ? 'these commands' : 'this command'} (searches Finnish electronics retailers and groups the same product across them) and parse the JSON stdout:
 
 \`\`\`
-hinta compare "${q}" --enrich --devices-only${inchArgs} --json
+${queries.map(x => `hinta compare "${x}" --enrich --devices-only${inchArgs} --json`).join('\n')}
 \`\`\`
-
+${queries.length > 1 ? `\nThe second, broader query catches shops whose titles write the capacity differently ("512 Gt", "2 Tt"); merge both result sets and drop duplicate offers (same url).\n` : ''}
 The JSON has a "groups" array. Each group is one distinct product variant carried by one or more retailers:
 - "name", "cheapest_price_euro", "matched_on" ("ean" = certain), "confidence".
 - "attributes": { brand, capacity_gb, screen_inches?, qualifiers?, kind }.
-- "offers": [{ source (retailer), name, price_euro, in_stock, url }], cheapest first.
+- "offers": [{ source (retailer), name, price_euro, in_stock, url }], cheapest first. "in_stock" is true, false, or null (the shop exposes no stock data).
 
-Keep ONLY groups that are genuinely the product "${scope.category}" (right brand and, if the query implied a capacity/size, that capacity/size). Drop accessories, unrelated items, and clearly-different-tier products. For each kept group, report the best BUYABLE offer: the cheapest in_stock offer; if the group has none in stock, its cheapest offer with inStock=false. Deduplicate near-identical variants. Return up to 10 variants, cheapest-in-stock first:
-- name, cheapestPriceEur, inStock, retailer (offer source), url (offer url), retailerCount (offers in the group).
+Keep ONLY groups that are genuinely the product "${scope.category}" (right brand and, if the query implied a capacity/size, that capacity/size). Drop accessories, unrelated items, and clearly-different-tier products. hinta can split one real variant into several groups when shops title it differently (e.g. "512GB - Star White" and "512 Gt, tähdenkajo"): merge those into one variant and count all their offers. For each variant, report the best BUYABLE offer: the cheapest offer with in_stock true; else the cheapest with in_stock null; else the cheapest with in_stock false. Copy in_stock as-is: null stays null, never false. Return up to 10 variants, in-stock first, then unknown, then out of stock:
+- name, cheapestPriceEur, inStock, retailer (offer source), url (offer url), retailerCount (distinct retailers across the merged offers).
 
 If the command errors or nothing matches, return an empty "variants" and a one-line "error". NEVER invent a price or URL.`,
     { label: `price:${q}`, phase: 'Price', schema: PRODUCT_SCHEMA, model: 'haiku', effort: 'medium' }
@@ -149,7 +155,7 @@ If the command errors or nothing matches, return an empty "variants" and a one-l
       tier: null,
       why: null,
       cheapestPriceEur: v.cheapestPriceEur,
-      inStock: !!v.inStock,
+      inStock: v.inStock ?? null,
       retailer: v.retailer,
       url: v.url,
       retailerCount: v.retailerCount || 1,
@@ -158,7 +164,7 @@ If the command errors or nothing matches, return an empty "variants" and a one-l
     }))
 
   if (!options.length) {
-    return `No in-stock Finnish listings matched **${scope.category}**.\n\n${scope.interpretation}${res?.error ? `\n\nSearch reported: ${res.error}` : ''}\n\nTry \`hinta compare "${q}"\` directly, or broaden the query.`
+    return `No Finnish listings matched **${scope.category}**.\n\n${scope.interpretation}${res?.error ? `\n\nSearch reported: ${res.error}` : ''}\n\nTry \`hinta compare "${q}"\` directly, or broaden the query.`
   }
 } else {
   const candidates = (scope.candidates || []).filter(c => c && c.model).slice(0, 8)
@@ -170,7 +176,7 @@ If the command errors or nothing matches, return an empty "variants" and a one-l
     properties: {
       foundInFinland: { type: 'boolean' },
       cheapestPriceEur: { type: ['number', 'null'] },
-      inStock: { type: 'boolean' },
+      inStock: { type: ['boolean', 'null'], description: 'null when the shop exposes no stock data' },
       retailer: { type: ['string', 'null'] },
       url: { type: ['string', 'null'] },
       retailerCount: { type: 'integer' },
@@ -188,9 +194,11 @@ If the command errors or nothing matches, return an empty "variants" and a one-l
 hinta compare "${c.model.replace(/"/g, '\\"')}" --enrich --devices-only${inchArgs} --json
 \`\`\`
 
-It returns a "groups" array; each group is a product across retailers, with "attributes" (brand, capacity_gb, screen_inches?, qualifiers?) and "offers" [{ source, price_euro, in_stock, url }] cheapest first.
+It returns a "groups" array; each group is a product across retailers, with "attributes" (brand, capacity_gb, screen_inches?, qualifiers?) and "offers" [{ source, price_euro, in_stock, url }] cheapest first. "in_stock" is true, false, or null (the shop exposes no stock data).
 
-Pick the ONE group that best matches "${c.model}" (brand "${c.brand}") — match the implied capacity/size, prefer the plain variant over add-ons/bundles. From it report the best BUYABLE offer (cheapest in_stock; else cheapest with inStock=false):
+If no group matches, run it once more without the capacity/size token (Finnish shops write capacities as "512 Gt" / "4 Tt", so "4TB" can miss them) and filter by capacity_gb yourself.
+
+Pick the group that best matches "${c.model}" (brand "${c.brand}") — match the implied capacity/size, prefer the plain variant over add-ons/bundles; if hinta split the same model into several groups under different shop titles, treat them as one. Report the best BUYABLE offer: the cheapest with in_stock true; else the cheapest with in_stock null; else the cheapest with in_stock false. Copy in_stock as-is: null stays null, never false.
 - foundInFinland (false if nothing matches, then null/0/false elsewhere), cheapestPriceEur, inStock, retailer, url, retailerCount, note (one short line only if something's off, else null).
 
 If the command errors or nothing matches, foundInFinland=false with the reason in note. NEVER invent a price or URL.`,
@@ -206,7 +214,7 @@ If the command errors or nothing matches, foundInFinland=false with the reason i
       tier: c.tier,
       why: c.why,
       cheapestPriceEur: p.cheapestPriceEur ?? null,
-      inStock: !!p.inStock,
+      inStock: p.inStock ?? null,
       retailer: p.retailer ?? null,
       url: p.url ?? null,
       retailerCount: p.retailerCount ?? 0,
@@ -238,7 +246,8 @@ Write a concise markdown recommendation using ONLY these facts:
 1. **Top pick** — best overall balance of quality and live price (NOT merely the cheapest). Give the name, price in EUR, retailer, in-stock status, and the buy URL, plus one line on why it wins${scope.mode === 'product' ? ' (cooling/noise/warranty/price for a variant)' : ''}.
 2. **Best value** and **Cheapest good option** — one line each (name, price, retailer, in-stock, URL). Skip a bucket the top pick already fills.
 ${scope.mode === 'category' ? '3. If a genuinely best-in-class model was NOT found in Finland (foundInFinland=false), note it in one line so the user knows it exists but is not stocked here — do NOT recommend buying it.\n' : ''}${scope.budgetEur ? `4. Flag any pick over the ${scope.budgetEur} EUR budget.\n` : ''}5. Prefer in-stock; if the best option is out of stock, say so and point at the best in-stock alternative. If prices cluster, say the market is tight so any reputable in-stock one is fine.
+6. End with one line: "Searched: Verkkokauppa.com, Power, Proshop, Multitronic, Jimms, Datatronic", plus, when relevant to this kind of product, the big Finnish sellers that list is missing (e.g. Gigantti, Apple, and the operators Elisa, Telia and DNA for phones), marked unchecked.
 
-Rules: prices are EUR and live. Never invent a price, retailer, or URL not in the JSON. Never recommend an item with foundInFinland=false as a buy. Be factual and tight — the buyer should know exactly what to click.`,
+Rules: prices are EUR and live. inStock null means the shop exposes no stock data: write "stock unknown, check the page", never "out of stock". Never invent a price, retailer, or URL not in the JSON. Never recommend an item with foundInFinland=false as a buy. Be factual and tight — the buyer should know exactly what to click.`,
   { label: 'recommend', phase: 'Recommend', model: 'haiku', effort: 'high' }
 )
