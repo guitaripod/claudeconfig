@@ -47,13 +47,30 @@ def _steamlib():
 
 
 def shortcut(appid: str) -> dict[str, str | int] | None:
-    """The non-Steam shortcut with this appid (lower-cased keys, quotes stripped), or None for a Steam game."""
+    """The non-Steam shortcut with this appid (lower-cased keys), or None for a Steam game.
+
+    Steam stores exe and startdir wrapped in quotes, which are stripped. Launch options stay
+    verbatim: their quotes belong to the arguments, and stripping them unbalances a trailing
+    quoted argument such as a map path.
+    """
     lib = _steamlib()
     tree, _, _ = lib.load_shortcuts()
     for _, (_, entry) in lib.entries(tree).items():
         if str(lib.entry_appid(entry)) == str(appid):
-            return {k.lower(): (v.strip('"') if isinstance(v, str) else v) for k, (_, v) in entry.items()}
+            return {k.lower(): (v.strip('"') if isinstance(v, str) and k.lower() != "launchoptions" else v)
+                    for k, (_, v) in entry.items()}
     return None
+
+
+def _shortcut_compat_override(appid: str) -> str | None:
+    """The prefix a shortcut borrows through STEAM_COMPAT_DATA_PATH=... in its launch options, if any.
+
+    Shortcuts that share another game's prefix (Mass Recall runs in the StarCraft II prefix so
+    saves and settings stay together) never get a compatdata folder of their own.
+    """
+    entry = shortcut(appid) if not _is_installed(appid) else None
+    m = re.search(r"(?:^|\s)STEAM_COMPAT_DATA_PATH=(\S+)", str(entry.get("launchoptions", ""))) if entry else None
+    return m.group(1) if m and os.path.isdir(os.path.join(m.group(1), "pfx")) else None
 
 
 def install_dir(appid: str) -> str:
@@ -71,6 +88,8 @@ def _is_installed(appid: str) -> bool:
 
 def compat_data(appid: str) -> str:
     """The Proton prefix root (the directory holding pfx/) for appid, preferring the game's own library as Steam does."""
+    if override := _shortcut_compat_override(appid):
+        return override
     home = app_manifest(appid)[0] if _is_installed(appid) else os.path.realpath(STEAM_ROOT)
     for lib in [home] + [l for l in library_paths() if l != home]:
         path = os.path.join(lib, "steamapps", "compatdata", appid)
