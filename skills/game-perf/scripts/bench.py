@@ -6,8 +6,10 @@
                    [--args=-nolauncher] [--env K=V ...]
     bench.py shot NAME [--crop WxH+X+Y]         screenshot (1280x720 unless cropped at full res)
     bench.py keys KEY [KEY ...]                 XTest keys: Return, Escape, Down, e, Shift_L+F2,
-                                                Return@0.5 (hold), sleep:1.5, mouse:dx,dy,steps
-    bench.py measure TAG [--seconds 33]         MangoHud per-frame log (--log-seconds at start) + nvidia-smi
+                                                Return@0.5 (hold), sleep:1.5, mouse:dx,dy,steps,
+                                                click:x,y[,button] (absolute, game resolution)
+    bench.py measure TAG [--seconds 33]         MangoHud per-frame log (--log-seconds at start) + nvidia-smi;
+                                                "missed" = refreshes without a new frame (the vsync lock metric)
     bench.py place all|p|p+helpers              live thread placement (start with --launcher none)
     bench.py stop                               kill the game, its wineserver and gamescope
     bench.py restore                            put the prefix's user.reg back as it was at first start
@@ -25,6 +27,7 @@ import glob
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import statistics
@@ -130,12 +133,13 @@ def cmd_start(a) -> None:
            f"SteamAppId={a.appid}", f"SteamGameId={_game_id(a.appid)}", f"PULSE_SINK={NULL_SINK}",
            "MANGOHUD=1", f"MANGOHUD_CONFIGFILE={conf}", *a.env]
     cmd = ["/usr/bin/gamescope", "--backend", "headless", "-W", str(a.width), "-H", str(a.height), "-r", str(a.refresh), "--",
-           "env", *env, *launcher, proton, "waitforexitandrun", exe, *a.args.split()]
+           "env", *env, *launcher, proton, "waitforexitandrun", exe, *shlex.split(a.args)]
     log = open(os.path.join(logdir, "gamescope.log"), "w")
     gs = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True, cwd=steamtools.install_dir(a.appid),
                           preexec_fn=lambda: signal.pthread_sigmask(signal.SIG_SETMASK, []))
     state = {"appid": a.appid, "label": label, "logdir": logdir, "gamescope_pid": gs.pid, "gamescope_start": _start_time(gs.pid),
-             "socket": "", "display": "", "launcher": a.launcher, "exe": os.path.basename(exe), "compat": compat, "proton": proton}
+             "socket": "", "display": "", "launcher": a.launcher, "exe": os.path.basename(exe), "compat": compat, "proton": proton,
+             "refresh": a.refresh}
     _save_state(state)
     for _ in range(60):
         text = open(log.name, errors="replace").read()
@@ -172,6 +176,19 @@ def cmd_shot(a) -> None:
     print(out)
 
 
+def _click(x, t, d, px: int, py: int, button: int = 1) -> None:
+    """Warps the pointer to (px, py) on the game's screen and clicks, for menus that ignore the keyboard."""
+    t.XTestFakeMotionEvent(d, -1, px, py, 0)
+    x.XFlush(d)
+    time.sleep(0.15)
+    t.XTestFakeButtonEvent(d, button, 1, 0)
+    x.XFlush(d)
+    time.sleep(0.08)
+    t.XTestFakeButtonEvent(d, button, 0, 0)
+    x.XFlush(d)
+    time.sleep(0.4)
+
+
 def cmd_keys(a) -> None:
     s = _state()
     x, t = ctypes.CDLL("libX11.so.6"), ctypes.CDLL("libXtst.so.6")
@@ -180,12 +197,17 @@ def cmd_keys(a) -> None:
     x.XFlush.argtypes = [ctypes.c_void_p]
     t.XTestFakeKeyEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
     t.XTestFakeRelativeMotionEvent.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_ulong]
+    t.XTestFakeMotionEvent.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_ulong]
+    t.XTestFakeButtonEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
     d = x.XOpenDisplay(s["display"].encode())
     if not d:
         raise SystemExit(f"cannot open X display {s['display']}")
     for item in a.keys:
         if item.startswith("sleep:"):
             time.sleep(float(item[6:]))
+            continue
+        if item.startswith("click:"):
+            _click(x, t, d, *(int(v) for v in item[6:].split(",")))
             continue
         if item.startswith("mouse:"):
             dx, dy, steps = (int(v) for v in item[6:].split(","))
@@ -214,6 +236,18 @@ def cmd_keys(a) -> None:
         time.sleep(0.4)
 
 
+def _missed_refreshes(rows: list[list[str]], head: int, refresh: int) -> int:
+    """Refresh cycles that got no new frame: elapsed time x refresh rate minus frames presented.
+
+    Under vsync (FIFO) this is the number that decides "locked": a frame queue absorbs uneven
+    present intervals, so 1% lows and jitter look poor while every refresh still gets a fresh
+    frame, and only a drained queue repeats one. Meaningless for an uncapped run.
+    """
+    col = rows[head].index("elapsed")
+    stamps = [float(r[col]) / 1e9 for r in rows[head + 1:] if r and r[0]]
+    return max(round((stamps[-1] - stamps[0]) * refresh) - (len(stamps) - 1), 0) if len(stamps) > 1 else 0
+
+
 def cmd_measure(a) -> None:
     s = _state()
     logdir = s["logdir"]
@@ -234,10 +268,11 @@ def cmd_measure(a) -> None:
     head = next(i for i, r in enumerate(rows) if r and r[0] == "fps")
     col = rows[head].index("frametime")
     ft = sorted(float(r[col]) for r in rows[head + 1:] if r and r[0])
+    missed = _missed_refreshes(rows, head, s.get("refresh", a.refresh_default))
     g = [list(map(float, l.split(","))) for l in out.splitlines() if l.strip()]
     p99 = ft[max(int(len(ft) * 0.99) - 1, 0)]
     print(f"{a.tag:24s} avg {1000/statistics.fmean(ft):6.1f} fps  1% low {1000/p99:6.1f}  jitter {statistics.pstdev(ft):4.2f} ms  "
-          f"frames {len(ft):5d}  gpu {statistics.fmean(x[0] for x in g):4.1f}% {statistics.fmean(x[1] for x in g):4.0f} W  "
+          f"frames {len(ft):5d}  missed {missed:4d}  gpu {statistics.fmean(x[0] for x in g):4.1f}% {statistics.fmean(x[1] for x in g):4.0f} W  "
           f"load {open('/proc/loadavg').read().split()[0]}")
 
 
@@ -336,7 +371,8 @@ def main() -> None:
     p.add_argument("--env", nargs="*", default=[]); p.set_defaults(fn=cmd_start)
     p = sub.add_parser("shot"); p.add_argument("name"); p.add_argument("--crop"); p.set_defaults(fn=cmd_shot)
     p = sub.add_parser("keys"); p.add_argument("keys", nargs="+"); p.set_defaults(fn=cmd_keys)
-    p = sub.add_parser("measure"); p.add_argument("tag"); p.add_argument("--seconds", type=int, default=33); p.set_defaults(fn=cmd_measure)
+    p = sub.add_parser("measure"); p.add_argument("tag"); p.add_argument("--seconds", type=int, default=33)
+    p.set_defaults(fn=cmd_measure, refresh_default=144)
     p = sub.add_parser("place"); p.add_argument("layout", choices=["all", "p", "p+helpers"]); p.set_defaults(fn=cmd_place)
     p = sub.add_parser("stop"); p.set_defaults(fn=cmd_stop)
     p = sub.add_parser("restore"); p.set_defaults(fn=cmd_restore)
