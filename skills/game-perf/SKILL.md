@@ -86,6 +86,13 @@ be running.
   (MangoHud CSVs, gamescope.log), session state in `bench.json`.
 - Key names are single characters or `Return Escape space Tab BackSpace Up Down Left Right
   Shift_L Control_L Alt_L F1 F2 F10 F11`. Anything else is rejected. Screenshot after each step.
+  `click:X,Y` clicks at game-resolution coordinates (the 1280x720 screenshot times 3 at 4K) for
+  menus that ignore the keyboard.
+- `--args` is split like a shell line, so quote a path with spaces:
+  `--args="'Z:\mnt\nvme8tb\StarCraft II\Maps\x.SC2Map'"`. An absolute `--exe` overrides the install dir.
+- Under vsync, judge the lock by `missed` (refreshes that got no new frame), not by the 1% low.
+  StarCraft II at FIFO 144 showed a 1% low of 90 and 1.7 ms jitter with 0 missed refreshes: the
+  frame queue absorbs uneven present intervals. Uncapped runs report 0 missed.
 - Games drop input sent before a menu is interactive: a `Return` sent during the splash was
   silently lost and the run measured the main menu. Wait until a screenshot shows the menu, then send keys.
 - Get to a repeatable scene: load the latest save ("Continue"), then turn the camera a fixed
@@ -207,3 +214,20 @@ top `DLSSG` line shows `2x` when FG runs. Take it out again before the final opt
 - Proton or protonfixes may already set a CPU topology (`WINE_CPU_TOPOLOGY` in `/proc/PID/environ`;
   Uncharted gets `16:0-15`). `PROTON_CPU_TOPOLOGY` loses to protonfixes, set `WINE_CPU_TOPOLOGY`
   to override.
+- A shortcut that borrows another game's prefix through `STEAM_COMPAT_DATA_PATH=...` in its launch
+  options (Mass Recall uses StarCraft II's) resolves to that prefix in `steamtools.py` and `bench.py`.
+- Games that compile shaders at runtime and save their shader list only on a clean exit
+  (StarCraft II's `ProgramData/Blizzard Entertainment/StarCraft II/Versions/Shaders*/userCache.bin`,
+  a key list, not bytecode) start cold on every bench launch, because `bench.py stop` kills them.
+  Their first fights then miss hundreds of refreshes that a warm cache does not (SC2: 283-461 cold vs
+  10 warm). Keep the list in place, or quit through the game menu, before judging hitches.
+- Keep a game's own shader-compile pool on the P-cores. Moving SC2's `shader compile` threads to the
+  E-cores made first-sight compile hitches worse (461 vs 34 missed refreshes in the same fight).
+- Custom D3D9 assets rendering solid red (StarCraft II custom maps and Mass Recall, NVIDIA 595+,
+  dxvk#5616) come from Wine's HLSL compiler. Install native `d3dx9_42` and `d3dcompiler_42` with
+  winetricks into the prefix (`WINEPREFIX=PREFIX/pfx WINE=GE/files/bin/wine WINESERVER=GE/files/bin/wineserver
+  winetricks -q d3dx9_42 d3dcompiler_42`). `d3dcompiler_42` alone changes nothing: the game compiles
+  through `d3dx9_42`, whose builtin loads Wine's `d3dcompiler_47`. Proton never overwrites a native
+  DLL in system32, so the fix survives Proton updates.
+- Battle.net replays and online modes need a Battle.net login, so the rig cannot reach them; use a
+  campaign or custom map launched through `Support64/SC2Switcher_x64.exe`.
