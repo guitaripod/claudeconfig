@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { beforeEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -99,6 +99,10 @@ function opencodeHost(reply: string, prompt = "fix the bug", parentID?: string) 
 }
 
 describe("opencode plugin", () => {
+  beforeEach(() => {
+    delete (globalThis as any)[Symbol.for("opencode.follow-through")]
+  })
+
   test("nudges once per prompt after an offer", async () => {
     const { default: plugin } = await import("../plugin/follow-through.js")
     const host = opencodeHost(OFFERS[1])
@@ -107,6 +111,17 @@ describe("opencode plugin", () => {
     await Bun.sleep(10)
     expect(host.prompts.length).toBe(1)
     expect(host.prompts[0]).toStartWith("You ended the turn offering work")
+  })
+
+  test("nudges once when the server sets the plugin up again", async () => {
+    const { default: plugin } = await import("../plugin/follow-through.js")
+    const first = opencodeHost(OFFERS[1])
+    const second = opencodeHost(OFFERS[1])
+    await plugin.setup(first.ctx)
+    await plugin.setup(second.ctx)
+    await Promise.all([first.done, second.done])
+    await Bun.sleep(10)
+    expect([...first.prompts, ...second.prompts].length).toBe(1)
   })
 
   test("leaves finished turns, child sessions and relays alone", async () => {

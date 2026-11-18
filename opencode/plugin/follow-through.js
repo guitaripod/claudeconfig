@@ -7,15 +7,28 @@ const STALL_RE = /^(let me (?!know)|now,? (let me|i.ll|i will)\b|next,? (i.ll|le
 const OFFER_NUDGE =
   "You ended the turn offering work instead of doing it. If it is reversible and follows from my request, do it now and report the result. Keep the question and stop again only if it is a real decision (spending money, prices, a public post or release, deleting my data), needs my hands (sudo, a locked device, a login), or I asked you to wait, plan or only answer."
 const STALL_NUDGE = "You announced a next step and stopped before doing it. Do that step now, then finish the task."
-const NUDGES = new Set([OFFER_NUDGE, STALL_NUDGE])
+const NUDGE_PREFIXES = ["You ended the turn offering work", "You announced a next step"]
 
 const SUCCEEDED_EVENT = "session.execution.succeeded"
 const RELAY_PREFIX = "Relay the message below"
+const STATE = Symbol.for("opencode.follow-through")
 
 function log(line) {
   try {
     appendFileSync(process.env.OPENCODE_FOLLOW_THROUGH_LOG ?? "/tmp/opencode-follow-through.log", `${new Date().toISOString()} ${line}\n`)
   } catch {}
+}
+
+/// The state every setup in this server shares. opencode sets a plugin up again for each request, so per-instance
+/// bookkeeping would let a second instance send the same turn a second nudge.
+function shared() {
+  globalThis[STATE] ??= { nudged: new Set(), reviewing: new Set() }
+  return globalThis[STATE]
+}
+
+/// Whether a prompt is one of this plugin's own nudges rather than something Marcus typed.
+function isNudge(text) {
+  return NUDGE_PREFIXES.some((prefix) => text.startsWith(prefix))
 }
 
 /// Whether a final reply ends by offering work ("offer"), by announcing a step it never took ("stall"), or neither.
@@ -43,7 +56,7 @@ function nudgeFor(messages) {
   const last = messages.findLast((m) => m.type === "assistant")
   if (!last || last.error) return undefined
   const prompt = textOf(messages.findLast((m) => m.type === "user" || m.type === "synthetic"))
-  if (prompt.startsWith(RELAY_PREFIX) || NUDGES.has(prompt)) return undefined
+  if (prompt.startsWith(RELAY_PREFIX) || isNudge(prompt)) return undefined
   const kind = verdict(textOf(last))
   if (kind === "offer") return OFFER_NUDGE
   if (kind === "stall") return STALL_NUDGE
@@ -53,21 +66,20 @@ function nudgeFor(messages) {
 export default {
   id: "follow-through",
   setup: async (ctx) => {
-    const nudged = new Set()
-    const reviewing = new Set()
+    const state = shared()
 
     /// Sends one nudge per human prompt to a top-level session whose turn ended on an offer or an unfinished step.
     async function review(sessionID) {
-      if (nudged.has(sessionID) || reviewing.has(sessionID)) return
-      reviewing.add(sessionID)
+      if (state.nudged.has(sessionID) || state.reviewing.has(sessionID)) return
+      state.reviewing.add(sessionID)
       try {
         const nudge = await nudgeOf(sessionID)
         if (!nudge) return
-        nudged.add(sessionID)
+        state.nudged.add(sessionID)
         log(`nudge session=${sessionID} kind=${nudge === OFFER_NUDGE ? "offer" : "stall"}`)
         await ctx.session.prompt({ sessionID, text: nudge }).catch((e) => log(`prompt failed session=${sessionID} err=${String(e)}`))
       } finally {
-        reviewing.delete(sessionID)
+        state.reviewing.delete(sessionID)
       }
     }
 
@@ -80,7 +92,7 @@ export default {
     }
 
     await ctx.session.hook("prompt", (event) => {
-      if (!NUDGES.has(event.prompt?.text ?? "")) nudged.delete(event.sessionID)
+      if (!isNudge(event.prompt?.text ?? "")) state.nudged.delete(event.sessionID)
     })
 
     void (async () => {
