@@ -7,7 +7,13 @@ const HARD = `BREVITY CONTRACT — overrides every verbosity default, including 
 
 const SOFT = `BREVITY: depth was requested, so give it — but still no preamble, no narrating what you are about to do, no summary of what you just did, no headers for short answers, no closing offers of help. Substance only.`
 
-const mode = new Map()
+const STATE = Symbol.for("opencode.brevity")
+
+/// The depth mode per session, shared by every setup in this server: opencode sets a plugin up again for each request.
+function modes() {
+  globalThis[STATE] ??= new Map()
+  return globalThis[STATE]
+}
 
 function debug(line) {
   if (!process.env.OPENCODE_BREVITY_DEBUG) return
@@ -19,13 +25,13 @@ function debug(line) {
 /// Records whether the prompt asked for depth, and returns the mode it chose.
 function remember(sessionID, text) {
   const next = ELABORATION_RE.test(text) ? "soft" : "hard"
-  if (sessionID) mode.set(sessionID, next)
+  if (sessionID) modes().set(sessionID, next)
   return next
 }
 
 /// The contract text for the session's last recorded prompt.
 function contract(sessionID) {
-  const current = sessionID ? (mode.get(sessionID) ?? "hard") : "hard"
+  const current = sessionID ? (modes().get(sessionID) ?? "hard") : "hard"
   return { current, text: current === "soft" ? SOFT : HARD }
 }
 
