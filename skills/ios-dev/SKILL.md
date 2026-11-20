@@ -8,8 +8,12 @@ description: Working in Marcus's iOS/macOS app projects (Xcode, xcodegen project
 ## Logger from day one
 Every mobile app persists its own diagnostics, because an agent cannot attach Xcode or Console to a phone. Pattern (reference `~/Dev/ios/golf-coach/golf-coach/Utilities/{AppLogger,LogFileWriter}.swift`, mirrored into psywave): `LogFileWriter` (append-only, size-rotated current+previous file in `Library/Logs/<app>.log`, writes serialized on a utility queue) behind an `AppLogger` facade that fans every call to OSLog **and** the file, with app-specific categories (lifecycle, generation, network, persistence, …). Route real diagnostic points (generation/import errors, lookup failures, SwiftData saves, launch) through it, never `print`/`NSLog`. Add it to any app that lacks it.
 
-## Device: iPhone Air
-devicectl name "iPhone Air", identifier `0A19DF7B-F393-5AA6-AD32-F997CC562974`, hostname `iPhone-Air.coredevice.local`. Not a simulator, not the iPhone XS, unless told. Simulator only if the Air is unreachable, and say so.
+## Test devices
+Real devices first, simulators only for sizes Marcus doesn't own (say so when you fall back). `xcrun devicectl list devices` shows what is reachable.
+- **iPhone Air**, iOS 27: devicectl `0A19DF7B-F393-5AA6-AD32-F997CC562974`, hostname `iPhone-Air.coredevice.local`, usually wireless. Whenever it is unlocked and available, every iPhone test runs on it.
+- **iPhone XS**, iOS 18.7: devicectl `D6798952-B031-588C-AFFB-FA9B46B061A3` (UDID `00008020-001958E40CC2002E`), usually wired, always on. Everyday iPhone testing and the iOS 18 floor for apps that support it.
+- **iPad Pro 11-inch M1** (usually landscape, wired, always on) and **iPad mini A20 Pro** (usually upright, wireless): see the `ipados` skill.
+A development profile must list every device it installs on: register the UDID and re-mint the profile (below) when one is missing. Never uninstall an app from a device; clean up build products and simulators after every test.
 
 ## From the Mac: manual signing + devicectl
 Automatic signing usually has no Xcode account configured. Sign manually via the ASC API: match a keychain `Apple Development` cert by SHA-1, register the device UDID, mint an `IOS_APP_DEVELOPMENT` profile for the bundle (inherits capabilities such as Sign in with Apple), and scope `CODE_SIGN_IDENTITY[sdk=iphoneos*]` + `PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]` to the app target's config only (global xcodebuild overrides break SPM targets like RevenueCat/Lottie). Install + launch with `devicectl`. Pull the app's log with the `ios-device-logs` skill.
