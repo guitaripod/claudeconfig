@@ -1,12 +1,15 @@
-import { appendFileSync } from "node:fs"
+import { appendFileSync, readFileSync } from "node:fs"
+import { homedir } from "node:os"
+import { join } from "node:path"
 
-const OFFER_RE =
-  /\b(want me to|would you like me to|do you want me to|shall i|should i (go ahead|start|proceed|push|commit|do|run|apply|add|fix|install|deploy|ship|build|make|delete|remove|merge|open|publish|re-?arm|resume|continue)|say the word|say (if|when|whether) you|say "?(resume|go|yes|continue|the word)|tell me (if|when|whether) you(.d)? (want|like|prefer)|let me know if|if you(.d| would)? (like|want|prefer),? (i|i.ll|i can|i could)|ready (to|for me to) (proceed|continue|start|go|implement|build|commit|push)|(continue|proceed)\?|need your go-?ahead|with your (ok|go-?ahead)|your call:)/i
-const STALL_RE = /^(let me (?!know)|now,? (let me|i.ll|i will)\b|next,? (i.ll|let me)\b|i.ll now\b|i will now\b)[^?]*$/i
-
-const OFFER_NUDGE =
-  "You ended the turn offering work instead of doing it. If it is reversible and follows from my request, do it now and report the result. Keep the question and stop again only if it is a real decision (spending money, prices, a public post or release, deleting my data), needs my hands (sudo, a locked device, a login), or I asked you to wait, plan or only answer."
-const STALL_NUDGE = "You announced a next step and stopped before doing it. Do that step now, then finish the task."
+/// The patterns and the words, read from the one file the Claude Code hook reads too, so the three agents can never
+/// disagree about what an offer is or what Marcus says about it.
+const RULES = JSON.parse(readFileSync(join(homedir(), "claudeconfig", "hooks", "follow-through.json"), "utf8"))
+const OFFER_RE = new RegExp(RULES.offer, "i")
+const STALL_RE = new RegExp(RULES.stall, "i")
+const STALL_EXCEPT = new RegExp(RULES.stallExcept, "i")
+const OFFER_NUDGE = RULES.offerNudge
+const STALL_NUDGE = RULES.stallNudge
 const NUDGE_PREFIXES = ["You ended the turn offering work", "You announced a next step"]
 
 const SUCCEEDED_EVENT = "session.execution.succeeded"
@@ -38,7 +41,7 @@ export function verdict(text) {
   const last = lines.at(-1) ?? ""
   if (OFFER_RE.test(tail)) return "offer"
   const sentence = last.trim().split(/(?<=[.!])\s+/).at(-1) ?? ""
-  if (last.length <= 300 && (/:\s*$/.test(last) || STALL_RE.test(sentence))) return "stall"
+  if (last.length <= 300 && (/:\s*$/.test(last) || (STALL_RE.test(sentence) && !STALL_EXCEPT.test(sentence)))) return "stall"
   return undefined
 }
 

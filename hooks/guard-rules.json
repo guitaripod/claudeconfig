@@ -1,0 +1,26 @@
+{
+  "rules": [
+    {
+      "all": [
+        "(git[ \t].*commit|gh[ \t]+(pr|release)[ \t]+(create|edit|merge))",
+        "(co-authored-by|generated with \\[?claude)"
+      ],
+      "ignoreCase": true,
+      "refusal": "Never add Co-Authored-By or 'Generated with Claude Code' to commits or PRs. Rewrite the message without the trailer."
+    },
+    {
+      "all": [
+        "((^|[;&|(])[ \t]*|[\"'])((ba|z)?sh[ \t]+)?[^ \t\"';&|]*install-macapp\\.sh"
+      ],
+      "ignoreCase": false,
+      "refusal": "Never install an ad-hoc build into /Applications. How an App Store Connect app reaches Marcus's devices is the TestFlight rule in CLAUDE.md (Autonomy). Delete the build products."
+    },
+    {
+      "all": [
+        "(systemctl[^|;&]*(restart|stop|kill|reload)[^|;&]*opencode-serve|(pkill|killall)[^|;&]*opencode|opencode[ \t]+service[ \t]+(stop|restart|set|unset))"
+      ],
+      "ignoreCase": false,
+      "refusal": "opencode-serve must never be restarted, stopped or killed from a session: it kills the in-flight turn. Make the change, then tell Marcus to hit restart in the Tailscode app."
+    }
+  ]
+}

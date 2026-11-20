@@ -1,0 +1,7 @@
+{
+  "offer": "\\b(want me to|would you like me to|do you want me to|shall i|should i (go ahead|start|proceed|push|commit|do|run|apply|add|fix|install|deploy|ship|build|make|delete|remove|merge|open|publish|re-?arm|resume|continue)|say the word|say (if|when|whether) you|say \"?(resume|go|yes|continue|the word)|tell me (if|when|whether) you(.d)? (want|like|prefer)|let me know if|if you(.d| would)? (like|want|prefer),? (i|i.ll|i can|i could)|ready (to|for me to) (proceed|continue|start|go|implement|build|commit|push)|(continue|proceed)\\?|need your go-?ahead|with your (ok|go-?ahead)|your call:)",
+  "stall": "^(let me|now,? (let me|i.ll|i will)|next,? (i.ll|let me)|i.ll now|i will now)\\b[^?]*$",
+  "stallExcept": "^let me know\\b",
+  "offerNudge": "You ended the turn offering work instead of doing it. If it is reversible and follows from my request, do it now and report the result. Keep the question and stop again only for what the Autonomy rules in CLAUDE.md leave to me (a real decision, something that needs my hands, or work they say waits for my word), or when I asked you to wait, plan or only answer.",
+  "stallNudge": "You announced a next step and stopped before doing it. Do that step now, then finish the task."
+}
