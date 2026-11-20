@@ -37,7 +37,12 @@ Everything here applies to every session on every machine. Machine-specific rule
 - A delegate gets the full spec inline and the command that proves the result, and reports that command's last output lines verbatim. Reject a result with zero tool uses or without that output, and rerun the command yourself before shipping. `hooks/delegate-check.sh` sends a delegate back once when it used no tools or edited without running a command afterwards; `delegation-report --before-after DATE` measures spend.
 
 ## iOS apps
-- Run on my iPhone Air (devicectl name "iPhone Air", id `0A19DF7B-F393-5AA6-AD32-F997CC562974`), never a simulator or the iPhone XS unless I say so.
+- Test on real devices first (`xcrun devicectl list devices`), simulators only for sizes I don't own, and clean up after every test:
+  - iPhone Air, iOS 27, devicectl `0A19DF7B-F393-5AA6-AD32-F997CC562974`, usually wireless: whenever it is unlocked and available, every iPhone test also runs on it.
+  - iPhone XS, iOS 18.7, devicectl `D6798952-B031-588C-AFFB-FA9B46B061A3`, usually wired and always on: everyday iPhone testing, and the oldest iOS for apps that support iOS 18.
+  - iPad Pro 11-inch M1, iPadOS 27, devicectl `CD771E70-8FB3-5862-B649-CC61B4493A1B`, usually wired and always on, usually held in landscape.
+  - iPad mini A20 Pro, iPadOS 27, UDID `00008160-00080C6834700036`, usually wireless, usually upright (when wired to arch: `pymobiledevice3` there).
+  - Test each iPad in the orientation it lives in, and optimise for both orientations. Never uninstall an app from a device (it wipes the data).
 - Store and marketing screenshots: frame EVERY device type (iPhone, iPhone Duo, iPad, Mac, Watch) with the `frames` CLI (`frames-cli` skill: `frames doctor` first, `frames --json info` to see the match), never a hand-drawn bezel or rounded rectangle; composition scripts call `frames` for the bezel and only add background and captions.
 - Every mobile app carries a file-based logger (`AppLogger` + `LogFileWriter`); add it to any app that lacks one. Logger pattern, signing, xtool-on-Linux and Sign in with Apple debugging: `ios-dev` skill. App Store Connect, releases and revenue: `app-store` skill.
 
