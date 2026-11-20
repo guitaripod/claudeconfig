@@ -46,6 +46,9 @@ Everything here applies to every session on every machine. Machine-specific rule
 - Store and marketing screenshots: frame EVERY device type (iPhone, iPhone Duo, iPad, Mac, Watch) with the `frames` CLI (`frames-cli` skill: `frames doctor` first, `frames --json info` to see the match), never a hand-drawn bezel or rounded rectangle; composition scripts call `frames` for the bezel and only add background and captions.
 - Every mobile app carries a file-based logger (`AppLogger` + `LogFileWriter`); add it to any app that lacks one. Logger pattern, signing, xtool-on-Linux and Sign in with Apple debugging: `ios-dev` skill. App Store Connect, releases and revenue: `app-store` skill.
 
+## Steam Deck
+- Anything that runs on the Deck (Linux apps and their Deck layouts, native ports, emulation and controller work) is tested on the real one first, like the Apple devices above: Steam Deck OLED, SteamOS 3.9, tailnet node `steamdeck`, usually online over the tailnet from either machine (`ssh deck@steamdeck`). Launch and screenshot env: memory `reference_steamdeck_ssh.md`. Never interrupt a game running on it, and clean up what the test put there.
+
 ## Media
 - Pictures, charts, decks and videos: high resolution, text big enough to read on a phone, and at least three render, look, fix passes before I see one (more when I name a number). Save finals where the machine rules say and give the absolute path.
 
