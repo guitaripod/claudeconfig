@@ -43,7 +43,7 @@ function eventFeed() {
 async function loadPlugin(holdChildren = false) {
   const waiting = new Map<string, () => void>()
   const hooks = new Map<string, (event: any) => any>()
-  const sent = { prompts: [] as any[], synthetics: [] as string[], interrupts: [] as string[], created: [] as string[] }
+  const sent = { prompts: [] as any[], synthetics: [] as string[], interrupts: [] as string[], created: [] as string[], creates: [] as any[] }
   const registered: { tool?: any; command?: any } = {}
   const feed = eventFeed()
   const childContexts: any[] = []
@@ -67,7 +67,8 @@ async function loadPlugin(holdChildren = false) {
         }
       },
       synthetic: async ({ text }: any) => void sent.synthetics.push(text),
-      create: async () => {
+      create: async (options: any) => {
+        sent.creates.push(options)
         const id = `ses_child_${sent.created.length}`
         sent.created.push(id)
         return { id }
@@ -252,5 +253,30 @@ describe("sub-agent requests", () => {
     const child = loaded.childContexts[0]
     expect(Object.keys(child.tools).sort()).toEqual(["execute", "read", "shell"])
     expect(child.system).toEqual([{ type: "text", text: "base prompt" }, CODE_MODE_BLOCK])
+  })
+})
+
+describe("workflow children", () => {
+  test("each child is titled by its workflow and tagged with the run and the call that started it", async () => {
+    const loaded = await loadPlugin()
+    const script = "export const meta = { name: 'pair' }\nphase('Fan')\nreturn await parallel([() => agent('a', { label: 'one' }), () => agent('b', { label: 'two' })])"
+    const context = { sessionID: PARENT, id: "call_77", signal: new AbortController().signal, progress: () => undefined }
+    await loaded.registered.tool.execute({ script }, context)
+    expect(loaded.sent.creates.map((c) => c.title).sort()).toEqual(["pair: one", "pair: two"])
+    const tags = loaded.sent.creates.map((c) => c.metadata.workflow)
+    expect(new Set(tags.map((t) => t.run)).size).toBe(1)
+    expect(tags[0].run).toMatch(/^wf_[0-9a-f]{12}$/)
+    expect(tags.every((t) => t.call === "call_77" && t.name === "pair" && t.phase === "Fan")).toBe(true)
+    expect(tags.map((t) => t.label).sort()).toEqual(["one", "two"])
+  })
+
+  test("a call without an id still tags its run, and two runs never share one", async () => {
+    const loaded = await loadPlugin()
+    const context = { sessionID: PARENT, signal: new AbortController().signal, progress: () => undefined }
+    await loaded.registered.tool.execute({ name: "kids" }, context)
+    await loaded.registered.tool.execute({ name: "kids" }, context)
+    const tags = loaded.sent.creates.map((c) => c.metadata.workflow)
+    expect(tags.every((t) => t.call === undefined)).toBe(true)
+    expect(tags[0].run).not.toBe(tags[1].run)
   })
 })

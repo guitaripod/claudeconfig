@@ -1,5 +1,5 @@
 import { toolDescription, ultracodeNotice } from "../../workflow-runtime/instructions.ts"
-import { findWorkflow, formatResult, hasUltracodeKeyword, invocationKey, listWorkflows, RepeatGuard, runWorkflow } from "../../workflow-runtime/runtime.ts"
+import { findWorkflow, formatResult, hasUltracodeKeyword, invocationKey, listWorkflows, newRunID, RepeatGuard, runWorkflow, workflowTag } from "../../workflow-runtime/runtime.ts"
 import type { AgentRequest, AgentResult, Meta, RunResult, Runner, WorkflowEvent } from "../../workflow-runtime/runtime.ts"
 
 interface ModelRef {
@@ -16,6 +16,7 @@ interface WorkflowInput {
 
 interface ToolContext {
   sessionID: string
+  id?: string
   signal: AbortSignal
   progress: (state: object) => Promise<void> | void
 }
@@ -253,8 +254,8 @@ export default {
       }
     }
 
-    /// Builds the runner that executes each agent() call as a child session of `parentID`.
-    async function createRunner(parentID: string, title: string): Promise<Runner> {
+    /// Builds the runner that executes each agent() call as a child session of `parentID`, each tagged with the run and the call that started it so a client can seat it on that call's card.
+    async function createRunner(parentID: string, run: string, call: string | undefined): Promise<Runner> {
       const [directory, fallbackModel, subagents] = await Promise.all([
         sessionDirectory(parentID),
         parentModel(parentID),
@@ -274,7 +275,8 @@ export default {
         async run(req: AgentRequest): Promise<AgentResult> {
           const session = await ctx.session.create({
             parentID,
-            title: `${title}: ${req.label}`,
+            title: `${req.workflow}: ${req.label}`,
+            metadata: { workflow: workflowTag(run, call, req) },
             agent: req.agentType && subagents.has(req.agentType) ? req.agentType : FALLBACK_AGENT,
             model: parseModel(req.model) ?? fallbackModel,
             location: { directory },
@@ -307,6 +309,7 @@ export default {
       args: unknown,
       signal: AbortSignal | undefined,
       progress: ((state: Progress) => Promise<void> | void) | undefined,
+      call: string | undefined,
     ): Promise<RunResult> {
       const cwd = await sessionDirectory(sessionID)
       const state: Progress = { running: 0, done: 0, failed: 0, agents: 0 }
@@ -324,7 +327,7 @@ export default {
         }
         void Promise.resolve(progress?.({ ...state })).catch(() => undefined)
       }
-      const runner = await createRunner(sessionID, source.name ?? "workflow")
+      const runner = await createRunner(sessionID, newRunID(), call)
       return runWorkflow({
         source: source.script,
         name: source.name,
@@ -367,6 +370,7 @@ export default {
               input.args,
               run.controller.signal,
               (state) => context.progress(state),
+              typeof context.id === "string" && context.id !== "" ? context.id : undefined,
             )
             return { content: guard.record(context.sessionID, key, result.ok, formatResult(result)) }
           } catch (error) {

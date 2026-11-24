@@ -15,13 +15,16 @@ import {
   invocationKey,
   listWorkflows,
   loadScript,
+  newRunID,
+  RosterKeeper,
   runWorkflow,
+  workflowTag,
 } from "./runtime"
 
 const WORKFLOWS_DIR = path.join(homedir(), "claudeconfig", "workflows")
 const GLOBALS_MESSAGE =
   "agent, parallel, pipeline, phase, log, args, budget and workflow are already defined globals: do not require, import or redeclare them."
-const SAVED = ["flyr", "hinta-best", "kaytetty-best", "verdict", "wwdc"]
+const SAVED = ["flyr", "hinta-best", "kaytetty-best", "verdict"]
 
 let root: string
 let savedEnv: Record<string, string | undefined>
@@ -129,13 +132,13 @@ return 1 + 1`
 })
 
 describe("saved workflows", () => {
-  test("all five saved workflows are listed from WORKFLOW_PATH", () => {
+  test("every saved workflow is listed from WORKFLOW_PATH", () => {
     process.env.WORKFLOW_PATH = WORKFLOWS_DIR
     try {
       const names = listWorkflows(root).map((w) => w.name)
       for (const name of SAVED) expect(names).toContain(name)
-      expect(findWorkflow("wwdc", root)).toBe(path.join(WORKFLOWS_DIR, "wwdc.js"))
-      expect(findWorkflow("wwdc.js", root)).toBe(path.join(WORKFLOWS_DIR, "wwdc.js"))
+      expect(findWorkflow("verdict", root)).toBe(path.join(WORKFLOWS_DIR, "verdict.js"))
+      expect(findWorkflow("verdict.js", root)).toBe(path.join(WORKFLOWS_DIR, "verdict.js"))
     } finally {
       delete process.env.WORKFLOW_PATH
     }
@@ -1019,5 +1022,37 @@ describe("RepeatGuard", () => {
     for (let i = 0; i < 80; i++) guard.record("s", invocationKey({ script: `s${i}` }), false, "x")
     expect(guard.record("s", invocationKey({ script: "s0" }), false, "x")).toBe("x")
     expect(guard.record("s", invocationKey({ script: "s79" }), false, "x")).toContain("already failed 1 time(s)")
+  })
+})
+
+describe("roster", () => {
+  test("follows agents from start to end with their phase, error and times", () => {
+    let clock = 1000
+    const keeper = new RosterKeeper("wf_abc", "call_1", () => clock)
+    keeper.apply({ type: "agent_start", index: 1, label: "scan", phase: "Look", running: 1, workflow: "audit" })
+    keeper.apply({ type: "agent_start", index: 2, label: "fix", running: 2 })
+    const early = keeper.snapshot()
+    clock = 2000
+    keeper.apply({ type: "agent_end", index: 2, label: "fix", ok: false, running: 1, done: 1, failed: 1, error: "boom" })
+    keeper.apply({ type: "agent_end", index: 1, label: "scan", ok: true, running: 0, done: 2, failed: 1 })
+    keeper.apply({ type: "agent_end", index: 9, label: "ghost", ok: true, running: 0, done: 3, failed: 1 })
+    const roster = keeper.snapshot()
+    expect(roster).toMatchObject({ run: "wf_abc", call: "call_1", name: "audit" })
+    expect(roster.agents).toEqual([
+      { id: "wf_abc-1", index: 1, label: "scan", phase: "Look", status: "done", startedAt: 1000, endedAt: 2000 },
+      { id: "wf_abc-2", index: 2, label: "fix", status: "failed", startedAt: 1000, endedAt: 2000, error: "boom" },
+    ])
+    expect(early.agents.map((a) => a.status)).toEqual(["running", "running"])
+  })
+
+  test("agent_start names the workflow, and tags carry only what is known", async () => {
+    const events: WorkflowEvent[] = []
+    const runner: Runner = { run: async () => ({ text: "ok" }) }
+    await runWorkflow({ source: "export const meta = { name: 'named' }\nreturn await agent('x')", runner, cwd: root, onEvent: (e) => events.push(e) })
+    expect(events.find((e) => e.type === "agent_start")).toMatchObject({ workflow: "named" })
+    const req = { prompt: "p", label: "l", workflow: "w", index: 3, signal: new AbortController().signal } as AgentRequest
+    expect(workflowTag("wf_1", undefined, req)).toEqual({ run: "wf_1", name: "w", label: "l", index: 3 })
+    expect(workflowTag("wf_1", "c", { ...req, phase: "P" })).toEqual({ run: "wf_1", call: "c", name: "w", label: "l", index: 3, phase: "P" })
+    expect(newRunID()).not.toBe(newRunID())
   })
 })

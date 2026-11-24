@@ -263,3 +263,25 @@ describe("sub-agents", () => {
     manager = undefined
   })
 })
+
+describe("workflow roster", () => {
+  test("live updates and the result carry the run's agents under the call that started it", async () => {
+    const loaded = loadExtension()
+    const updates: any[] = []
+    const result = await loaded.registered.tool.execute(
+      "call_9",
+      { name: "kids" },
+      new AbortController().signal,
+      (update: any) => updates.push(update),
+      loaded.ctx,
+    )
+    const last = updates.at(-1).details.workflow
+    expect(last.call).toBe("call_9")
+    expect(last.run).toMatch(/^wf_[0-9a-f]{12}$/)
+    expect(last.agents).toHaveLength(1)
+    expect(last.agents[0]).toMatchObject({ id: `${last.run}-1`, label: expect.any(String), status: "done" })
+    expect(updates[0].details.workflow.agents[0].status).toBe("running")
+    expect(result.details.workflow).toMatchObject({ run: last.run, call: "call_9", name: "kids" })
+    expect(result.details.workflow.agents[0].status).toBe("done")
+  })
+})

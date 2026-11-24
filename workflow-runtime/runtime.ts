@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
@@ -35,7 +35,7 @@ export interface Runner {
 export type WorkflowEvent =
   | { type: "phase"; title: string }
   | { type: "log"; message: string }
-  | { type: "agent_start"; index: number; label: string; phase?: string; running: number }
+  | { type: "agent_start"; index: number; label: string; phase?: string; running: number; workflow?: string }
   | {
       type: "agent_end"
       index: number
@@ -538,7 +538,7 @@ async function runAgent(
     recordAbortedAgent(state, index, label, e)
     throw e
   }
-  state.emit({ type: "agent_start", index, label, phase, running: state.semaphore.inUse })
+  state.emit({ type: "agent_start", index, label, phase, running: state.semaphore.inUse, workflow: workflowName })
   let outcome: Outcome
   try {
     outcome = await executeAgent(state, request)
@@ -801,6 +801,93 @@ export function formatResult(r: RunResult): string {
   const footer = `workflow ${r.name}: ${r.agents} agents, ${r.failed} failed, ${(r.durationMs / 1000).toFixed(1)}s`
   const problems = r.logs.filter((line) => /fail|error/i.test(line))
   return [body, "", footer, ...problems].join("\n")
+}
+
+/// What a client is told about the run a workflow tool call is driving: the run's id, the call that
+/// started it, the workflow's name and every agent fanned out so far. The keys are read by every
+/// installed Tailscode through the bridge or the session it lands on, so they are added to and
+/// never renamed.
+export interface WorkflowRoster {
+  run: string
+  call?: string
+  name?: string
+  agents: RosterAgent[]
+}
+
+export interface RosterAgent {
+  id: string
+  index: number
+  label: string
+  phase?: string
+  status: "running" | "done" | "failed"
+  startedAt: number
+  endedAt?: number
+  error?: string
+}
+
+/// The tag a workflow's child session carries, so a client can seat the child on the card of the
+/// call that fanned it out instead of guessing from the clock.
+export interface WorkflowTag {
+  run: string
+  call?: string
+  name: string
+  label: string
+  index: number
+  phase?: string
+}
+
+/// A fresh id for one workflow run, in the shape Claude Code's own runs use.
+export function newRunID(): string {
+  return `wf_${randomUUID().replaceAll("-", "").slice(0, 12)}`
+}
+
+export function workflowTag(run: string, call: string | undefined, req: AgentRequest): WorkflowTag {
+  const tag: WorkflowTag = { run, name: req.workflow, label: req.label, index: req.index }
+  if (call) tag.call = call
+  if (req.phase) tag.phase = req.phase
+  return tag
+}
+
+/// Keeps a run's roster from the events the runtime emits, for a harness whose child sessions no
+/// client can list.
+export class RosterKeeper {
+  readonly #roster: WorkflowRoster
+  readonly #agents = new Map<number, RosterAgent>()
+  readonly #now: () => number
+
+  constructor(run: string, call?: string, now: () => number = Date.now) {
+    this.#roster = { run, agents: [] }
+    if (call) this.#roster.call = call
+    this.#now = now
+  }
+
+  apply(event: WorkflowEvent): void {
+    if (event.type === "agent_start") {
+      if (event.workflow) this.#roster.name = event.workflow
+      const agent: RosterAgent = {
+        id: `${this.#roster.run}-${event.index}`,
+        index: event.index,
+        label: event.label,
+        status: "running",
+        startedAt: this.#now(),
+      }
+      if (event.phase) agent.phase = event.phase
+      this.#agents.set(event.index, agent)
+    }
+    if (event.type === "agent_end") {
+      const agent = this.#agents.get(event.index)
+      if (!agent) return
+      agent.status = event.ok ? "done" : "failed"
+      agent.endedAt = this.#now()
+      if (event.error) agent.error = event.error
+    }
+  }
+
+  /// A detached copy, so a consumer holding an earlier snapshot never sees it change.
+  snapshot(): WorkflowRoster {
+    const agents = [...this.#agents.values()].sort((a, b) => a.index - b.index).map((agent) => ({ ...agent }))
+    return { ...this.#roster, agents }
+  }
 }
 
 export function hasUltracodeKeyword(text: string): boolean {

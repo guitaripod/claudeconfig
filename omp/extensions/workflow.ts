@@ -9,10 +9,13 @@ import {
 	hasUltracodeKeyword,
 	invocationKey,
 	listWorkflows,
+	newRunID,
 	RepeatGuard,
+	RosterKeeper,
 	type RunResult,
 	runWorkflow,
 	type WorkflowEvent,
+	type WorkflowRoster,
 } from "../../workflow-runtime/runtime.ts";
 
 type AgentSession = Awaited<ReturnType<ExtensionAPI["pi"]["createAgentSession"]>>["session"];
@@ -300,7 +303,8 @@ async function execute(
 	ctx: ExtensionContext,
 	invocation: Invocation,
 	outer: AbortSignal | undefined,
-	onProgress: ((text: string) => void) | undefined,
+	roster: RosterKeeper,
+	onProgress: ((text: string, roster: WorkflowRoster) => void) | undefined,
 ): Promise<RunResult> {
 	const controller = new AbortController();
 	const forward = () => controller.abort();
@@ -316,7 +320,8 @@ async function execute(
 			runner: { nativeSchema: true, run: req => runChild(pi, instance, ctx, req) },
 			onEvent: event => {
 				applyEvent(progress, event);
-				onProgress?.(describeProgress(progress));
+				roster.apply(event);
+				if (event.type !== "log") onProgress?.(describeProgress(progress), roster.snapshot());
 			},
 		});
 	} finally {
@@ -345,7 +350,7 @@ function registerWorkflowTool(pi: ExtensionAPI, instance: Instance): void {
 			name: z.string().optional().describe("Name of a saved workflow to run. Give this or script."),
 			args: z.any().optional().describe("Value passed to the script as args."),
 		}),
-		async execute(_toolCallId, params, signal, onUpdate, ctx) {
+		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			if (isSubagent(ctx)) return textResult(SUBAGENT_REFUSAL, true);
 			const sessionId = ctx.sessionManager.getSessionId();
 			const input = effectiveInput(instance, sessionId, params as ToolInput);
@@ -353,11 +358,16 @@ function registerWorkflowTool(pi: ExtensionAPI, instance: Instance): void {
 			if (typeof invocation === "string") return textResult(invocation, true);
 			const refusal = instance.guard.refusal(sessionId);
 			if (refusal) return textResult(refusal, true);
-			const result = await execute(pi, instance, ctx, invocation, signal, text =>
-				onUpdate?.({ content: [{ type: "text", text }] }),
+			const roster = new RosterKeeper(newRunID(), toolCallId || undefined);
+			const result = await execute(pi, instance, ctx, invocation, signal, roster, (text, workflow) =>
+				onUpdate?.({ content: [{ type: "text", text }], details: { workflow } }),
 			);
 			const text = instance.guard.record(sessionId, invocationKey(input), result.ok, formatResult(result));
-			return { ...textResult(text, !result.ok), details: { agents: result.agents, failed: result.failed } };
+			const workflow = { ...roster.snapshot(), name: result.name };
+			return {
+				...textResult(text, !result.ok),
+				details: { agents: result.agents, failed: result.failed, workflow },
+			};
 		},
 	});
 }
