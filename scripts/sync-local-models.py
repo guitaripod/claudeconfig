@@ -102,10 +102,11 @@ STYLES = {
     "qwen": {
         "variants": _qwen_variants,
         "efforts": ["low", "medium", "xhigh"],
-        "output": 65536,
+        "output": 32768,
         "format": "qwen-chat-template",
         "qwen_effort": True,
         "llama_cpp_budget": True,
+        "tokenizer": "qwen3",
     },
     "muse": {
         "variants": _muse_variants,
@@ -267,6 +268,8 @@ def _omp_overrides(models: dict[str, dict]) -> dict:
         entry["contextWindow"] = meta["context"]
         entry["maxTokens"] = profile["output"]
         entry["input"] = ["text", "image"] if meta["vision"] else ["text"]
+        if profile.get("tokenizer"):
+            entry["tokenizer"] = profile["tokenizer"]
         compat = {
             "thinkingFormat": profile["format"],
             "reasoningContentField": "reasoning" if meta["vllm"] else "reasoning_content",
