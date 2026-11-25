@@ -103,20 +103,29 @@ describe("opencode plugin", () => {
     delete (globalThis as any)[Symbol.for("opencode.follow-through")]
   })
 
-  test("nudges once per prompt after an offer", async () => {
+  test("leaves an offered turn alone", async () => {
     const { default: plugin } = await import("../plugin/follow-through.js")
     const host = opencodeHost(OFFERS[1])
     await plugin.setup(host.ctx)
     await host.done
     await Bun.sleep(10)
+    expect(host.prompts).toEqual([])
+  })
+
+  test("nudges once after an announced step", async () => {
+    const { default: plugin } = await import("../plugin/follow-through.js")
+    const host = opencodeHost(STALLS[0])
+    await plugin.setup(host.ctx)
+    await host.done
+    await Bun.sleep(10)
     expect(host.prompts.length).toBe(1)
-    expect(host.prompts[0]).toStartWith("You ended the turn offering work")
+    expect(host.prompts[0]).toStartWith("You announced a next step")
   })
 
   test("nudges once when the server sets the plugin up again", async () => {
     const { default: plugin } = await import("../plugin/follow-through.js")
-    const first = opencodeHost(OFFERS[1])
-    const second = opencodeHost(OFFERS[1])
+    const first = opencodeHost(STALLS[0])
+    const second = opencodeHost(STALLS[0])
     await plugin.setup(first.ctx)
     await plugin.setup(second.ctx)
     await Promise.all([first.done, second.done])

@@ -8,7 +8,6 @@ const RULES = JSON.parse(readFileSync(join(homedir(), "claudeconfig", "hooks", "
 const OFFER_RE = new RegExp(RULES.offer, "i")
 const STALL_RE = new RegExp(RULES.stall, "i")
 const STALL_EXCEPT = new RegExp(RULES.stallExcept, "i")
-const OFFER_NUDGE = RULES.offerNudge
 const STALL_NUDGE = RULES.stallNudge
 const NUDGE_PREFIXES = ["You ended the turn offering work", "You announced a next step"]
 
@@ -54,15 +53,14 @@ function textOf(message) {
     .join("\n")
 }
 
-/// The prompt a finished turn earns, or undefined when it ended properly or was a relay.
+/// The prompt a finished turn earns, or undefined when it ended properly or was a relay. opencode only nudges an
+/// unfinished step: the offer nudge stays a Claude Code hook in this server, where it arrives as Marcus's own prompt.
 function nudgeFor(messages) {
   const last = messages.findLast((m) => m.type === "assistant")
   if (!last || last.error) return undefined
   const prompt = textOf(messages.findLast((m) => m.type === "user" || m.type === "synthetic"))
   if (prompt.startsWith(RELAY_PREFIX) || isNudge(prompt)) return undefined
-  const kind = verdict(textOf(last))
-  if (kind === "offer") return OFFER_NUDGE
-  if (kind === "stall") return STALL_NUDGE
+  if (verdict(textOf(last)) === "stall") return STALL_NUDGE
   return undefined
 }
 
@@ -71,7 +69,7 @@ export default {
   setup: async (ctx) => {
     const state = shared()
 
-    /// Sends one nudge per human prompt to a top-level session whose turn ended on an offer or an unfinished step.
+    /// Sends one nudge per human prompt to a top-level session whose turn ended before doing the step it announced.
     async function review(sessionID) {
       if (state.nudged.has(sessionID) || state.reviewing.has(sessionID)) return
       state.reviewing.add(sessionID)
@@ -79,7 +77,7 @@ export default {
         const nudge = await nudgeOf(sessionID)
         if (!nudge) return
         state.nudged.add(sessionID)
-        log(`nudge session=${sessionID} kind=${nudge === OFFER_NUDGE ? "offer" : "stall"}`)
+        log(`nudge session=${sessionID}`)
         await ctx.session.prompt({ sessionID, text: nudge }).catch((e) => log(`prompt failed session=${sessionID} err=${String(e)}`))
       } finally {
         state.reviewing.delete(sessionID)
