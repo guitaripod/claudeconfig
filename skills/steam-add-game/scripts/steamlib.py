@@ -83,9 +83,24 @@ def game_running(exe_name: str) -> bool:
                           stdout=subprocess.DEVNULL).returncode == 0
 
 
+def steam_game_running() -> bool:
+    """True while any Steam-launched game is alive: its `reaper SteamLaunch` process, judged by
+    argv so a shell that merely quotes those words never counts."""
+    for pid in filter(str.isdigit, os.listdir('/proc')):
+        try:
+            argv = open(f'/proc/{pid}/cmdline', 'rb').read().split(b'\0')
+        except OSError:
+            continue
+        if len(argv) > 1 and argv[0].endswith(b'/reaper') and argv[1] == b'SteamLaunch':
+            return True
+    return False
+
+
 def stop_steam(timeout: int = 120) -> bool:
     if not steam_running():
         return True
+    if steam_game_running():
+        raise SystemExit('a Steam game is running (Marcus may be playing); refusing to stop Steam')
     subprocess.run(['steam', '-shutdown'], stdout=subprocess.DEVNULL,
                    stderr=subprocess.DEVNULL)
     deadline = time.time() + timeout

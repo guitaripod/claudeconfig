@@ -23,7 +23,8 @@ Not for owned Steam games that just need installing — that's the client's job.
    `config.vdf` are all rewritten from memory when Steam exits, silently discarding any
    edit made while it was up. Every write here must be: stop Steam → edit → start Steam →
    re-read the file to confirm the values survived. `steamlib.require_steam_stopped()`
-   enforces the first half; you must still do the read-back.
+   enforces the first half; you must still do the read-back. `steamlib.stop_steam()`
+   refuses while any Steam game runs: a shortcut write once closed a SWTOR session mid-play.
 2. **The appid is a hash, not a counter.**
    `zlib.crc32(exe_with_surrounding_quotes + appname) | 0x80000000`. Renaming the entry
    or moving the exe changes it and orphans the artwork. To launch:

@@ -140,10 +140,12 @@ def main():
     p.add_argument('--user')
     p.add_argument('--apply', action='store_true')
     sub = p.add_subparsers(dest='cmd', required=True)
+    writes = argparse.ArgumentParser(add_help=False)
+    writes.add_argument('--apply', action='store_true', default=argparse.SUPPRESS)
 
     sub.add_parser('list').set_defaults(fn=cmd_list)
 
-    a = sub.add_parser('add')
+    a = sub.add_parser('add', parents=[writes])
     a.add_argument('--name', required=True)
     a.add_argument('--exe', required=True)
     a.add_argument('--dir')
@@ -152,18 +154,18 @@ def main():
     a.add_argument('--proton')
     a.set_defaults(fn=cmd_add)
 
-    sl = sub.add_parser('set-launch')
+    sl = sub.add_parser('set-launch', parents=[writes])
     sl.add_argument('--appid')
     sl.add_argument('--steam-appid')
     sl.add_argument('--launch', required=True)
     sl.set_defaults(fn=cmd_set_launch)
 
-    i = sub.add_parser('set-icon')
+    i = sub.add_parser('set-icon', parents=[writes])
     i.add_argument('--appid', required=True)
     i.add_argument('--icon')
     i.set_defaults(fn=cmd_set_icon)
 
-    c = sub.add_parser('set-proton')
+    c = sub.add_parser('set-proton', parents=[writes])
     c.add_argument('--appid', required=True)
     c.add_argument('--proton', required=True)
     c.set_defaults(fn=cmd_set_proton)
