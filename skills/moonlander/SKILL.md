@@ -29,6 +29,7 @@ Each layer lists 72 keys row by row, left half then right half: rows 0 to 2 have
 ## Traps
 
 - Local builds and Oryx now diverge: Oryx shows the last pulled revision, not the flashed firmware. `zapp update`, `zapp flash <oryx url>` and Keymapp's flash all put Oryx's version back over local edits; never run them unless he asks to go back to Oryx.
+- Baton Pass (`mac_layer = 1` in `~/.config/baton-pass/config.toml`) pairs over Oryx raw HID and holds layer 1 while input is on the Mac, so layer 1 stays the macOS layer and `ORYX_ENABLE = yes` stays in `rules.mk`.
 - `config.h` keeps `SERIAL_NUMBER "x60G0/y70no"` so `status` and Keymapp still identify the layout; Keymapp's layout picture is then stale after local edits.
 - First flash on a machine needs the udev rules once (`sudo`, his hands): `sudo cp ~/Dev/moonlander/udev/50-zsa.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger`. arch has them when `/etc/udev/rules.d/50-zsa.rules` exists.
 - The toolchain image `moonlander-qmk:firmware24` and the fork clone are what builds run from; keep them. A new Oryx QMK version (`qmkVersion` 25) clones `firmware25` and builds a new image on the next `build`; remove the old pair then.
