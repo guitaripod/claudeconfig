@@ -16,6 +16,8 @@ tiers:
   t2:
     label: cheap cloud
     chain:
+      - runner: opencode
+        model: opencode-go/deepseek-v4.1-flash
       - runner: omp
         model: ollama-cloud/glm-5.3-flash
         thinking: low
@@ -47,6 +49,9 @@ classes:
   strings:
     tier: t1
     ceiling: t2
+  l10n:
+    tier: t2
+    ceiling: t3
   docs:
     tier: t1
     ceiling: t2

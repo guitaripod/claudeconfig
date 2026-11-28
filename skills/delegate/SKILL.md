@@ -13,6 +13,8 @@ YAML at `<repo>/.delegate/packets/<ulid>.yml`. Three fields matter most:
 - `paths` — allowed paths/globs the worker may create or modify. Empty means unrestricted — always set it.
 - `verify` — shell command run in the isolated worktree after the worker finishes; exit 0 passes. Leaving it unset (or using a class with `verified: false`) means nothing checks the work.
 
+`answer` (`{file, input}`) makes the packet a function instead of an edit, for work that is strings in, strings out (translations, release notes per locale, classifying rows): `read` files and the JSON `input` are carried in the prompt, the worker replies with one JSON document and edits nothing, and delegate writes that reply to `file` with keys sorted. Before `verify` runs it refuses a reply with no JSON, a worker that changed a file, and an answer that does not carry exactly the input's keys (an array: as many items). `verify` finds the file in `$DELEGATE_ANSWER` and may fold it into what ships (`scripts/l10n-check.py --add "$DELEGATE_ANSWER"`); list those files in `paths` too. Ask only for what is missing, pin terms in a glossary the packet `read`s, and never use an agent packet for this kind of work.
+
 Other fields: `class` (selects tier/ceiling/verify defaults below), `id` (ULID, auto-assigned), `tier`/`ceiling` (override the class), `mode` (normal/conserve/rush), `effort` (low/medium/high), `timeout` (seconds, worker and verifier each), `attempts` (per tier before escalating), `read` (files the worker should read before starting), `notes` (free-form context appended to the worker prompt), `repo` (defaults to cwd when run). Full JSON schema: `delegate schema`.
 
 ## Classes (default tier → ceiling)
@@ -23,13 +25,14 @@ Other fields: `class` (selects tier/ceiling/verify defaults below), `id` (ULID, 
 | rust-impl | t1 | t3 | `cargo build && cargo clippy --all-targets -- -D warnings && cargo test` |
 | swift-impl | t2 | t3 | — |
 | strings | t1 | t2 | — |
+| l10n | t2 | t3 | — |
 | docs | t1 | t2 | unverified |
 | review | t3 | t3 | unverified |
 
-Tiers: t1 local (llama-swap Qwen 27B), t2 cheap cloud (ollama-cloud glm-5.3-flash, Kimi K2.6 as failover), t3 frontier (Claude Fable 5.1 through Claude Code headless on the user's subscription). `delegate tiers` shows the resolved chain plus live health on this host.
+Tiers: t1 local (llama-swap Qwen 27B), t2 cheap cloud (DeepSeek V4.1 Flash on the OpenCode Go plan through the `opencode` runner, then ollama-cloud glm-5.3-flash and Kimi K2.6 as failover), t3 frontier (Claude Fable 5.1 through Claude Code headless on the user's subscription). `delegate tiers` shows the resolved chain plus live health on this host.
 
 ## CLI
-- `delegate new --class <c> --goal <text> [--path <p>]... [--verify <cmd>] [--read <file>]... [--notes <text>] [--tier <t>] [--ceiling <t>] [--mode normal|conserve|rush] [--effort low|medium|high] [--timeout <secs>] [--attempts <n>] [--repo <dir>] [-o <file>] [--edit] [--run]` — prints the packet path.
+- `delegate new --class <c> --goal <text> [--path <p>]... [--verify <cmd>] [--read <file>]... [--notes <text>] [--answer <file> [--input <file>]] [--tier <t>] [--ceiling <t>] [--mode normal|conserve|rush] [--effort low|medium|high] [--timeout <secs>] [--attempts <n>] [--repo <dir>] [-o <file>] [--edit] [--run]` — prints the packet path.
 - `delegate run <packet.yml> [--tier t] [--ceiling t] [--mode m] [--attempts n] [--json] [-y]` — streams events: human lines, or with `--json` one JSON object per line (`run_id`, `seq`, `ts`, `kind`, plus per-kind fields). Kinds: `run_started`, `tier_selected`, `tier_skipped`, `attempt_started`, `progress`, `attempt_finished` (tier, attempt, status, verify_exit, duration_ms, tokens_in/out, changed_files, scope_violations, verify_tail, worker_summary), `approval_required`, `approval_resolved`, `escalated` (from, to, reason), `applied` (files, patch_bytes), `run_finished` (status: passed/failed/held/cancelled/error, passed_tier, escalations, duration_ms, summary). Exit 0 passed, 1 failed/held/cancelled, 2 error. Non-TTY runs need `-y`.
 - `delegate replay <run-id> [--tier t] ...` — re-run a stored run's packet, optionally on another tier.
 - `delegate log [--limit n] [--json]` — recent runs.
