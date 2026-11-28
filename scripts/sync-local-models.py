@@ -24,6 +24,12 @@ Per model, llama-swap holds:
                  can switch thinking off and is implied by requiresEffort, so
                  omp's schema never sees it
 
+The engine a descriptor names (llama.cpp, vLLM, SGLang) is also the opencode
+provider the model is listed under, because llama-swap fronts several engines on
+one port and a row has to say which one runs it: `llama-server` for llama.cpp and
+vLLM, `sglang` for SGLang. omp reaches llama-swap directly, so it has one provider
+whatever the engine.
+
 Run with --check to see what would change without writing.
 """
 import argparse
@@ -43,6 +49,17 @@ OMP_MODELS = Path.home() / ".omp/agent/models.yml"
 BLACKWALL_MODELS = Path.home() / ".config/blackwall/models.toml"
 PROVIDER = "llama-server"
 OMP_PROVIDER = "llama-swap"
+BASE_URL = "http://localhost:8081/v1"
+
+# A model is served by whichever engine its descriptor names, and the engine is what the picker
+# has to say under the row: llama-swap fronts several of them on one port, so one provider block
+# for all of them labelled an SGLang model "llama.cpp". Keys are the descriptor's engine word.
+ENGINE_PROVIDERS = {
+    "llama.cpp": ("llama-server", "Llama Server (local)"),
+    "vLLM": ("llama-server", "Llama Server (local)"),
+    "SGLang": ("sglang", "SGLang (local)"),
+}
+OWNED_PROVIDERS = {provider_id for provider_id, _ in ENGINE_PROVIDERS.values()}
 NAME_LIMIT = 16
 
 QWEN_BUDGET = {
@@ -231,30 +248,56 @@ def _discover(config_path: Path) -> dict[str, dict]:
     return models
 
 
+def _engine(meta: dict) -> str:
+    """The serving engine a model's descriptor names: the one word that says who runs it."""
+    for word in ENGINE_PROVIDERS:
+        if word.lower() in meta["description"].lower():
+            return word
+    raise SystemExit(
+        f"{meta['name']}: descriptor {meta['description']!r} names no engine "
+        f"({', '.join(ENGINE_PROVIDERS)})"
+    )
+
+
 def _opencode_models(models: dict[str, dict]) -> dict:
     out = {}
     for meta in models.values():
         if not meta["opencode"]:
             continue
-        profile = meta["style"]
-        entry = {
-            "name": meta["name"],
-            "reasoning": True,
-            "tool_call": True,
-            "attachment": meta["vision"],
-            "limit": {"context": meta["context"], "output": profile["output"]},
-            "modalities": {
-                "input": ["text", "image"] if meta["vision"] else ["text"],
-                "output": ["text"],
-            },
-        }
-        variants = profile["variants"]()
-        if profile.get("llama_cpp_budget") and meta["llama_cpp"]:
-            variants["think"].update(QWEN_BUDGET)
-        if variants:
-            entry["variants"] = variants
-        out[meta["opencode_id"]] = entry
+        out[meta["opencode_id"]] = _opencode_entry(meta)
     return out
+
+
+def _opencode_providers(models: dict[str, dict]) -> dict[str, dict]:
+    """One provider block per serving engine, each holding the models that engine runs."""
+    groups: dict[str, dict] = {}
+    for meta in models.values():
+        if not meta["opencode"]:
+            continue
+        provider_id = ENGINE_PROVIDERS[_engine(meta)][0]
+        groups.setdefault(provider_id, {})[meta["opencode_id"]] = _opencode_entry(meta)
+    return groups
+
+
+def _opencode_entry(meta: dict) -> dict:
+    profile = meta["style"]
+    entry = {
+        "name": meta["name"],
+        "reasoning": True,
+        "tool_call": True,
+        "attachment": meta["vision"],
+        "limit": {"context": meta["context"], "output": profile["output"]},
+        "modalities": {
+            "input": ["text", "image"] if meta["vision"] else ["text"],
+            "output": ["text"],
+        },
+    }
+    variants = profile["variants"]()
+    if profile.get("llama_cpp_budget") and meta["llama_cpp"]:
+        variants["think"].update(QWEN_BUDGET)
+    if variants:
+        entry["variants"] = variants
+    return entry
 
 
 def _omp_overrides(models: dict[str, dict]) -> dict:
@@ -299,15 +342,21 @@ def _json_text(data: dict) -> str:
 def _planned_files(models: dict[str, dict]) -> dict[Path, str]:
     """The new text of every file this script owns, keyed by path."""
     local = json.loads(OPENCODE_LOCAL.read_text())
-    provider = local.setdefault("provider", {}).setdefault(PROVIDER, {})
-    provider.setdefault("npm", "@ai-sdk/openai-compatible")
-    provider.setdefault("name", "Llama Server (local)")
-    provider.setdefault("options", {"baseURL": "http://localhost:8081/v1"})
-    provider["models"] = _opencode_models(models)
+    providers = local.setdefault("provider", {})
+    groups = _opencode_providers(models)
+    for provider_id, name in set(ENGINE_PROVIDERS.values()):
+        if provider_id in groups:
+            block = providers.setdefault(provider_id, {})
+            block.setdefault("npm", "@ai-sdk/openai-compatible")
+            block["name"] = name
+            block.setdefault("options", {"baseURL": BASE_URL})
+            block["models"] = groups[provider_id]
+        elif provider_id in providers:
+            providers.pop(provider_id)
     planned = {OPENCODE_LOCAL: _json_text(local)}
 
     shared = json.loads(OPENCODE_SHARED.read_text())
-    if shared.get("provider", {}).pop(PROVIDER, None) is not None:
+    if any(shared.get("provider", {}).pop(owned, None) is not None for owned in OWNED_PROVIDERS):
         planned[OPENCODE_SHARED] = _json_text(shared)
 
     omp = yaml.safe_load(OMP_MODELS.read_text())
