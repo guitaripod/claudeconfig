@@ -10,14 +10,14 @@ description: Change Marcus's ZSA Moonlander keyboard layout (keys, layers, tap d
 ```sh
 moonlander status   # keyboard serial (Oryx layout/revision), repo origin, Oryx latest
 moonlander pull     # overwrite keymap/ with Oryx's latest revision (--revision ID for another)
-moonlander build    # compile to /mnt/nvme8tb/moonlander/moonlander.bin; compiler errors on stderr
+moonlander build    # compile to ~/.local/share/moonlander/moonlander.bin (a link to /mnt/nvme8tb/moonlander on arch); compiler errors on stderr
 moonlander flash    # zapp waits for the bootloader, then flashes
 ```
 
 ## Workflow
 
 1. `moonlander status`. If `oryx_latest.revision` differs from `repo.oryx.revision`, he edited in Oryx since the last pull: ask before `pull`, it replaces local edits (git keeps them).
-2. Edit `keymap/keymap.c` (and `config.h`, `rules.mk` for features). Keycodes are QMK's, from ZSA's fork at the branch in `oryx.json` (`firmware24` for `qmkVersion` 24): `/mnt/nvme8tb/moonlander/qmk-firmware24/quantum/keycodes.h` and `docs/` there. The no-comments rule applies here too.
+2. Edit `keymap/keymap.c` (and `config.h`, `rules.mk` for features). Keycodes are QMK's, from ZSA's fork at the branch in `oryx.json` (`firmware24` for `qmkVersion` 24): `~/.local/share/moonlander/qmk-firmware24/quantum/keycodes.h` and `docs/` there. The no-comments rule applies here too.
 3. `moonlander build` until it passes. A build that passes is the only proof an edit is valid.
 4. Commit the keymap change in `~/Dev/moonlander` and push.
 5. `moonlander flash` needs his hands: he holds the layer-2 key (`MO(2)`) and taps the top-right key of the right half (`QK_BOOT`), or presses the reset pinhole. Run it in the background, tell him to press it, and confirm zapp's success line. Afterwards `zapp devices` shows the keyboard back in normal mode.
